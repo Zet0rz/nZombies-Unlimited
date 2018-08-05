@@ -1,0 +1,19 @@
+"nzombies-unlimited"
+{
+	"base"		"base"
+    "title"  "nZombies Unlimited"
+    "version"   "0.0.1"
+    "menusystem"	"1"
+    "maps"	"^nz_"
+
+    "author_name"   "Alig96, Zet0r, Lolle"
+    "author_email"  ""
+
+    "icon"  ""
+    "info"  ""
+    "hide"  "0"
+
+	"settings"
+	{
+	}
+}
