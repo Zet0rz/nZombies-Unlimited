@@ -1,4 +1,10 @@
 
+-- Temporary to try another structure
+if true then
+	AddCSLuaFile("nzombies-unlimited/core/loader.lua")
+	include("nzombies-unlimited/core/loader.lua")
+return end
+
 local mode = engine.ActiveGamemode()
 print("Running NZ Lua: ", mode)
 if mode ~= "sandbox" and mode ~= "base" then return end

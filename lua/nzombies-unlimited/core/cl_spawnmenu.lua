@@ -1,94 +1,32 @@
 
 local tabname = "nZombies Unlimited"
 
+local tab
 local tabs = {}
-tabs["Entities"] = {func = function(pnl)
-	local ctrl = vgui.Create("SpawnmenuContentPanel", sh)
-	ctrl:EnableSearch("nzu", "PopulateNZU")
-	ctrl:CallPopulateHook("PopulateNZU")
-	return ctrl
-end, icon = "icon16/control_repeat_blue.png", tooltip = "nZombies Entities"}
+function nzu.AddSpawnmenuTab(name, paneltype, func, icon, tooltip)
+	if tabs[name] and IsValid(tabs[name].panel) then
+		for k,v in pairs(tabs[name].panel:GetChildren()) do v:Remove() end
+		func(tabs[name].panel)
+		return
+	end
 
-function NZ:AddTab(name, panelfunc, icon, tooltip)
-	tabs[name] = {func = panelfunc, icon = icon, tooltip = tooltip}
+	tabs[name] = {type = paneltype, func = func, icon = icon, tooltip = tooltip}
+	if IsValid(tab) then
+		local p = vgui.Create(paneltype, tab)
+		func(p)
+		tab:AddSheet(name, p, icon, false, false, tooltip)
+		tabs[name].panel = p
+	end
 end
 
-hook.Add("PopulateNZU", "AddNZUContent", function(pnlContent, tree, node)
-
-	-- Get a list of available NPCs
-	local NPCList = list.Get( "NPC" )
-
-	-- Categorize them
-	local Categories = {}
-	for k, v in pairs( NPCList ) do
-
-		local Category = v.Category or "Other"
-		local Tab = Categories[ Category ] or {}
-
-		Tab[ k ] = v
-
-		Categories[ Category ] = Tab
-
-	end
-
-	-- Create an icon for each one and put them on the panel
-	for CategoryName, v in SortedPairs( Categories ) do
-
-		-- Add a node to the tree
-		local node = tree:AddNode( CategoryName, "icon16/monkey.png" )
-
-		-- When we click on the node - populate it using this function
-		node.DoPopulate = function( self )
-
-			-- If we've already populated it - forget it.
-			if ( self.PropPanel ) then return end
-
-			-- Create the container panel
-			self.PropPanel = vgui.Create( "ContentContainer", pnlContent )
-			self.PropPanel:SetVisible( false )
-			self.PropPanel:SetTriggerSpawnlistChange( false )
-
-			for name, ent in SortedPairsByMemberValue( v, "Name" ) do
-
-				spawnmenu.CreateContentIcon( ent.ScriptedEntityType or "npc", self.PropPanel, {
-					nicename	= ent.Name or name,
-					spawnname	= name,
-					material	= "entities/" .. name .. ".png",
-					weapon		= ent.Weapons,
-					admin		= ent.AdminOnly
-				} )
-
-			end
-
-		end
-
-		-- If we click on the node populate it and switch to it.
-		node.DoClick = function( self )
-
-			self:DoPopulate()
-			pnlContent:SwitchPanel( self.PropPanel )
-
-		end
-
-	end
-
-	-- Select the first node
-	local FirstNode = tree:Root():GetChildNode(0)
-	if (IsValid(FirstNode)) then
-		FirstNode:InternalDoClick()
-	end
-
-end)
-
 spawnmenu.AddCreationTab(tabname, function()
-	local sh = vgui.Create("DPropertySheet")
+	tab = vgui.Create("DPropertySheet")
 	for k,v in pairs(tabs) do
-		local pnl = v.func(sh)
-		sh:AddSheet(k, pnl, v.icon, false, false, v.tooltip)
+		local p = vgui.Create(v.type, tab)
+		v.func(p)
+		tab:AddSheet(k, p, v.icon, false, false, v.tooltip)
+		v.panel = p
 	end
-	sh:SetSkin("nZombies Unlimited")
-	
-	return sh
-
-end, "icon16/control_repeat_blue.png", 1000, "nZombies Unlimited: Entities, Logic, Controls")
+	return tab
+end, "icon16/control_repeat_blue.png", 1000, "nZombies Unlimited - Control Panel")
 
