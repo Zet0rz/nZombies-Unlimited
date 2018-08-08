@@ -57,16 +57,22 @@ SKIN.colCategoryTextInactive	= Color( 200, 200, 200, 255 )
 SKIN.fontCategoryHeader			= "TabLarge"
 
 SKIN.colNumberWangBG			= Color( 255, 240, 150, 255 )
-SKIN.colTextEntryBG				= Color( 240, 240, 240, 255 )
-SKIN.colTextEntryBorder			= Color( 20, 20, 20, 255 )
-SKIN.colTextEntryText			= Color( 20, 20, 20, 255 )
-SKIN.colTextEntryTextHighlight	= Color( 20, 200, 250, 255 )
+SKIN.colTextEntryBG				= Color( 50, 50, 50, 255 )
+SKIN.colTextEntryBG_Disabled	= Color( 20, 20, 20, 255 )
+SKIN.colTextEntryBG_Focus		= Color( 75, 75, 75, 255 )
+SKIN.colTextEntryBorder			= Color( 0, 0, 0, 255 )
+SKIN.colTextEntryText			= Color( 200, 200, 200, 255 )
+SKIN.colTextEntryTextHighlight	= Color( 150, 150, 150, 255 )
 SKIN.colTextEntryTextCursor		= Color( 0, 0, 100, 255 )
-SKIN.colTextEntryTextPlaceholder= Color( 128, 128, 128, 255 )
+SKIN.colTextEntryTextPlaceholder= Color( 75, 75, 75, 255 )
 
 SKIN.colMenuBG					= Color( 255, 255, 255, 200 )
 SKIN.colMenuBorder				= Color( 0, 0, 0, 200 )
 
+SKIN.colButtonBG				= Color( 0, 0, 0, 255 )
+SKIN.colButtonBG_Disabled		= Color( 255, 255, 255, 255 )
+SKIN.colButtonBG_Hovered		= Color( 255, 255, 255, 255 )
+SKIN.colButtonBG_Down			= Color( 255, 255, 255, 255 )
 SKIN.colButtonText				= Color( 255, 255, 255, 255 )
 SKIN.colButtonTextDisabled		= Color( 255, 255, 255, 55 )
 SKIN.colButtonBorder			= Color( 20, 20, 20, 255 )
@@ -101,7 +107,7 @@ SKIN.tex.RadioButtonD				= GWEN.CreateTextureNormal( 464, 80, 15, 15 )
 SKIN.tex.TreePlus					= GWEN.CreateTextureNormal( 448, 96, 15, 15 )
 SKIN.tex.TreeMinus					= GWEN.CreateTextureNormal( 464, 96, 15, 15 )
 SKIN.tex.TextBox					= GWEN.CreateTextureBorder( 0, 150, 127, 21, 4, 4, 4, 4 )
-SKIN.tex.TextBox_Focus				= GWEN.CreateTextureBorder( 0, 172, 127, 21, 4, 4, 4, 4 )
+SKIN.tex.TextBox_Focus				= GWEN.CreateTextureBorder( 0, 150, 127, 21, 4, 4, 4, 4 )
 SKIN.tex.TextBox_Disabled			= GWEN.CreateTextureBorder( 0, 194, 127, 21, 4, 4, 4, 4 )
 SKIN.tex.MenuBG_Column				= GWEN.CreateTextureBorder( 128, 128, 127, 63, 24, 8, 8, 8 )
 SKIN.tex.MenuBG						= GWEN.CreateTextureBorder( 128, 192, 127, 63, 8, 8, 8, 8 )
@@ -243,10 +249,10 @@ SKIN.Colours.Window.TitleActive		= GWEN.TextureColor( 4 + 8 * 0, 508 )
 SKIN.Colours.Window.TitleInactive	= GWEN.TextureColor( 4 + 8 * 1, 508 )
 
 SKIN.Colours.Button = {}
-SKIN.Colours.Button.Normal			= GWEN.TextureColor( 4 + 8 * 2, 508 )
-SKIN.Colours.Button.Hover			= GWEN.TextureColor( 4 + 8 * 3, 508 )
-SKIN.Colours.Button.Down			= GWEN.TextureColor( 4 + 8 * 2, 500 )
-SKIN.Colours.Button.Disabled		= GWEN.TextureColor( 4 + 8 * 3, 500 )
+SKIN.Colours.Button.Normal			= SKIN.colButtonBG
+SKIN.Colours.Button.Hover			= SKIN.colButtonBG_Hovered
+SKIN.Colours.Button.Down			= SKIN.colButtonBG_Down
+SKIN.Colours.Button.Disabled		= SKIN.colButtonBG_Disabled
 
 SKIN.Colours.Tab = {}
 SKIN.Colours.Tab.Active = {}
@@ -354,22 +360,21 @@ end
 	Button
 -----------------------------------------------------------]]
 function SKIN:PaintButton( panel, w, h )
-
 	if ( !panel.m_bBackground ) then return end
 
 	if ( panel.Depressed || panel:IsSelected() || panel:GetToggle() ) then
-		return self.tex.Button_Down( 0, 0, w, h )
+		return self.tex.Button_Down( 0, 0, w, h, self.colButtonBG_Down )
 	end
 
 	if ( panel:GetDisabled() ) then
-		return self.tex.Button_Dead( 0, 0, w, h )
+		return self.tex.Button_Dead( 0, 0, w, h, self.colButtonBG_Disabled)
 	end
 
 	if ( panel.Hovered ) then
-		return self.tex.Button_Hovered( 0, 0, w, h )
+		return self.tex.Button_Hovered( 0, 0, w, h, self.colButtonBG_Hovered)
 	end
 
-	self.tex.Button( 0, 0, w, h )
+	self.tex.Button( 0, 0, w, h, self.colButtonBG )
 
 end
 
@@ -430,11 +435,11 @@ function SKIN:PaintTextEntry( panel, w, h )
 	if ( panel.m_bBackground ) then
 
 		if ( panel:GetDisabled() ) then
-			self.tex.TextBox_Disabled( 0, 0, w, h )
+			self.tex.TextBox_Disabled( 0, 0, w, h, self.colTextEntryBG_Disabled)
 		elseif ( panel:HasFocus() ) then
-			self.tex.TextBox_Focus( 0, 0, w, h )
+			self.tex.TextBox_Focus( 0, 0, w, h, self.colTextEntryBG_Focus )
 		else
-			self.tex.TextBox( 0, 0, w, h )
+			self.tex.TextBox( 0, 0, w, h, self.colTextEntryBG )
 		end
 
 	end

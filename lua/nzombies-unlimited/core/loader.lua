@@ -6,6 +6,7 @@ NZU_SANDBOX = true
 NZU_NZOMBIES = false
 
 if SERVER then
+	AddCSLuaFile("cl_nzombies_skin.lua")
 	AddCSLuaFile("cl_spawnmenu.lua")
 	AddCSLuaFile("entities.lua")
 	AddCSLuaFile("logicmap.lua")
@@ -14,6 +15,7 @@ if SERVER then
 	AddCSLuaFile("cl_vgui_configtree.lua")
 	include("sv_saveload.lua")
 else
+	include("cl_nzombies_skin.lua")
 	include("cl_spawnmenu.lua")
 	include("cl_vgui_configtree.lua")
 	include("cl_saveload.lua")
