@@ -1,6 +1,12 @@
 # nZombies Unlimited
 nZombies Unlimited is an experimental idea of breaking the [original nZombies](https://github.com/Zet0rz/nzombies) free from its limits. It is a complete recreation built from the ground up with the idea of modularizing _everything_ and supporting full toolkits for Config creation.
 
+**Status:** Early development (not playable)
+
+**How to follow progress:** View progress in the [Projects tab](https://github.com/Zet0rz/nZombies-Unlimited/projects). Read about each entry by clicking it.
+
+**How to have an influence:** Comment on the Issues shown in the current Project with suggestions around that part.
+
 ## What's different?
 nZombies Unlimited bases itself on a series of ideas:
 - Sandbox-based Config Creation
