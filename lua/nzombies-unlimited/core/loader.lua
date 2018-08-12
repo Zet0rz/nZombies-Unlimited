@@ -13,6 +13,8 @@ if SERVER then
 	AddCSLuaFile("configsettings.lua")
 	AddCSLuaFile("cl_saveload.lua")
 	AddCSLuaFile("cl_vgui_configtree.lua")
+	AddCSLuaFile("logic/logic_manager.lua")
+
 	include("sv_saveload.lua")
 else
 	include("cl_nzombies_skin.lua")
@@ -23,3 +25,4 @@ end
 include("entities.lua")
 include("logicmap.lua")
 include("configsettings.lua")
+include("logic/logic_manager.lua")
