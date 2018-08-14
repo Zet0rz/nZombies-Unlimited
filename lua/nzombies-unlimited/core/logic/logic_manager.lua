@@ -6,8 +6,9 @@ local createdlogics = {}
 local function makelogic(class)
 	if logicunits[class] then
 		local unit = table.Copy(logicunits[class])
-		unti.BaseClass = unit.Base and logicunits[unit.Base] or nil
+		unit.BaseClass = unit.Base and logicunits[unit.Base] or nil
 		unit.ClassName = class
+		unit.m_vPos = Vector()
 		unit.m_tOutputConnections = {}
 		unit.m_tInputConnections = {}
 
@@ -41,33 +42,33 @@ end
 
 local logic_metatable = {
 	-- Return position of the Logic unit; If it is entity-tied, it's that entity's position
-	function GetPos(self)
+	GetPos = function(self)
 		if IsValid(self.m_eTiedEntity) then return self.m_eTiedEntity:GetPos() end
 		return self.m_vPos
 	end,
 
 	-- Enable/disable functionality. This freezes its think function.
-	function Enable(self)
+	Enable = function(self)
 		self.m_bEnabled = true
 	end,
-	function Disable(self)
+	Disable = function(self)
 		self.m_bEnabled = false
 	end,
-	function IsEnabled(self)
+	IsEnabled = function(self)
 		return self.m_bEnabled
 	end,
 
 	-- Entity-tying binds the unit to an entity and follows it around
-	function GetTiedEntity(self)
+	GetTiedEntity = function(self)
 		return self.m_eTiedEntity
 	end,
 
 	-- Fires an input into this logic unit letting you decide who to make responsible
 	-- Args are normally given by the connection, varargs dynamically from the logic unit itself
-	function Input(self, inp, activator, caller, args, ...)
+	Input = function(self, inp, activator, caller, args, ...)
 		local f = self.Inputs and self.Inputs[inp]
-		if f then
-			local result = f(self, activator, caller, args, ...)
+		if f and f.Function then
+			local result = f.Function(self, activator, caller, args, ...)
 			if result == nil then return true end -- No return = default it worked
 			return result
 		end
@@ -77,7 +78,7 @@ local logic_metatable = {
 	-- Fires an ouput on this entity, looping through all connections and activating them
 	-- Passes itself as the activator, but chains the caller along (often a player)
 	-- Optionally passes a set of varargs that can be read as dynamic args
-	function Output(self, outp, caller, ...)
+	Output = function(self, outp, caller, ...)
 		local c = self:GetOutputConnections()
 		if c and c[outp] then
 			for k,v in pairs(c[outp]) do
@@ -86,18 +87,8 @@ local logic_metatable = {
 		end
 	end,
 
-	-- Disconnects a connection from an ouput
-	-- Requires specifying what output to disconnect from and what id
-	function Disconnect(self, outp, connectionid)
-		local c = self:GetOutputConnections()
-		if not c[outp] or not c[outp][connectionid] then return end
-		
-		-- We can't table.remove as it shifts the indexes of other entries down, which breaks their connectionid
-		c[outp][connectionid] = nil
-	end,
-
 	-- Gets the table of connections
-	function GetOutputConnections(self)
+	GetOutputConnections = function(self)
 		return self.m_tOutputConnections
 	end
 
@@ -111,6 +102,7 @@ if SERVER then
 	util.AddNetworkString("nzu_logic_position")
 	util.AddNetworkString("nzu_logic_creation")
 	util.AddNetworkString("nzu_logic_entitytie")
+	util.AddNetworkString("nzu_logic_connection")
 
 	-- Set the position if this is a floating point unit; it's basically arbitrary
 	-- Network it if appropriate (Sandbox)
@@ -226,11 +218,23 @@ if SERVER then
 		end
 	end]]
 
-	logic_metatable.Connect = function(self, outp, target, inp, args)
+	logic_metatable.Connect = function(self, outp, target, inp, args, responsibleplayer)
 		if target.Inputs[inp] then
 			local c = self:GetOutputConnections()
 			if not c[outp] then c[outp] = {} end
+
+			local actualargs
+			if args == "" then args = nil end
+			if target.Inputs[inp].AcceptInput then
+				local allowed, args2, parsed = target.Inputs[inp].AcceptInput(target, args)
+				if not allowed then return end
+
+				actualargs = args2
+				args = parsed or args
+			end
+
 			local tbl = makeconnection(self, outp, target, inp, args)
+			tbl.ActualArgs = actualargs
 			local index = table.insert(c[outp], tbl)
 
 			net.Start("nzu_logic_connection")
@@ -242,16 +246,67 @@ if SERVER then
 				net.WriteUInt(target.m_iIndex, 16)
 				net.WriteString(inp)
 
-				if args == "" then args = nil end
-				if target.Inputs[inp].ParseArgs then
-					local args2, parsed = target.Inputs[inp].ParseArgs(args)
-					tbl.ActualArgs = args2
-					args = parsed or args
-				end
+				
 				net.WriteString(args or "")
 			net.Broadcast()
 
 			return index
+		end
+	end
+
+	-- Disconnects a connection from an ouput
+	-- Requires specifying what output to disconnect from and what id
+	logic_metatable.Disconnect = function(self, outp, connectionid)
+		local c = self:GetOutputConnections()
+		if not c[outp] or not c[outp][connectionid] then return end
+		
+		-- We can't table.remove as it shifts the indexes of other entries down, which breaks their connectionid
+		c[outp][connectionid] = nil
+
+		net.Start("nzu_logic_connection")
+			net.WriteUInt(self.m_iIndex, 16)
+			net.WriteUInt(connectionid, 16)
+			net.WriteBool(false)
+
+			net.WriteString(outp)
+		net.Broadcast()
+	end
+
+	-- Do a full sync to a player; this completely refreshes (or recreates) this unit and its properites
+	-- for that player. Can pass a table of players or otherwise acceptable net.Send recipients
+	logic_metatable.FullSync = function(self, ply)
+		net.Start("nzu_logic_creation")
+			net.WriteUInt(self.m_iIndex, 16)
+			net.WriteBool(true)
+			net.WriteString(self.ClassName)
+		net.Send(ply)
+
+		if self.m_eTiedEntity then
+			net.Start("nzu_logic_entitytie")
+				net.WriteUInt(self.m_iIndex, 16)
+				net.WriteBool(true)
+				net.WriteEntity(self.m_eTiedEntity)
+			net.Send(ply)
+		else
+			net.Start("nzu_logic_position")
+				net.WriteUInt(self.m_iIndex, 16)
+				net.WriteVector(self:GetPos())
+			net.Send(ply)
+		end
+
+		for k,v in pairs(self:GetConnections()) do
+			for k2,v2 in pairs(v) do
+				net.Start("nzu_logic_connection")
+					net.WriteUInt(self.m_iIndex, 16)
+					net.WriteUInt(k2, 16)
+					net.WriteBool(true)
+
+					net.WriteString(k)
+					net.WriteUInt(v2.Target.m_iIndex, 16)
+					net.WriteString(v2.Input)
+					net.WriteString(v2.Args or "")
+				net.Send(ply)
+			end
 		end
 	end
 
@@ -264,6 +319,7 @@ else
 			local unit = class and makelogic(class)
 			if unit then
 				createdlogics[index] = unit
+				unit.m_iIndex = index
 			end
 		else
 			if createdlogics[index] then
@@ -330,12 +386,14 @@ else
 				end
 			else
 				local c = unit:GetOutputConnections()
+				local outp = net.ReadString()
 				if c[outp] then c[outp][cid] = nil end
 			end
 		end
 	end)
 end
 logic_metatable.__index = logic_metatable
+logic_metatable.__tostring = function(self) return "nzu_Logic ["..self.m_iIndex.."]["..self.ClassName.."]" end
 -- Todo: Expose this table to FindMetaTable("nzu_Logic")?
 
 -- This is based around the same system as the vgui system
@@ -374,20 +432,42 @@ function nzu.RegisterLogicUnit(classname, LOGIC, base)
 		queuedregistration[classname] = nil
 	end
 
+	-- Update all existing logic units with the refresh
+	for k,v in pairs(createdlogics) do
+		if v.ClassName == classname then
+			table.Merge(v, LOGIC)
+		end
+	end
+
 	return LOGIC
 end
 
-function nzu.CreateLogicUnit(class, nonetwork)
-	local unit = makelogic(class)
-	if unit then
-		unit.m_iIndex = table.insert(createdlogics, unit)
-		unit.m_bNetwork = not nonetwork
+if SERVER then
+	function nzu.CreateLogicUnit(class, nonetwork)
+		local unit = makelogic(class)
+		if unit then
+			unit.m_iIndex = table.insert(createdlogics, unit)
+			unit.m_bNetwork = not nonetwork
 
-		if unit.m_bNetwork then unit:NetworkCreation() end
+			if unit.m_bNetwork then unit:NetworkCreation() end
 
-		-- We don't initialize it; it should only initialize when the actual game begins
-		-- Likewise, Think doesn't run on it yet. The only thing that really works is positioning and settings
+			-- We don't initialize it; it should only initialize when the actual game begins
+			-- Likewise, Think doesn't run on it yet. The only thing that really works is positioning and settings
 
-		return unit
+			return unit
+		end
 	end
+end
+
+function nzu.GetLogicUnit(id)
+	return createdlogics[id]
+end
+
+-- Full sync (only available once per player per connect)
+if SERVER then
+	hook.Add("PlayerInitialSpawn", "nzu_Logic_Fullsync", function(ply)
+		for k,v in pairs(createdlogics) do
+			v:FullSync(ply)
+		end
+	end)
 end

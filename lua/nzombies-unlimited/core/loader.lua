@@ -26,3 +26,7 @@ include("entities.lua")
 include("logicmap.lua")
 include("configsettings.lua")
 include("logic/logic_manager.lua")
+
+-- Test unit
+AddCSLuaFile("logic/nzu_logic_testunit.lua")
+include("logic/nzu_logic_testunit.lua")
