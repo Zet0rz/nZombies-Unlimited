@@ -21,6 +21,7 @@ else
 	include("cl_spawnmenu.lua")
 	include("cl_vgui_configtree.lua")
 	include("cl_saveload.lua")
+	include("logic/sv_logicmap.lua")
 end
 include("entities.lua")
 include("logicmap.lua")

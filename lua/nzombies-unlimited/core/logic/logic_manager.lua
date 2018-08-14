@@ -290,7 +290,7 @@ if SERVER then
 
 	-- These are the types you can send
 	-- Read types are just defined in net.ReadVars
-	-- We had to overwrite net.WriteVars because they'd also send an unnecesasry 8 bit UInt
+	-- We had to not use net.WriteVars because they'd also send an unnecesasry 8 bit UInt
 	local writetypes = {
 		[TYPE_STRING]		= function ( t, v )	net.WriteString( v )		end,
 		[TYPE_NUMBER]		= function ( t, v )	net.WriteDouble( v )		end,
