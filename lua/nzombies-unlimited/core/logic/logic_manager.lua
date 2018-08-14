@@ -15,7 +15,8 @@ local function makelogic(class)
 	end
 end
 
-local connection_metatable = {
+-- Logic Connections as objects
+--[[local connection_metatable = {
 	function Remove(self)
 
 	end
@@ -29,6 +30,12 @@ end
 connection_metatable.__index = connection_metatable
 local function makeconnection(self, outp, target, inp, args)
 	local tbl = {From = self, Output = outp, Target = target, Input = inp, Args = args}
+	return tbl
+end]]
+
+-- Logic Connections as lightweight tables
+local function makeconnection(self, outp, target, inp, args)
+	local tbl = {Target = target, Input = inp, Args = args}
 	return tbl
 end
 
@@ -74,7 +81,7 @@ local logic_metatable = {
 		local c = self:GetOutputConnections()
 		if c and c[outp] then
 			for k,v in pairs(c[outp]) do
-				v.target:Input(v.input, self, caller, v.args, ...) -- Dynamic args (passed from the logic unit, optional)
+				v.Target:Input(v.Input, self, caller, v.ActualArgs or v.Args, ...) -- Dynamic args (passed from the logic unit, optional)
 			end
 		end
 	end,
@@ -157,7 +164,7 @@ if SERVER then
 	end
 
 	-- Destroy the logic unit, including all output and input connections
-	logic_metatable.Destroy = function(self)
+	--[[logic_metatable.Remove = function(self)
 		-- Remove from all connections
 		-- This doesn't need to be networked since the clients can just do the same
 		for k,v in pairs(self.m_tOutputConnections) do
@@ -171,12 +178,26 @@ if SERVER then
 			net.WriteUInt(self.m_iIndex, 16)
 			net.WriteBool(false)
 		net.Broadcast()
+	end]]
+	logic_metatable.Remove = function(self)
+		local index = self.m_iIndex
+		for k,v in pairs(self) do
+			self[k] = nil
+		end
+		self.m_bDestroyed = true
+
+		createdlogics[index] = nil
+
+		net.Start("nzu_logic_creation")
+			net.WriteUInt(index, 16)
+			net.WriteBool(false)
+		net.Broadcast()
 	end
 
 	-- Creates a connection between an output on this to an input on another unit
 	-- Defines what arguments this connection carries
 	-- Returns connection ID (used to remove)
-	logic_metatable.Connect = function(self, outp, target, inp, args)
+	--[[logic_metatable.Connect = function(self, outp, target, inp, args)
 		if target.Inputs[inp] then
 			local c = self:GetOutputConnections()
 			if not c[outp] then c[outp] = {} end
@@ -203,6 +224,35 @@ if SERVER then
 
 			return tbl.OutputID, tbl
 		end
+	end]]
+
+	logic_metatable.Connect = function(self, outp, target, inp, args)
+		if target.Inputs[inp] then
+			local c = self:GetOutputConnections()
+			if not c[outp] then c[outp] = {} end
+			local tbl = makeconnection(self, outp, target, inp, args)
+			local index = table.insert(c[outp], tbl)
+
+			net.Start("nzu_logic_connection")
+				net.WriteUInt(self.m_iIndex, 16)
+				net.WriteUInt(index, 16)
+				net.WriteBool(true)
+
+				net.WriteString(outp)
+				net.WriteUInt(target.m_iIndex, 16)
+				net.WriteString(inp)
+
+				if args == "" then args = nil end
+				if target.Inputs[inp].ParseArgs then
+					local args2, parsed = target.Inputs[inp].ParseArgs(args)
+					tbl.ActualArgs = args2
+					args = parsed or args
+				end
+				net.WriteString(args or "")
+			net.Broadcast()
+
+			return index
+		end
 	end
 
 else
@@ -216,7 +266,12 @@ else
 				createdlogics[index] = unit
 			end
 		else
-			if createdlogics[index] then createdlogics[index]:Destroy() end
+			if createdlogics[index] then
+				for k,v in pairs(createdlogics[index]) do
+					createdlogics[index][k] = nil
+				end
+				createdlogics[index].m_bDestroyed = true
+			end
 			createdlogics[index] = nil
 		end
 	end)
@@ -250,6 +305,33 @@ else
 			if createdlogics[index] then logic_metatable.TieToEntity(createdlogics[index], ent) end
 		else
 			if createdlogics[index] then logic_metatable.Untie(createdlogics[index]) end
+		end
+	end)
+
+	-- Receive networking around connection and disconnection of logic units
+	net.Receive("nzu_logic_connection", function()
+		local unitindex = net.ReadUInt(16)
+		local cid = net.ReadUInt(16)
+		if createdlogics[unitindex] then
+			local unit = createdlogics[unitindex]
+			if net.ReadBool() then
+				local outp = net.ReadString()
+				local target = net.ReadUInt(16)
+				local inp = net.ReadString()
+				local args = net.ReadString()
+				if args == "" then args = nil end
+				
+				if createdlogics[target] then
+					local tbl = makeconnection(unit, outp, createdlogics[target], inp, args)
+					local c = unit:GetOutputConnections()
+					if not c[outp] then c[outp] = {} end
+
+					c[outp][cid] = tbl
+				end
+			else
+				local c = unit:GetOutputConnections()
+				if c[outp] then c[outp][cid] = nil end
+			end
 		end
 	end)
 end
