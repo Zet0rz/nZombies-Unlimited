@@ -40,4 +40,18 @@ LOGIC.Inputs = {
 		end
 	},
 }
+
+LOGIC.Settings = {
+	["SomeColor"] = {Type = TYPE_COLOR},
+	["ANumber"] = {Type = TYPE_NUMBER},
+	["NetworkEfficient8BitInt"] = {
+		NetSend = function(self, val)
+			net.WriteInt(val, 8)
+		end,
+		NetRead = function(self)
+			return net.ReadInt(8)
+		end,
+	}
+}
+
 nzu.RegisterLogicUnit("nzu_logic_test", LOGIC)

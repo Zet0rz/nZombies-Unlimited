@@ -12,6 +12,13 @@ local function makelogic(class)
 		unit.m_tOutputConnections = {}
 		unit.m_tInputConnections = {}
 
+		unit.m_tSettings = {}
+		if unit.Settings then
+			for k,v in pairs(unit.Settings) do
+				unit.m_tSettings[k] = v.Default
+			end
+		end
+
 		return unit
 	end
 end
@@ -90,12 +97,20 @@ local logic_metatable = {
 	-- Gets the table of connections
 	GetOutputConnections = function(self)
 		return self.m_tOutputConnections
-	end
+	end,
 
 	-- Expose this? Currently only used for internal removal upon destroy
 	--[[function GetInputConnections(self)
 		return self.m_tInputConnections
-	end]]
+	end,]]
+
+	IsValid = function(self)
+		return not self.m_bDestroyed
+	end,
+
+	GetSetting = function(self, setting)
+		return self.m_tSettings[setting]
+	end,
 }
 
 if SERVER then
@@ -103,6 +118,7 @@ if SERVER then
 	util.AddNetworkString("nzu_logic_creation")
 	util.AddNetworkString("nzu_logic_entitytie")
 	util.AddNetworkString("nzu_logic_connection")
+	util.AddNetworkString("nzu_logic_setting")
 
 	-- Set the position if this is a floating point unit; it's basically arbitrary
 	-- Network it if appropriate (Sandbox)
@@ -272,6 +288,41 @@ if SERVER then
 		net.Broadcast()
 	end
 
+	-- These are the types you can send
+	-- Read types are just defined in net.ReadVars
+	-- We had to overwrite net.WriteVars because they'd also send an unnecesasry 8 bit UInt
+	local writetypes = {
+		[TYPE_STRING]		= function ( t, v )	net.WriteString( v )		end,
+		[TYPE_NUMBER]		= function ( t, v )	net.WriteDouble( v )		end,
+		[TYPE_TABLE]		= function ( t, v )	net.WriteTable( v )			end,
+		[TYPE_BOOL]			= function ( t, v )	net.WriteBool( v )			end,
+		[TYPE_ENTITY]		= function ( t, v )	net.WriteEntity( v )		end,
+		[TYPE_VECTOR]		= function ( t, v )	net.WriteVector( v )		end,
+		[TYPE_ANGLE]		= function ( t, v )	net.WriteAngle( v )			end,
+		[TYPE_MATRIX]		= function ( t, v )	net.WriteMatrix( v )		end,
+		[TYPE_COLOR]		= function ( t, v )	net.WriteColor( v )			end,
+	}
+
+	-- Sets a setting on this Logic Unit. Networks using net.WriteType and net.ReadType. However a NetSend and NetRead
+	-- function can be defined to save a little bandwidth or allow custom networking (such as a list of options)
+	-- Does not work with tables unless NetSend and NetRead is implemented to handle it
+	logic_metatable.SetSetting = function(self, setting, val)
+		if not self.Settings[setting] then return end
+		local settingtbl = self.Settings[setting]
+		if settingtbl.Parse then val = settingtbl.Parse(self, val) end
+
+		self.m_tSettings[setting] = val
+		net.Start("nzu_logic_setting")
+			net.WriteUInt(self.m_iIndex, 16)
+			net.WriteString(setting)
+			if settingtbl.NetSend then
+				settingtbl.NetSend(self, val)
+			elseif settingtbl.Type then
+				writetypes[settingtbl.Type](val)
+			end
+		net.Broadcast()
+	end
+
 	-- Do a full sync to a player; this completely refreshes (or recreates) this unit and its properites
 	-- for that player. Can pass a table of players or otherwise acceptable net.Send recipients
 	logic_metatable.FullSync = function(self, ply)
@@ -307,6 +358,18 @@ if SERVER then
 					net.WriteString(v2.Args or "")
 				net.Send(ply)
 			end
+		end
+
+		for k,v in pairs(self.Settings) do
+			net.Start("nzu_logic_setting")
+				net.WriteUInt(self.m_iIndex, 16)
+				net.WriteString(k)
+				if v.NetSend then
+					v.NetSend(self, self.m_tSettings[k])
+				elseif v.Type then
+					writetypes[v.Type](self.m_tSettings[k])
+				end
+			net.Send(ply)
 		end
 	end
 
@@ -388,6 +451,24 @@ else
 				local c = unit:GetOutputConnections()
 				local outp = net.ReadString()
 				if c[outp] then c[outp][cid] = nil end
+			end
+		end
+	end)
+
+	net.Receive("nzu_logic_setting", function()
+		local index = net.ReadUInt(16)
+		local unit = createdlogics[index]
+		if unit then
+			local setting = net.ReadString()
+			local val
+			if unit.Settings[setting] then
+				local stbl = unit.Settings[setting]
+				if stbl.NetRead then
+					val = stbl.NetRead(unit)
+				elseif stbl.Type then
+					val = net.ReadVars[stbl.Type]()
+				end
+				unit.m_tSettings[setting] = val
 			end
 		end
 	end)
