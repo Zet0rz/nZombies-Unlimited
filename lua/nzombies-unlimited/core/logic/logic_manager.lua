@@ -111,9 +111,25 @@ local logic_metatable = {
 	GetSetting = function(self, setting)
 		return self.m_tSettings[setting]
 	end,
+
+	Index = function(self) return self.m_iIndex end
 }
 
 if SERVER then
+	local function writefullunit(self)
+		net.WriteUInt(self.m_iIndex, 16)
+		net.WriteBool(true)
+		net.WriteString(self.ClassName)
+		net.WriteVector(self:GetPos())
+
+		if self.m_eTiedEntity then
+			net.WriteBool(true)
+			net.WriteEntity(self.m_eTiedEntity)
+		else
+			net.WriteBool(false)
+		end
+	end
+
 	util.AddNetworkString("nzu_logic_position")
 	util.AddNetworkString("nzu_logic_creation")
 	util.AddNetworkString("nzu_logic_entitytie")
@@ -138,10 +154,14 @@ if SERVER then
 	-- Internal function: Network its creation to all connected players
 	logic_metatable.NetworkCreation = function(self)
 		net.Start("nzu_logic_creation")
-			net.WriteUInt(self.m_iIndex, 16)
-			net.WriteBool(true)
-			net.WriteString(self.ClassName)
+			writefullunit(self)
 		net.Broadcast()
+	end
+
+	-- Spawns the unit by networking its creation, finalizing its existence
+	logic_metatable.Spawn = function(self)
+		if self.m_bNetwork then self:NetworkCreation() end
+		hook.Run("nzu_LogicUnitCreated", self)
 	end
 
 	-- Internal function: Network its removal to all connected players
@@ -154,6 +174,8 @@ if SERVER then
 
 	logic_metatable.TieToEntity = function(self, ent)
 		self.m_eTiedEntity = ent
+		if not self.m_bNetwork then return end
+
 		net.Start("nzu_logic_entitytie")
 			net.WriteUInt(self.m_iIndex, 16)
 			net.WriteBool(true)
@@ -165,6 +187,8 @@ if SERVER then
 			self:SetPos(self.m_eTiedEntity:GetPos())
 		end
 		self.m_eTiedEntity = nil
+		if not self.m_bNetwork then return end
+
 		net.Start("nzu_logic_entitytie")
 			net.WriteUInt(self.m_iIndex, 16)
 			net.WriteBool(false)
@@ -188,6 +212,8 @@ if SERVER then
 		net.Broadcast()
 	end]]
 	logic_metatable.Remove = function(self)
+		hook.Run("nzu_LogicUnitRemoved", self)
+
 		local index = self.m_iIndex
 		for k,v in pairs(self) do
 			self[k] = nil
@@ -252,6 +278,7 @@ if SERVER then
 			local tbl = makeconnection(self, outp, target, inp, args)
 			tbl.ActualArgs = actualargs
 			local index = table.insert(c[outp], tbl)
+			if not self.m_bNetwork then return index end
 
 			net.Start("nzu_logic_connection")
 				net.WriteUInt(self.m_iIndex, 16)
@@ -278,6 +305,7 @@ if SERVER then
 		
 		-- We can't table.remove as it shifts the indexes of other entries down, which breaks their connectionid
 		c[outp][connectionid] = nil
+		if not self.m_bNetwork then return end
 
 		net.Start("nzu_logic_connection")
 			net.WriteUInt(self.m_iIndex, 16)
@@ -312,6 +340,8 @@ if SERVER then
 		if settingtbl.Parse then val = settingtbl.Parse(self, val) end
 
 		self.m_tSettings[setting] = val
+		if not self.m_bNetwork then return end
+
 		net.Start("nzu_logic_setting")
 			net.WriteUInt(self.m_iIndex, 16)
 			net.WriteString(setting)
@@ -327,23 +357,8 @@ if SERVER then
 	-- for that player. Can pass a table of players or otherwise acceptable net.Send recipients
 	logic_metatable.FullSync = function(self, ply)
 		net.Start("nzu_logic_creation")
-			net.WriteUInt(self.m_iIndex, 16)
-			net.WriteBool(true)
-			net.WriteString(self.ClassName)
+			writefullunit(self)
 		net.Send(ply)
-
-		if self.m_eTiedEntity then
-			net.Start("nzu_logic_entitytie")
-				net.WriteUInt(self.m_iIndex, 16)
-				net.WriteBool(true)
-				net.WriteEntity(self.m_eTiedEntity)
-			net.Send(ply)
-		else
-			net.Start("nzu_logic_position")
-				net.WriteUInt(self.m_iIndex, 16)
-				net.WriteVector(self:GetPos())
-			net.Send(ply)
-		end
 
 		for k,v in pairs(self:GetConnections()) do
 			for k2,v2 in pairs(v) do
@@ -379,13 +394,21 @@ else
 		local index = net.ReadUInt(16)
 		if net.ReadBool() then
 			local class = net.ReadString()
+			local pos = net.ReadVector()
+			local entity = net.ReadBool() and net.ReadEntity() or nil
+
 			local unit = class and makelogic(class)
 			if unit then
 				createdlogics[index] = unit
 				unit.m_iIndex = index
+				unit.m_vPos = pos or Vector()
+				if entity then unit.m_eTiedEntity = entity end
+
+				hook.Run("nzu_LogicUnitCreated", unit)
 			end
 		else
 			if createdlogics[index] then
+				hook.Run("nzu_LogicUnitRemoved", unit)
 				for k,v in pairs(createdlogics[index]) do
 					createdlogics[index][k] = nil
 				end
@@ -530,8 +553,6 @@ if SERVER then
 			unit.m_iIndex = table.insert(createdlogics, unit)
 			unit.m_bNetwork = not nonetwork
 
-			if unit.m_bNetwork then unit:NetworkCreation() end
-
 			-- We don't initialize it; it should only initialize when the actual game begins
 			-- Likewise, Think doesn't run on it yet. The only thing that really works is positioning and settings
 
@@ -542,6 +563,24 @@ end
 
 function nzu.GetLogicUnit(id)
 	return createdlogics[id]
+end
+function nzu.GetAllLogicUnits()
+	local tbl = {}
+	for k,v in pairs(createdlogics) do
+		tbl[k] = v
+	end
+	return tbl
+end
+
+function nzu.GetStoredLogicUnit(class)
+	return logicunits[class]
+end
+function nzu.GetLogicUnitList()
+	local tbl = {}
+	for k,v in pairs(logicunits) do
+		tbl[k] = v
+	end
+	return tbl
 end
 
 -- Full sync (only available once per player per connect)

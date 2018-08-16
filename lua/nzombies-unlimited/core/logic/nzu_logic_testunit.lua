@@ -1,6 +1,13 @@
 
 local LOGIC = {}
 
+LOGIC.Spawnable = true
+LOGIC.Category = "Debug Units"
+LOGIC.AdminOnly = true
+
+LOGIC.Name = "Debug Printer"
+LOGIC.Description = "Receives inputs to print to server console. Can optionally have a delay, and fires outputs upon printing something matching set patterns."
+LOGIC.Icon = "icon16/disk.png"
 -- These are only used for UI; any output can be connected (you can make secret code-only outputs this way)
 LOGIC.Outputs = {
 	"UponPrintA", "UponPrintAnything"

@@ -3,8 +3,8 @@ local PANEL = {}
 
 function PANEL:Init()
 	self.Panels = {}
-	--self.m_iTopLeftX = 0 -- This is negative
-	--self.m_iTopLeftY = 0 -- This is positive (y = up)
+	self.m_iTopLeftX = 0 -- This is negative
+	self.m_iTopLeftY = 0 -- This is positive (y = up)
 
 	self.Canvas = self:AddNonCanvas("Panel")
 	self.Canvas.OnMousePressed = function(s,c) self:OnMousePressed(c) end
@@ -13,9 +13,9 @@ function PANEL:Init()
 		--c:SizeToChildren(true,true)
 	end
 	
-	self:SetCanvasSize(10000,10000,10000,10000) -- 10,000 units in all directions
 	self.m_iScale = 0.1 -- 0.1 pixels per unit
-	timer.Simple(0.01, function()
+	self:SetCanvasSize(10000,10000,10000,10000) -- 10,000 units in all directions
+	timer.Simple(0.05, function()
 		self:SnapTo(0,0)
 	end)
 end
@@ -50,12 +50,23 @@ function PANEL:GetAbsolutePosition(x,y)
 	return tx*self:GetScale(),ty*self:GetScale()
 end
 
+function PANEL:GetAbsoluteFramePosition(x,y)
+	local tx,ty = self:GetAbsolutePosition(x,y)
+	local cx,cy = self.Canvas:GetPos()
+	return tx+cx, ty+cy
+end
+
 function PANEL:DropAction(pnls, dropped, menu, x, y)
 	if dropped then
 		local tx,ty = self:GetLocalPosition(self.Canvas:LocalCursorPos())
 		for k,v in pairs(pnls) do
-			self:SetChildPos(v,tx,ty)
-			if v.OnMapPositionChanged then v:OnMapPositionChanged(tx,ty) end -- Call the callback
+			if v.OnDrop then v = v:OnDrop() end
+			if IsValid(v) then
+				if not v.OnDropIntoMap or not v:OnDropIntoMap(tx,ty) then
+					self:SetChildPos(v,tx,ty)
+					if v.OnMapPositionChanged then v:OnMapPositionChanged(tx,ty) end -- Call the callback
+				end
+			end
 		end
 	end
 end
@@ -93,7 +104,7 @@ function PANEL:SetChildPos(p, x,y)
 	tx = math.Clamp(tx - w/2, 0, self.Canvas:GetWide() - w)
 	ty = math.Clamp(ty - h/2, 0, self.Canvas:GetTall() - h)
 	p:SetPos(tx,ty)
-	self:InvalidateLayout()
+	--self:InvalidateLayout()
 end
 
 function PANEL:MakeDroppable(str) 

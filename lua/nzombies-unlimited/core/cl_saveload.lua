@@ -318,4 +318,4 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 		save:StretchToParent(w,0,0,0)
 	end
 	
-end, "icon16/floppy_disk.png", "Save your Config or load another")
+end, "icon16/disk.png", "Save your Config or load another")
