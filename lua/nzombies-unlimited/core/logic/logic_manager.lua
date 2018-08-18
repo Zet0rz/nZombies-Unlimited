@@ -134,6 +134,7 @@ if SERVER then
 	util.AddNetworkString("nzu_logic_creation")
 	util.AddNetworkString("nzu_logic_entitytie")
 	util.AddNetworkString("nzu_logic_connection")
+	util.AddNetworkString("nzu_logic_connection_setting")
 	util.AddNetworkString("nzu_logic_setting")
 
 	-- Set the position if this is a floating point unit; it's basically arbitrary
@@ -278,6 +279,8 @@ if SERVER then
 			local tbl = makeconnection(self, outp, target, inp, args)
 			tbl.ActualArgs = actualargs
 			local index = table.insert(c[outp], tbl)
+
+			hook.Run("nzu_LogicUnitConnected", self, outp, index, tbl)
 			if not self.m_bNetwork then return index end
 
 			net.Start("nzu_logic_connection")
@@ -297,12 +300,47 @@ if SERVER then
 		end
 	end
 
+	-- Sets the connection settings of a specified connection
+	-- This is close to recreating, but more along the lines of overwriting
+	logic_metatable.SetConnectionSettings = function(self, outp, connectionid, args)
+		local c = self:GetOutputConnections()
+		if not c[outp] or not c[outp][connectionid] then return end
+		local connection = c[outp][connectionid]
+		local target = connection.Target
+		local inp = connection.Input
+
+		local actualargs
+		if args == "" then args = nil end
+		if target.Inputs[inp].AcceptInput then
+			local allowed, args2, parsed = target.Inputs[inp].AcceptInput(target, args)
+			if not allowed then return end
+
+			actualargs = args2
+			args = parsed or args
+		end
+
+		connection.Args = args
+		connection.ActualArgs = actualargs
+
+		hook.Run("nzu_LogicUnitConnectionChanged", self, outp, connectionid, connection)
+		if not self.m_bNetwork then return end
+
+		net.Start("nzu_logic_connection_setting")
+			net.WriteUInt(self.m_iIndex, 16)
+			net.WriteUInt(connectionid, 16)
+			net.WriteString(outp)
+			net.WriteString(args or "")
+		net.Broadcast()
+	end
+
 	-- Disconnects a connection from an ouput
 	-- Requires specifying what output to disconnect from and what id
 	logic_metatable.Disconnect = function(self, outp, connectionid)
 		local c = self:GetOutputConnections()
 		if not c[outp] or not c[outp][connectionid] then return end
 		
+		hook.Run("nzu_LogicUnitDisconnected", self, outp, connectionid, c[outp][connectionid])
+
 		-- We can't table.remove as it shifts the indexes of other entries down, which breaks their connectionid
 		c[outp][connectionid] = nil
 		if not self.m_bNetwork then return end
@@ -340,6 +378,8 @@ if SERVER then
 		if settingtbl.Parse then val = settingtbl.Parse(self, val) end
 
 		self.m_tSettings[setting] = val
+
+		hook.Run("nzu_LogicUnitSettingChanged", self, setting, val)
 		if not self.m_bNetwork then return end
 
 		net.Start("nzu_logic_setting")
@@ -427,7 +467,10 @@ else
 		local index = net.ReadUInt(16)
 		local pos = net.ReadVector()
 		local unit = createdlogics[index]
-		if unit then unit:SetPos(pos) end
+		if unit then
+			unit:SetPos(pos)
+			hook.Run("nzu_LogicUnitMoved", unit, pos)
+		end
 	end)
 
 	-- Clientside entity tying; this will also be overriden next time the server networks its state
@@ -469,11 +512,31 @@ else
 					if not c[outp] then c[outp] = {} end
 
 					c[outp][cid] = tbl
+					hook.Run("nzu_LogicUnitConnected", unit, outp, cid, tbl)
 				end
 			else
 				local c = unit:GetOutputConnections()
 				local outp = net.ReadString()
-				if c[outp] then c[outp][cid] = nil end
+				if c[outp] then
+					hook.Run("nzu_LogicUnitDisconnected", unit, outp, cid, c[outp][cid])
+					c[outp][cid] = nil
+				end
+			end
+		end
+	end)
+
+	-- Receive networking around connection setting updates
+	-- This should only update connections that already exist
+	net.Receive("nzu_logic_connection_setting", function()
+		local unitindex = net.ReadUInt(16)
+		local cid = net.ReadUInt(16)
+		local outp = net.ReadString()
+		local args = net.ReadString()
+		if IsValid(createdlogics[unitindex]) then
+			local c = createdlogics[unitindex]:GetOutputConnections()
+			if c and c[outp] and c[outp][cid] then
+				c[outp][cid].Args = args ~= "" and args or nil
+				hook.Run("nzu_LogicUnitConnectionChanged", unit, outp, cid, c[outp][cid])
 			end
 		end
 	end)
@@ -492,6 +555,7 @@ else
 					val = net.ReadVars[stbl.Type]()
 				end
 				unit.m_tSettings[setting] = val
+				hook.Run("nzu_LogicUnitSettingChanged", unit, setting, val)
 			end
 		end
 	end)

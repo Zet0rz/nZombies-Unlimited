@@ -23,3 +23,18 @@ net.Receive("nzu_logicmap_move", function(len, ply)
 		unit:SetPos(pos)
 	end
 end)
+
+util.AddNetworkString("nzu_logicmap_connect")
+net.Receive("nzu_logicmap_connect", function(len, ply)
+	local index = net.ReadUInt(16)
+	local outport = net.ReadString()
+	local target = net.ReadUInt(16)
+	local inport = net.ReadString()
+	local args = net.ReadString()
+
+	local unit = nzu.GetLogicUnit(index)
+	local unit2 = nzu.GetLogicUnit(target)
+	if IsValid(unit) and IsValid(unit2) then
+		unit:Connect(outport, unit2, inport, args, ply)
+	end
+end)

@@ -10,7 +10,12 @@ LOGIC.Description = "Receives inputs to print to server console. Can optionally 
 LOGIC.Icon = "icon16/disk.png"
 -- These are only used for UI; any output can be connected (you can make secret code-only outputs this way)
 LOGIC.Outputs = {
-	"UponPrintA", "UponPrintAnything"
+	["UponPrintA"] = {
+		Port = {Side = RIGHT, Pos = 5}
+	},
+	["UponPrintAnything"] = {
+		Port = {Side = RIGHT,  Pos = 15}
+	},
 }
 
 local function doprint(self, str)
@@ -24,7 +29,8 @@ LOGIC.Inputs = {
 	["Print"] = {
 		Function = function(self, activator, caller, args, ...)
 			doprint(self, args)
-		end
+		end,
+		Port = {Side = LEFT, Pos = 5}
 	},
 	["TimedPrint"] = {
 		AcceptInput = function(self, args)
