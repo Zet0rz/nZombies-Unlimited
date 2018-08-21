@@ -11,10 +11,10 @@ LOGIC.Icon = "icon16/disk.png"
 -- These are only used for UI; any output can be connected (you can make secret code-only outputs this way)
 LOGIC.Outputs = {
 	["UponPrintA"] = {
-		Port = {Side = RIGHT, Pos = 5}
+		Port = {Side = RIGHT, Pos = 10}
 	},
 	["UponPrintAnything"] = {
-		Port = {Side = RIGHT,  Pos = 15}
+		Port = {Side = RIGHT,  Pos = 25}
 	},
 }
 
@@ -55,16 +55,23 @@ LOGIC.Inputs = {
 }
 
 LOGIC.Settings = {
-	["SomeColor"] = {Type = TYPE_COLOR},
-	["ANumber"] = {Type = TYPE_NUMBER},
+	["SomeColor"] = {Type = TYPE_COLOR, Default = Color(255,255,255)},
+	["ANumber"] = {Type = TYPE_NUMBER, Default = 1.5},
 	["NetworkEfficient8BitInt"] = {
+		Type = TYPE_NUMBER,
 		NetSend = function(self, val)
 			net.WriteInt(val, 8)
 		end,
 		NetRead = function(self)
 			return net.ReadInt(8)
 		end,
-	}
+		Default = 3,
+	},
+	["BoolTest"] = {Type = TYPE_BOOL, Default = true},
+	["VectorTest"] = {Type = TYPE_VECTOR, Default = Vector(1,2,3)},
+	["AngleTest"] = {Type = TYPE_ANGLE, Default = Angle(0,180,360)},
+	["MatrixTest"] = {Type = TYPE_MATRIX, Default = Matrix()},
+	
 }
 
 nzu.RegisterLogicUnit("nzu_logic_test", LOGIC)

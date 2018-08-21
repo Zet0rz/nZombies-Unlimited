@@ -7,10 +7,6 @@ function CONNECTION:Init()
 	self:SetSize(port_size,port_size)
 	self:Droppable("nzu_logicmap_connection_in")
 	self:SetPaintBackground(false)
-
-	self.Tail = vgui.Create("DPanel")
-	self.Tail:SetMouseInputEnabled(false)
-	self.Tail:SetPaintBackground(false)
 end
 function CONNECTION:PaintOver(x,y)
 	if IsValid(self.Output) then
@@ -20,7 +16,7 @@ function CONNECTION:PaintOver(x,y)
 end
 
 function CONNECTION:SetPorts(outp, inp)
-	self.Tail:SetParent(outp.Panel)
+	self.Tail = outp.Panel
 	self:SetParent(inp.Panel)
 end
 
@@ -29,11 +25,13 @@ function CONNECTION:SetConnection(c)
 end
 
 function CONNECTION:PaintOver(x,y)
-	surface.SetDrawColor(0,0,0)
-	DisableClipping(true)
-	local tx,ty = self:ScreenToLocal(self.Tail:LocalToScreen(self.Tail:GetPos()))
-	surface.DrawLine(tx + 5,ty + 5,x - 5,y - 5)
-	DisableClipping(false)
+	if IsValid(self.Tail) then
+		surface.SetDrawColor(0,0,0)
+		DisableClipping(true)
+		local tx,ty = self:ScreenToLocal(self.Tail:LocalToScreen(5,5))
+		surface.DrawLine(tx,ty,x - 5,y - 5)
+		DisableClipping(false)
+	end
 end
 
 --[[function CONNECTION:OnMouseReleased(code)
@@ -102,6 +100,134 @@ derma.DefineControl("DLogicMapUnitConnection", "", CONNECTION, "DPanel")
 derma.DefineControl("DLogicMapUnitInput", "", INPUTPORT, "DPanel")
 derma.DefineControl("DLogicMapUnitOutput", "", OUTPUTPORT, "DPanel")
 
+local TYPE = {}
+local createpanel = {
+	[TYPE_STRING]		= function() return vgui.Create("DTextEntry") end,
+	[TYPE_NUMBER]		= function() local p = vgui.Create("Panel") p.N = p:Add("DNumberWang") p.N:Dock(FILL) p.N:SetMinMax(nil,nil) p:SetTall(40) return p end,
+	[TYPE_BOOL]			= function() local p = vgui.Create("DCheckBoxLabel") p:SetText("Enabled") p:SetTall(50) p:SetTextColor(color_black) return p end,
+	--[TYPE_ENTITY]		= function end,
+	[TYPE_VECTOR]		= function() local p = vgui.Create("DVectorEntry") p:SetTall(30) return p end,
+	[TYPE_ANGLE]		= function() local p = vgui.Create("DAngleEntry") p:SetTall(30) return p end,
+	[TYPE_MATRIX]		= function() local p = vgui.Create("DMatrixEntry") p:SetTall(100) return p end,
+	[TYPE_COLOR]		= function() return vgui.Create("DColorMixer") end,
+}
+local setvalue = {
+	[TYPE_STRING]		= function(p,v) p:SetText(v) end,
+	[TYPE_NUMBER]		= function(p,v) p.N:SetValue(v) end,
+	[TYPE_BOOL]			= function(p,v) p:SetChecked(v) end,
+	--[TYPE_ENTITY]		= function end,
+	[TYPE_VECTOR]		= function(p,v) p:SetVector(v) end,
+	[TYPE_ANGLE]		= function(p,v) p:SetAngles(v) end,
+	[TYPE_MATRIX]		= function(p,v) p:SetMatrix(v) end,
+	[TYPE_COLOR]		= function(p,v) p:SetColor(v) end,
+}
+local getvalue = {
+	[TYPE_STRING]		= function(p) return p:GetText() end,
+	[TYPE_NUMBER]		= function(p) return p.N:GetValue() end,
+	[TYPE_BOOL]			= function(p) return p:GetChecked() end,
+	--[TYPE_ENTITY]		= function end,
+	[TYPE_VECTOR]		= function(p) return p:GetVector() end,
+	[TYPE_ANGLE]		= function(p) return p:GetAngles() end,
+	[TYPE_MATRIX]		= function(p) return p:GetMatrix() end,
+	[TYPE_COLOR]		= function(p) local c = p:GetColor() return Color(c.r,c.g,c.b,c.a) end,
+}
+
+-- These are here temporarily; We will move files around so it becomes shared/nZombies/Sandbox separated files
+local writetypes = {
+	[TYPE_STRING]		= function ( v )	net.WriteString( v )		end,
+	[TYPE_NUMBER]		= function ( v )	net.WriteDouble( v )		end,
+	[TYPE_TABLE]		= function ( v )	net.WriteTable( v )			end,
+	[TYPE_BOOL]			= function ( v )	net.WriteBool( v ) 			end,
+	[TYPE_ENTITY]		= function ( v )	net.WriteEntity( v )		end,
+	[TYPE_VECTOR]		= function ( v )	net.WriteVector( v )		end,
+	[TYPE_ANGLE]		= function ( v )	net.WriteAngle( v )			end,
+	[TYPE_MATRIX]		= function ( v )	net.WriteMatrix( v )		end,
+	[TYPE_COLOR]		= function ( v )	net.WriteColor( v )			end,
+}
+
+local SETTINGS = {}
+function SETTINGS:SetUnit(u)
+	if not IsValid(self.TopPanel) then
+		self.TopPanel = self:Add("Panel")
+		self.TopPanel:Dock(TOP)
+		self.TopPanel:SetTall(30)
+	end
+
+	if not IsValid(self.SaveAll) then
+		self.SaveAll = self.TopPanel:Add("DButton")
+		self.SaveAll:Dock(RIGHT)
+		self.SaveAll:SetWide(100)
+		self.SaveAll:SetText("Save all")
+		self.SaveAll:DockMargin(5,5,5,5)
+	end
+
+	if not IsValid(self.Name) then
+		self.Name = self.TopPanel:Add("DLabel")
+		self.Name:Dock(TOP)
+		self.Name:SetContentAlignment(4)
+		self.Name:SetTextColor(color_black)
+		self.Name:SetTextInset(5,0)
+	end
+	self.Name:SetText(u.Name or "[No Name]")
+	self.Name:SizeToContents()
+
+	if not IsValid(self.Class) then
+		self.Class = self.TopPanel:Add("DLabel")
+		self.Class:SetContentAlignment(4)
+		self.Class:Dock(TOP)
+		self.Class:SetTextColor(color_black)
+		self.Class:SetTextInset(5,0)
+	end
+	self.Class:SetText(tostring(u))
+	self.Class:SizeToContents()
+	
+	if not IsValid(self.Categories) then
+		self.Categories = self:Add("DCategoryList")
+		self.Categories:Dock(FILL)
+	else
+		self.Categories:Clear()
+	end
+
+	for k,v in pairs(u.Settings) do
+		local panel
+		if v.CustomPanel then
+			panel = v.CustomPanel.Create()
+			v.CustomPanel.Set(panel, u:GetSettings(k))
+			panel._GetValue = v.CustomPanel.Get
+		elseif v.Type and createpanel[v.Type] then
+			panel = createpanel[v.Type]()
+			setvalue[v.Type](panel, u:GetSetting(k))
+			panel._GetValue = getvalue[v.Type]
+		end
+
+		if panel then
+			local cat = self.Categories:Add(k)
+			cat:SetTall(panel:GetTall())
+			cat:SetExpanded(false)
+			cat:SetContents(panel)
+			cat:DockMargin(0,0,0,1)
+
+			local save = cat.Header:Add("DButton")
+			save:Dock(RIGHT)
+			save:DockMargin(2,2,2,2)
+			save:SetWide(50)
+			save:SetText("Save")
+			save.DoClick = function(s)
+				net.Start("nzu_logicmap_setting")
+					net.WriteUInt(u:Index(), 16)
+					net.WriteString(k)
+					if v.NetSend then
+						v.NetSend(self, panel:_GetValue())
+					elseif v.Type then
+						writetypes[v.Type](panel:_GetValue())
+					end
+				net.SendToServer()
+			end
+		end
+	end
+end
+derma.DefineControl("DLogicMapSettingsPanel", "", SETTINGS, "DPanel")
+
 local PANEL = {}
 AccessorFunc(PANEL,"m_bDisplayPorts", "ShowPorts", FORCE_BOOL)
 
@@ -129,6 +255,14 @@ function PANEL:Init()
 	self.ChipCanvas = self:Add("Panel")
 	self.ChipCanvas:Dock(FILL)
 	self.ChipCanvas:SetMouseInputEnabled(false)
+
+	self.SettingsButton = vgui.Create("DImageButton", self.RightPorts)
+	self.SettingsButton:SetImage("icon16/cog.png")
+	self.SettingsButton:SetSize(port_size, port_size)
+	self.SettingsButton:Dock(TOP)
+	self.SettingsButton:SetZPos(100)
+	self.SettingsButton.DoClick = function() self:OpenSettings() end
+
 	self.IGNORECHILD = nil
 
 	self.m_tOutputPorts = {}
@@ -186,6 +320,22 @@ function PANEL:SetLogicUnit(unit)
 	self:UpdatePorts()
 end
 
+function PANEL:OpenSettings()
+	if IsValid(self.SettingsPanel) then return end
+	self.SettingsPanel = vgui.Create("DFrame", self:GetParent())
+	self.SettingsPanel:SetTitle(tostring(self.m_lUnit))
+
+	local settings = self.SettingsPanel:Add("DLogicMapSettingsPanel")
+	settings:SetUnit(self.m_lUnit)
+	settings:Dock(FILL)
+
+	local x,y = self:GetPos()
+	self.SettingsPanel:SetSize(300,500)
+	self.SettingsPanel:SetPos(x,y)
+
+	self.SettingsPanel:SetZPos(200)
+end
+
 function PANEL:PerformLayout()
 	if IsValid(self.Icon) then
 		local x,y = self.ChipCanvas:GetSize()
@@ -240,6 +390,7 @@ function PANEL:UpdatePorts()
 		for k,v in pairs(self.m_tInputPorts) do if IsValid(v.Panel) then v.Panel:Remove() end end
 		for k,v in pairs(self.m_tOutputPorts) do if IsValid(v.Panel) then v.Panel:Remove() end end
 	end
+	self.SettingsButton:SetVisible(self:GetShowPorts())
 end
 
 function PANEL:AddOutputPort(name, side, pos)
@@ -320,18 +471,18 @@ addunittomap = function(unit)
 			net.SendToServer()
 		end
 
+		logicmapchips[unit:Index()] = chip
+
 		for k,v in pairs(unit:GetOutputConnections()) do
 			for k2,v2 in pairs(v) do
 				addconnection(unit, k, k2, v2, chip)
 			end
 		end
-
-		logicmapchips[unit:Index()] = chip
 	end
 end
 
 nzu.AddSpawnmenuTab("Logic Map", "DPanel", function(panel)
-	panel:SetSkin("nZombies Unlimited")
+	--panel:SetSkin("nZombies Unlimited")
 	panel:SetBackgroundColor(Color(100,100,100))
 
 	local toolbarwidth = 150

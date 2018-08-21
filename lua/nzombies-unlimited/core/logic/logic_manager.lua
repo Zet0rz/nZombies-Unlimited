@@ -358,15 +358,15 @@ if SERVER then
 	-- Read types are just defined in net.ReadVars
 	-- We had to not use net.WriteVars because they'd also send an unnecesasry 8 bit UInt
 	local writetypes = {
-		[TYPE_STRING]		= function ( t, v )	net.WriteString( v )		end,
-		[TYPE_NUMBER]		= function ( t, v )	net.WriteDouble( v )		end,
-		[TYPE_TABLE]		= function ( t, v )	net.WriteTable( v )			end,
-		[TYPE_BOOL]			= function ( t, v )	net.WriteBool( v )			end,
-		[TYPE_ENTITY]		= function ( t, v )	net.WriteEntity( v )		end,
-		[TYPE_VECTOR]		= function ( t, v )	net.WriteVector( v )		end,
-		[TYPE_ANGLE]		= function ( t, v )	net.WriteAngle( v )			end,
-		[TYPE_MATRIX]		= function ( t, v )	net.WriteMatrix( v )		end,
-		[TYPE_COLOR]		= function ( t, v )	net.WriteColor( v )			end,
+		[TYPE_STRING]		= function ( v )	net.WriteString( v )		end,
+		[TYPE_NUMBER]		= function ( v )	net.WriteDouble( v )		end,
+		[TYPE_TABLE]		= function ( v )	net.WriteTable( v )			end,
+		[TYPE_BOOL]			= function ( v )	net.WriteBool( v )			end,
+		[TYPE_ENTITY]		= function ( v )	net.WriteEntity( v )		end,
+		[TYPE_VECTOR]		= function ( v )	net.WriteVector( v )		end,
+		[TYPE_ANGLE]		= function ( v )	net.WriteAngle( v )			end,
+		[TYPE_MATRIX]		= function ( v )	net.WriteMatrix( v )		end,
+		[TYPE_COLOR]		= function ( v )	net.WriteColor( v )			end,
 	}
 
 	-- Sets a setting on this Logic Unit. Networks using net.WriteType and net.ReadType. However a NetSend and NetRead
@@ -562,7 +562,9 @@ else
 end
 logic_metatable.__index = logic_metatable
 logic_metatable.__tostring = function(self) return "nzu_Logic ["..self.m_iIndex.."]["..self.ClassName.."]" end
--- Todo: Expose this table to FindMetaTable("nzu_Logic")?
+
+-- Expose the metatable to FindMetaTable("nzu_LogicUnit")
+debug.getregistry().nzu_LogicUnit = logic_metatable
 
 -- This is based around the same system as the vgui system
 local queuedregistration = {}
