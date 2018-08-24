@@ -115,6 +115,49 @@ local logic_metatable = {
 	Index = function(self) return self.m_iIndex end
 }
 
+--[[-------------------------------------------------------------------------
+Net Extension: Write Setting
+Writes a Logic Unit's setting based on its set Type, or NetSend/NetRead functions
+---------------------------------------------------------------------------]]
+-- These are the types you can send
+-- Read types are just defined in net.ReadVars
+-- We had to not use net.WriteVars because they'd also send an unnecesasry 8 bit UInt
+local writetypes = {
+	[TYPE_STRING]		= function ( v )	net.WriteString( v )		end,
+	[TYPE_NUMBER]		= function ( v )	net.WriteDouble( v )		end,
+	[TYPE_TABLE]		= function ( v )	net.WriteTable( v )			end,
+	[TYPE_BOOL]			= function ( v )	net.WriteBool( v )			end,
+	[TYPE_ENTITY]		= function ( v )	net.WriteEntity( v )		end,
+	[TYPE_VECTOR]		= function ( v )	net.WriteVector( v )		end,
+	[TYPE_ANGLE]		= function ( v )	net.WriteAngle( v )			end,
+	[TYPE_MATRIX]		= function ( v )	net.WriteMatrix( v )		end,
+	[TYPE_COLOR]		= function ( v )	net.WriteColor( v )			end,
+}
+function logic_metatable:NetWriteSetting(setting, val)
+	local settingtbl = self.Settings[setting]
+	net.WriteString(setting)
+	if settingtbl.NetSend then
+		settingtbl.NetSend(self, val)
+	elseif settingtbl.Type then
+		writetypes[settingtbl.Type](val)
+	end
+end
+
+function logic_metatable:NetReadSetting()
+	local setting = net.ReadString()
+	local settingtbl = self.Settings[setting]
+	if settingtbl.NetRead then
+		val = settingtbl.NetRead(self)
+	elseif settingtbl.Type then
+		val = net.ReadVars[settingtbl.Type]()
+	end
+
+	return setting, val
+end
+
+--[[-------------------------------------------------------------------------
+Net-related META functions
+---------------------------------------------------------------------------]]
 if SERVER then
 	local function writefullunit(self)
 		net.WriteUInt(self.m_iIndex, 16)
@@ -291,7 +334,6 @@ if SERVER then
 				net.WriteString(outp)
 				net.WriteUInt(target.m_iIndex, 16)
 				net.WriteString(inp)
-
 				
 				net.WriteString(args or "")
 			net.Broadcast()
@@ -354,21 +396,6 @@ if SERVER then
 		net.Broadcast()
 	end
 
-	-- These are the types you can send
-	-- Read types are just defined in net.ReadVars
-	-- We had to not use net.WriteVars because they'd also send an unnecesasry 8 bit UInt
-	local writetypes = {
-		[TYPE_STRING]		= function ( v )	net.WriteString( v )		end,
-		[TYPE_NUMBER]		= function ( v )	net.WriteDouble( v )		end,
-		[TYPE_TABLE]		= function ( v )	net.WriteTable( v )			end,
-		[TYPE_BOOL]			= function ( v )	net.WriteBool( v )			end,
-		[TYPE_ENTITY]		= function ( v )	net.WriteEntity( v )		end,
-		[TYPE_VECTOR]		= function ( v )	net.WriteVector( v )		end,
-		[TYPE_ANGLE]		= function ( v )	net.WriteAngle( v )			end,
-		[TYPE_MATRIX]		= function ( v )	net.WriteMatrix( v )		end,
-		[TYPE_COLOR]		= function ( v )	net.WriteColor( v )			end,
-	}
-
 	-- Sets a setting on this Logic Unit. Networks using net.WriteType and net.ReadType. However a NetSend and NetRead
 	-- function can be defined to save a little bandwidth or allow custom networking (such as a list of options)
 	-- Does not work with tables unless NetSend and NetRead is implemented to handle it
@@ -381,15 +408,9 @@ if SERVER then
 
 		hook.Run("nzu_LogicUnitSettingChanged", self, setting, val)
 		if not self.m_bNetwork then return end
-
 		net.Start("nzu_logic_setting")
 			net.WriteUInt(self.m_iIndex, 16)
-			net.WriteString(setting)
-			if settingtbl.NetSend then
-				settingtbl.NetSend(self, val)
-			elseif settingtbl.Type then
-				writetypes[settingtbl.Type](val)
-			end
+			self:NetWriteSetting(setting, val)
 		net.Broadcast()
 	end
 
@@ -418,12 +439,7 @@ if SERVER then
 		for k,v in pairs(self.Settings) do
 			net.Start("nzu_logic_setting")
 				net.WriteUInt(self.m_iIndex, 16)
-				net.WriteString(k)
-				if v.NetSend then
-					v.NetSend(self, self.m_tSettings[k])
-				elseif v.Type then
-					writetypes[v.Type](self.m_tSettings[k])
-				end
+				self:NetWriteSetting(k, self:GetSetting(k))
 			net.Send(ply)
 		end
 	end
@@ -545,15 +561,8 @@ else
 		local index = net.ReadUInt(16)
 		local unit = createdlogics[index]
 		if unit then
-			local setting = net.ReadString()
-			local val
-			if unit.Settings[setting] then
-				local stbl = unit.Settings[setting]
-				if stbl.NetRead then
-					val = stbl.NetRead(unit)
-				elseif stbl.Type then
-					val = net.ReadVars[stbl.Type]()
-				end
+			local setting, val = unit:NetReadSetting()
+			if setting and unit.Settings[setting] then
 				unit.m_tSettings[setting] = val
 				hook.Run("nzu_LogicUnitSettingChanged", unit, setting, val)
 			end

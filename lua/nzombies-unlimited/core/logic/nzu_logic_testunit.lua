@@ -71,7 +71,14 @@ LOGIC.Settings = {
 	["VectorTest"] = {Type = TYPE_VECTOR, Default = Vector(1,2,3)},
 	["AngleTest"] = {Type = TYPE_ANGLE, Default = Angle(0,180,360)},
 	["MatrixTest"] = {Type = TYPE_MATRIX, Default = Matrix()},
-	
+	["ParseAtoB"] = {
+		Type = TYPE_STRING,
+		Default = "B",
+		Parse = function(self, val)
+			if val == "A" then return "B" end
+			return val
+		end,
+	},
 }
 
 nzu.RegisterLogicUnit("nzu_logic_test", LOGIC)

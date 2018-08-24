@@ -19,6 +19,10 @@ function nzu.AddSpawnmenuTab(name, paneltype, func, icon, tooltip)
 	end
 end
 
+function nzu.GetSpawnmenuTab(name)
+	return tabs[name] and tabs[name].panel
+end
+
 spawnmenu.AddCreationTab(tabname, function()
 	tab = vgui.Create("DPropertySheet")
 	for k,v in pairs(tabs) do

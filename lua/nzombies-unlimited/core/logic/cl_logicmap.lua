@@ -102,7 +102,7 @@ derma.DefineControl("DLogicMapUnitOutput", "", OUTPUTPORT, "DPanel")
 
 local TYPE = {}
 local createpanel = {
-	[TYPE_STRING]		= function() return vgui.Create("DTextEntry") end,
+	[TYPE_STRING]		= function() local p = vgui.Create("DTextEntry") p:SetTall(40) return p end,
 	[TYPE_NUMBER]		= function() local p = vgui.Create("Panel") p.N = p:Add("DNumberWang") p.N:Dock(FILL) p.N:SetMinMax(nil,nil) p:SetTall(40) return p end,
 	[TYPE_BOOL]			= function() local p = vgui.Create("DCheckBoxLabel") p:SetText("Enabled") p:SetTall(50) p:SetTextColor(color_black) return p end,
 	--[TYPE_ENTITY]		= function end,
@@ -112,7 +112,7 @@ local createpanel = {
 	[TYPE_COLOR]		= function() return vgui.Create("DColorMixer") end,
 }
 local setvalue = {
-	[TYPE_STRING]		= function(p,v) p:SetText(v) end,
+	[TYPE_STRING]		= function(p,v) p:SetText(v or "") end,
 	[TYPE_NUMBER]		= function(p,v) p.N:SetValue(v) end,
 	[TYPE_BOOL]			= function(p,v) p:SetChecked(v) end,
 	--[TYPE_ENTITY]		= function end,
@@ -156,9 +156,23 @@ function SETTINGS:SetUnit(u)
 	if not IsValid(self.SaveAll) then
 		self.SaveAll = self.TopPanel:Add("DButton")
 		self.SaveAll:Dock(RIGHT)
-		self.SaveAll:SetWide(100)
+		self.SaveAll:SetWide(60)
 		self.SaveAll:SetText("Save all")
 		self.SaveAll:DockMargin(5,5,5,5)
+		self.SaveAll.DoClick = function(s)
+			for k,v in pairs(self.Settings) do v._Save() end
+		end
+	end
+
+	if not IsValid(self.ReloadAll) then
+		self.ReloadAll = self.TopPanel:Add("DButton")
+		self.ReloadAll:Dock(RIGHT)
+		self.ReloadAll:SetWide(60)
+		self.ReloadAll:SetText("Reload All")
+		self.ReloadAll:DockMargin(5,5,0,5)
+		self.ReloadAll.DoClick = function(s)
+			self:Reload()
+		end
 	end
 
 	if not IsValid(self.Name) then
@@ -188,22 +202,32 @@ function SETTINGS:SetUnit(u)
 		self.Categories:Clear()
 	end
 
+	self.Settings = {}
 	for k,v in pairs(u.Settings) do
 		local panel
 		if v.CustomPanel then
 			panel = v.CustomPanel.Create()
 			v.CustomPanel.Set(panel, u:GetSettings(k))
 			panel._GetValue = v.CustomPanel.Get
+			panel._SetValue = v.CustomPanel.Set
 		elseif v.Type and createpanel[v.Type] then
 			panel = createpanel[v.Type]()
 			setvalue[v.Type](panel, u:GetSetting(k))
 			panel._GetValue = getvalue[v.Type]
+			panel._SetValue = setvalue[v.Type]
 		end
 
 		if panel then
+			panel._Save = function()
+				net.Start("nzu_logicmap_setting")
+					net.WriteUInt(u:Index(), 16)
+					u:NetWriteSetting(k, panel:_GetValue())
+				net.SendToServer()
+			end
+
 			local cat = self.Categories:Add(k)
 			cat:SetTall(panel:GetTall())
-			cat:SetExpanded(false)
+			cat:SetExpanded(true)
 			cat:SetContents(panel)
 			cat:DockMargin(0,0,0,1)
 
@@ -212,18 +236,19 @@ function SETTINGS:SetUnit(u)
 			save:DockMargin(2,2,2,2)
 			save:SetWide(50)
 			save:SetText("Save")
-			save.DoClick = function(s)
-				net.Start("nzu_logicmap_setting")
-					net.WriteUInt(u:Index(), 16)
-					net.WriteString(k)
-					if v.NetSend then
-						v.NetSend(self, panel:_GetValue())
-					elseif v.Type then
-						writetypes[v.Type](panel:_GetValue())
-					end
-				net.SendToServer()
-			end
+			save.DoClick = panel._Save
+
+			self.Settings[k] = panel
 		end
+	end
+
+	self.m_lUnit = u
+end
+
+function SETTINGS:Reload()
+	if not self.Settings or not IsValid(self.m_lUnit) then return end
+	for k,v in pairs(self.Settings) do
+		v:_SetValue(self.m_lUnit:GetSetting(k))
 	end
 end
 derma.DefineControl("DLogicMapSettingsPanel", "", SETTINGS, "DPanel")
@@ -321,19 +346,24 @@ function PANEL:SetLogicUnit(unit)
 end
 
 function PANEL:OpenSettings()
-	if IsValid(self.SettingsPanel) then return end
-	self.SettingsPanel = vgui.Create("DFrame", self:GetParent())
-	self.SettingsPanel:SetTitle(tostring(self.m_lUnit))
+	if not IsValid(self.SettingsFrame) then
+		self.SettingsFrame = vgui.Create("DFrame", self:GetParent())
+		self.SettingsFrame:SetTitle(tostring(self.m_lUnit))
 
-	local settings = self.SettingsPanel:Add("DLogicMapSettingsPanel")
-	settings:SetUnit(self.m_lUnit)
-	settings:Dock(FILL)
+		local settings = self.SettingsFrame:Add("DLogicMapSettingsPanel")
+		settings:SetUnit(self.m_lUnit)
+		settings:Dock(FILL)
+
+		self.SettingsFrame:SetDeleteOnClose(true)
+		self.SettingsFrame:SetZPos(200)
+		self.SettingsFrame:SetSize(300,500)
+
+		self.SettingsPanel = settings
+	end
+	self.SettingsFrame:SetVisible(true)
 
 	local x,y = self:GetPos()
-	self.SettingsPanel:SetSize(300,500)
-	self.SettingsPanel:SetPos(x,y)
-
-	self.SettingsPanel:SetZPos(200)
+	self.SettingsFrame:SetPos(x,y)
 end
 
 function PANEL:PerformLayout()
@@ -343,6 +373,10 @@ function PANEL:PerformLayout()
 		self.Icon:SetSize(min,min)
 		self.Icon:SetPos(x/2 - min/2, y/2 - min/2)
 	end
+end
+
+function PANEL:OnRemove()
+	if IsValid(self.SettingsFrame) then self.SettingsFrame:Remove() end
 end
 
 local postypes = {
@@ -567,4 +601,12 @@ hook.Add("nzu_LogicUnitConnected", "nzu_LogicMapConnected", function(u, outp, ci
 	local chip = logicmapchips[u:Index()]
 	if not chip then addunittomap(u) end
 	addconnection(u, outp, cid, c, chip)
+end)
+
+hook.Add("nzu_LogicUnitSettingChanged", "nzu_LogicMapSetting", function(u, setting, val)
+	local chip = logicmapchips[u:Index()]
+	if chip and chip.SettingsPanel then
+		local p = chip.SettingsPanel.Settings[setting]
+		p:_SetValue(val)
+	end
 end)

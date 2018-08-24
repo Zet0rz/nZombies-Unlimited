@@ -42,17 +42,12 @@ end)
 util.AddNetworkString("nzu_logicmap_setting")
 net.Receive("nzu_logicmap_setting", function(len, ply)
 	local index = net.ReadUInt(16)
-	local setting = net.ReadString()
 
 	local unit = nzu.GetLogicUnit(index)
-	if IsValid(unit) and unit.Settings[setting] then
-		local val
-		local stbl = unit.Settings[setting]
-		if stbl.NetRead then
-			val = stbl.NetRead(unit)
-		elseif stbl.Type then
-			val = net.ReadVars[stbl.Type]()
+	if IsValid(unit) then
+		local setting, val = unit:NetReadSetting()
+		if setting and val then 
+			unit:SetSetting(setting, val)
 		end
-		unit:SetSetting(setting, val)
 	end
 end)

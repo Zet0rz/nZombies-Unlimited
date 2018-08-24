@@ -18,6 +18,8 @@ function PANEL:Init()
 end
 
 function PANEL:SetVector(v)
+	local v = Vector(v.x, v.y, v.z)
+
 	self.nX:SetValue(v.x)
 	self.nY:SetValue(v.y)
 	self.nZ:SetValue(v.z)
@@ -68,6 +70,8 @@ function ANGLE:Init()
 end
 
 function ANGLE:SetAngles(a)
+	local a = Angle(a.p, a.y, a.r)
+
 	self.nP:SetValue(a.p)
 	self.nY:SetValue(a.y)
 	self.nR:SetValue(a.r)
@@ -109,6 +113,7 @@ function MATRIX:Init()
 end
 
 function MATRIX:SetMatrix(m)
+	local m = Matrix(m:ToTable())
 	for i = 1,4 do
 		for j = 1,4 do
 			self.m_tNumberWangs[i][j]:SetValue(m:GetField(i,j))

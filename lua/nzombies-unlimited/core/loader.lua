@@ -18,12 +18,14 @@ if SERVER then
 
 	include("sv_saveload.lua")
 	include("logic/sv_logicmap.lua")
+	include("cl_entities.lua")
 else
 	include("cl_nzombies_skin.lua")
 	include("cl_spawnmenu.lua")
 	include("cl_vgui_configtree.lua")
 	include("cl_saveload.lua")
 	include("logic/cl_logicmap.lua")
+	include("cl_entities.lua")
 end
 include("entities.lua")
 include("logicmap.lua")
