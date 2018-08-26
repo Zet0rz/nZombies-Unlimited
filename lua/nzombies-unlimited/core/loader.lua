@@ -15,23 +15,27 @@ if SERVER then
 	AddCSLuaFile("cl_vgui_configtree.lua")
 	AddCSLuaFile("logic/logic_manager.lua")
 	AddCSLuaFile("logic/cl_logicmap.lua")
+	AddCSLuaFile("spawnmenu_entities.lua")
 
 	include("sv_saveload.lua")
 	include("logic/sv_logicmap.lua")
-	include("cl_entities.lua")
 else
 	include("cl_nzombies_skin.lua")
 	include("cl_spawnmenu.lua")
 	include("cl_vgui_configtree.lua")
 	include("cl_saveload.lua")
 	include("logic/cl_logicmap.lua")
-	include("cl_entities.lua")
 end
 include("entities.lua")
 include("logicmap.lua")
 include("configsettings.lua")
 include("logic/logic_manager.lua")
 
+include("spawnmenu_entities.lua")
+
 -- Test unit
 AddCSLuaFile("logic/nzu_logic_testunit.lua")
 include("logic/nzu_logic_testunit.lua")
+
+AddCSLuaFile("spawnmenu_entities_test.lua")
+include("spawnmenu_entities_test.lua")
