@@ -55,9 +55,9 @@ function INPUTPORT:DropAction(pnls, dropped, menu, x, y)
 		for k,v in pairs(pnls) do
 			-- Request a connection
 			net.Start("nzu_logicmap_connect")
-				net.WriteUInt(v.m_lUnit:Index(), 16)
+				net.WriteUInt(v.m_lUnit:LogicIndex(), 16)
 				net.WriteString(v.m_sPort)
-				net.WriteUInt(self.m_lUnit:Index(), 16)
+				net.WriteUInt(self.m_lUnit:LogicIndex(), 16)
 				net.WriteString(self.m_sPort)
 				net.WriteString("") -- For now, no arguments. Maybe change later so client can "pre-send" args?
 			net.SendToServer()
@@ -207,12 +207,12 @@ function SETTINGS:SetUnit(u)
 		local panel
 		if v.CustomPanel then
 			panel = v.CustomPanel.Create()
-			v.CustomPanel.Set(panel, u:GetSettings(k))
+			v.CustomPanel.Set(panel, u:GetLogicSetting(k))
 			panel._GetValue = v.CustomPanel.Get
 			panel._SetValue = v.CustomPanel.Set
 		elseif v.Type and createpanel[v.Type] then
 			panel = createpanel[v.Type]()
-			setvalue[v.Type](panel, u:GetSetting(k))
+			setvalue[v.Type](panel, u:GetLogicSetting(k))
 			panel._GetValue = getvalue[v.Type]
 			panel._SetValue = setvalue[v.Type]
 		end
@@ -220,8 +220,8 @@ function SETTINGS:SetUnit(u)
 		if panel then
 			panel._Save = function()
 				net.Start("nzu_logicmap_setting")
-					net.WriteUInt(u:Index(), 16)
-					u:NetWriteSetting(k, panel:_GetValue())
+					net.WriteUInt(u:LogicIndex(), 16)
+					u:NetWriteLogicSetting(k, panel:_GetValue())
 				net.SendToServer()
 			end
 
@@ -248,7 +248,7 @@ end
 function SETTINGS:Reload()
 	if not self.Settings or not IsValid(self.m_lUnit) then return end
 	for k,v in pairs(self.Settings) do
-		v:_SetValue(self.m_lUnit:GetSetting(k))
+		v:_SetValue(self.m_lUnit:GetLogicSetting(k))
 	end
 end
 derma.DefineControl("DLogicMapSettingsPanel", "", SETTINGS, "DPanel")
@@ -288,6 +288,13 @@ function PANEL:Init()
 	self.SettingsButton:SetZPos(100)
 	self.SettingsButton.DoClick = function() self:OpenSettings() end
 
+	self.EntityIcon = vgui.Create("DImage", self.TopPorts)
+	self.EntityIcon:SetImage("icon16/bricks.png")
+	self.EntityIcon:SetSize(port_size, port_size)
+	self.EntityIcon:Dock(RIGHT)
+	self.EntityIcon:SetZPos(100)
+	self.EntityIcon:SetVisible(false)
+
 	self.IGNORECHILD = nil
 
 	self.m_tOutputPorts = {}
@@ -309,12 +316,13 @@ function PANEL:OnChildAdded(p)
 end
 
 function PANEL:SetLogicUnit(unit)
-	if unit.CustomPanel then
+	local chip = unit.nzu_Logic or unit
+	if chip.CustomPanel then
 		self:Clear()
-		unit:CustomPanel(self)
+		chip.CustomPanel(unit, self)
 	else
 		if not self.Icon then self.Icon = self:Add("DImage") end
-		self.Icon:SetImage(unit.Icon)
+		self.Icon:SetImage(chip.Icon)
 		--self.Icon:Dock(FILL)
 		--self.Icon:DockMargin(10,10,10,10)
 		self.Icon:SetKeepAspect(true)
@@ -327,17 +335,19 @@ function PANEL:SetLogicUnit(unit)
 	self.m_tOutputPorts = {}
 	self.m_tInputPorts = {}
 
-	if unit.Outputs then
-		for k,v in pairs(unit.Outputs) do
+	local outputs = unit:GetLogicOutputs()
+	if outputs then
+		for k,v in pairs(outputs) do
 			if v.Port then
-				self.m_tOutputPorts[k] = v.Port
+				self.m_tOutputPorts[k] = {Side = v.Port.Side, Pos = v.Port.Pos}
 			end
 		end
 	end
-	if unit.Inputs then
-		for k,v in pairs(unit.Inputs) do
+	local inputs = unit:GetLogicInputs()
+	if inputs then
+		for k,v in pairs(inputs) do
 			if v.Port then
-				self.m_tInputPorts[k] = v.Port
+				self.m_tInputPorts[k] = {Side = v.Port.Side, Pos = v.Port.Pos}
 			end
 		end
 	end
@@ -377,6 +387,13 @@ end
 
 function PANEL:OnRemove()
 	if IsValid(self.SettingsFrame) then self.SettingsFrame:Remove() end
+end
+
+function PANEL:Think()
+	if IsValid(self.m_bThinkPosition) then
+		local pos = self.m_lUnit:GetPos()
+		self.m_bThinkPosition:SetChildPos(self, pos.x, pos.y)
+	end
 end
 
 local postypes = {
@@ -476,9 +493,9 @@ local function addconnection(unit, outp, cid, c, chip)
 	if outputport then
 		if outputport.Connections[cid] then return end -- It already exists. Maybe update?
 		local target = c.Target
-		if not IsValid(target) then return elseif not logicmapchips[target:Index()] then addunittomap(target) end
+		if not IsValid(target) then return elseif not logicmapchips[target:LogicIndex()] then addunittomap(target) end
 
-		local inputport = logicmapchips[target:Index()].m_tInputPorts[c.Input]
+		local inputport = logicmapchips[target:LogicIndex()].m_tInputPorts[c.Input]
 		if inputport then
 			local p = vgui.Create("DLogicMapUnitConnection", logicmap)
 			p:SetPorts(outputport, inputport)
@@ -487,9 +504,10 @@ local function addconnection(unit, outp, cid, c, chip)
 	end
 end
 addunittomap = function(unit)
-	if IsValid(logicmapchips[unit:Index()]) then return end
+	if IsValid(logicmapchips[unit:LogicIndex()]) then return end
 
 	if IsValid(logicmap) then
+		print(unit:LogicIndex())
 		local chip = vgui.Create("DLogicMapUnit", logicmap)
 		chip:SetShowPorts(true)
 		chip:SetLogicUnit(unit)
@@ -497,17 +515,22 @@ addunittomap = function(unit)
 		local pos = unit:GetPos()
 		logicmap:SetChildPos(chip, pos.x,pos.y)
 
-		chip:Droppable("nzu_logicmap")
-		chip.OnDropIntoMap = function(x,y)
-			net.Start("nzu_logicmap_move")
-				net.WriteUInt(unit:Index(), 16)
-				net.WriteVector(Vector(x,y,0))
-			net.SendToServer()
+		if type(unit) == "Entity" then
+			chip.m_bThinkPosition = logicmap
+			chip.EntityIcon:SetVisible(true)
+		else
+			chip:Droppable("nzu_logicmap")
+			chip.OnDropIntoMap = function(x,y)
+				net.Start("nzu_logicmap_move")
+					net.WriteUInt(unit:LogicIndex(), 16)
+					net.WriteVector(Vector(x,y,0))
+				net.SendToServer()
+			end
 		end
 
-		logicmapchips[unit:Index()] = chip
+		logicmapchips[unit:LogicIndex()] = chip
 
-		for k,v in pairs(unit:GetOutputConnections()) do
+		for k,v in pairs(unit:GetLogicOutputConnections()) do
 			for k2,v2 in pairs(v) do
 				addconnection(unit, k, k2, v2, chip)
 			end
@@ -596,17 +619,25 @@ nzu.AddSpawnmenuTab("Logic Map", "DPanel", function(panel)
 	end
 end, "icon16/arrow_switch.png", "Create and connect Config Logic")
 
-hook.Add("nzu_LogicUnitCreated", "nzu_LogicMapCreate", function(u) addunittomap(u) end)
+hook.Add("nzu_LogicUnitCreated", "nzu_LogicMapCreate", addunittomap)
 hook.Add("nzu_LogicUnitConnected", "nzu_LogicMapConnected", function(u, outp, cid, c)
-	local chip = logicmapchips[u:Index()]
+	local chip = logicmapchips[u:LogicIndex()]
 	if not chip then addunittomap(u) end
 	addconnection(u, outp, cid, c, chip)
 end)
 
 hook.Add("nzu_LogicUnitSettingChanged", "nzu_LogicMapSetting", function(u, setting, val)
-	local chip = logicmapchips[u:Index()]
+	local chip = logicmapchips[u:LogicIndex()]
 	if chip and chip.SettingsPanel then
 		local p = chip.SettingsPanel.Settings[setting]
 		p:_SetValue(val)
 	end
 end)
+
+hook.Add("nzu_LogicEntityCreated", "nzu_LogicMapCreate", addunittomap)
+
+local function removeunit(unit)
+	if logicmapchips[unit:LogicIndex()] then logicmapchips[unit:LogicIndex()]:Remove() end
+end
+hook.Add("nzu_LogicUnitRemoved", "nzu_LogicMapRemove", removeunit)
+hook.Add("nzu_LogicEntityRemoved", "nzu_LogicMapRemove", removeunit)

@@ -35,7 +35,7 @@ net.Receive("nzu_logicmap_connect", function(len, ply)
 	local unit = nzu.GetLogicUnit(index)
 	local unit2 = nzu.GetLogicUnit(target)
 	if IsValid(unit) and IsValid(unit2) then
-		unit:Connect(outport, unit2, inport, args, ply)
+		unit:LogicConnect(outport, unit2, inport, args, ply)
 	end
 end)
 
@@ -45,9 +45,9 @@ net.Receive("nzu_logicmap_setting", function(len, ply)
 
 	local unit = nzu.GetLogicUnit(index)
 	if IsValid(unit) then
-		local setting, val = unit:NetReadSetting()
+		local setting, val = unit:NetReadLogicSetting()
 		if setting and val then 
-			unit:SetSetting(setting, val)
+			unit:SetLogicSetting(setting, val)
 		end
 	end
 end)
