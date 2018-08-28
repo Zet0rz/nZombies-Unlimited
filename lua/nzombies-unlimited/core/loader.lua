@@ -1,6 +1,8 @@
 -- Create a global module
 nzu = nzu or {}
 
+function nzu.IsAdmin(ply) return ply:IsAdmin() end -- Replace this later
+
 -- Globals to act like SERVER and CLIENT (reversed when modules are loaded in the main mode)
 NZU_SANDBOX = true
 NZU_NZOMBIES = false
@@ -17,14 +19,19 @@ if SERVER then
 	AddCSLuaFile("logic/cl_logicmap.lua")
 	AddCSLuaFile("spawnmenu_entities.lua")
 
+	AddCSLuaFile("extensions/extension_manager.lua")
+
 	include("sv_saveload.lua")
 	include("logic/sv_logicmap.lua")
+	include("extensions/extension_manager.lua")
 else
 	include("cl_nzombies_skin.lua")
 	include("cl_spawnmenu.lua")
 	include("cl_vgui_configtree.lua")
 	include("cl_saveload.lua")
 	include("logic/cl_logicmap.lua")
+
+	include("extensions/extension_manager.lua")
 end
 include("entities.lua")
 include("logicmap.lua")

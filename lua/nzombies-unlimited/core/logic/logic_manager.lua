@@ -809,6 +809,13 @@ if SERVER then
 		self.m_sLogicClass = nil
 	end
 
+	hook.Add("OnEntityCreated", "nzu_LogicEntityCreate", function(ent)
+		if ent.nzu_Logic and not ent.m_bLogicEnabled then
+			ent.m_bLogicNetwork = not ent.nzu_Logic.NoNetwork
+			initializelogicentity(ent)
+		end
+	end)
+
 else
 	net.Receive("nzu_logic_logicentity", function()
 		local ent = net.ReadEntity()
