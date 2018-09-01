@@ -1,4 +1,10 @@
 
+if SERVER then
+	util.AddNetworkString("nzu_extension_load")
+	util.AddNetworkString("nzu_extension_available")
+	util.AddNetworkString("nzu_extension_setting")
+end
+
 local extensions = {}
 function nzu.GetExtension(id)
 	return extension[id]
@@ -120,8 +126,11 @@ function EXTENSION:GetSettingsList()
 	return self.Settings
 end
 
+local loadingextension
+function nzu.Extension() return loadingextension end
+
 if SERVER then
-	util.AddNetworkString("nzu_extension_setting")
+	
 	function EXTENSION:SetSetting(key)
 		if not self.Settings or not self.Settings[setting] then return end
 		local settingtbl = self.Settings[setting]
@@ -137,12 +146,10 @@ if SERVER then
 		end
 	end
 
-	util.AddNetworkString("nzu_extension_load")
-	util.AddNetworkString("nzu_extension_available")
 	function nzu.LoadExtension(id)
 		if not availableextensions[id] then print("Could not load Extension '"..id.."'. Maybe try nzu.RefreshExtensions()?") return end
 
-		local extension = setmetatable({}, EXTENSION)
+		loadingextension = setmetatable({}, EXTENSION)
 		loadluafiles(extensionpath..id)
 
 		if extension.Settings then
@@ -158,6 +165,9 @@ if SERVER then
 		net.Start("nzu_extension_load")
 			net.WriteString(id)
 		net.Broadcast()
+
+		loadingextension = nil
+		hook.Run("nzu_ExtensionLoaded", id)
 	end
 
 	hook.Add("PlayerInitialSpawn", "nzu_Extension_FullSync", function(ply)
@@ -192,7 +202,7 @@ if SERVER then
 else
 	net.Receive("nzu_extension_load", function()
 		local id = net.ReadString()
-		local extension = setmetatable({}, EXTENSION)
+		loadingextension = setmetatable({}, EXTENSION)
 		loadluafiles(extensionpath..id)
 
 		if extension.Settings then
@@ -206,6 +216,9 @@ else
 
 		if not availableextensions[id] then availableextensions[id] = {} end
 		availableextensions[id].Loaded = true
+
+		loadingextension = nil
+		hook.Run("nzu_ExtensionLoaded", id)
 	end)
 
 	net.Receive("nzu_extension_setting", function()
