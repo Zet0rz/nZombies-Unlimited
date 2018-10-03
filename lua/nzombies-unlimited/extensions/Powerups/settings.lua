@@ -9,7 +9,7 @@ local powerups = {
 	"Carpenter",
 }
 
-EXTENSION.Settings = {
+local settings = {
 	["Enabled Powerups"] = {
 		Type = TYPE_BOOL,
 		NetSend = function(self, val)
@@ -28,11 +28,15 @@ EXTENSION.Settings = {
 }
 
 if CLIENT then
-	function EXTENSION:Panel()
+	local panelfunc = function()
 		local p = vgui.Create("DPanel")
 		p:SetBackgroundColor(Color(255,0,0))
 		p:SetSize(100,500)
 
 		return p
 	end
+
+	return settings, panelfunc
 end
+
+return settings

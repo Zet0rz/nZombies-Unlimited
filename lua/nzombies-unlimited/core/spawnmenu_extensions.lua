@@ -7,6 +7,24 @@ local function generateextensionpanel(id, ext)
 	checkbox:Dock(RIGHT)
 	checkbox:SetWide(20)
 
+	if ext.Loaded then
+		checkbox:SetChecked(true)
+		local extension = nzu.GetExtension(id)
+		local panel
+		if extension and extension.Panel then panel = extension:Panel() else
+			panel = vgui.Create("DLabel")
+			panel:SetText("No control panel for this Extension.")
+		end
+		f:SetContents(panel)
+	end
+
+	checkbox.OnChange = function(s,b)
+		net.Start("nzu_extension_load")
+			net.WriteString(id)
+			net.WriteBool(b)
+		net.SendToServer()
+	end
+
 	return f
 end
 
