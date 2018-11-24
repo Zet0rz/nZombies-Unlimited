@@ -1,32 +1,42 @@
 
-local function generateextensionpanel(id, ext)
+local function generatesettingspanel(ext)
+	local p = nzu.GetExtensionPanel(ext)
+	if not p then
+		p = vgui.Create("DPanel")
+		local t = p:Add("DLabel")
+		t:SetText("No settings for this extension...")
+		t:SetContentAlignment(5)
+		t:SetTextColor(Color(0,0,0))
+		t:Dock(TOP)
+		p:SetTall(30)
+	end
+	return p
+end
+
+local function generateextensionpanel(ext)
 	local f = vgui.Create("DCollapsibleCategory")
-	f:SetLabel((ext.Details.Name or "[Unknown Name]") .. " ["..id.."]")
+	local details = nzu.GetExtensionDetails(ext)
+
+	f:SetLabel((details.Name or "[Unknown Name]") .. " ["..ext.."]")
 
 	local checkbox = f.Header:Add("DCheckBoxLabel")
 	checkbox:Dock(RIGHT)
 	checkbox:SetWide(20)
-
-	if ext.Loaded then
-		checkbox:SetChecked(true)
-		local extension = nzu.GetExtension(id)
-		local panel
-		if extension and extension.Panel then panel = extension:Panel() else
-			panel = vgui.Create("DLabel")
-			panel:SetText("No control panel for this Extension.")
-		end
-		f:SetContents(panel)
-	end
+	checkbox:SetChecked(nzu.IsExtensionLoaded(ext))
+	f.LoadedCheckbox = checkbox
+	f:SetContents(generatesettingspanel(""))
 
 	checkbox.OnChange = function(s,b)
 		net.Start("nzu_extension_load")
-			net.WriteString(id)
+			net.WriteString(ext)
 			net.WriteBool(b)
 		net.SendToServer()
 	end
 
 	return f
 end
+
+local extpanels = {}
 
 local columns = 3
 local pad = 3
@@ -47,16 +57,46 @@ nzu.AddSpawnmenuTab("Config Settings", "DPanel", function(panel)
 		end
 	end
 
-	nzu.RefreshExtensions()
 	local loadedexts = 1
 	for i = 1,6 do
-		for k,v in pairs(nzu.GetExtensionList()) do
-			local f = generateextensionpanel(k,v)
+		for k,v in pairs(nzu.GetInstalledExtensionList()) do
+			local f = generateextensionpanel(v)
 			panel.Lists[loadedexts]:Add(f)
 			f:Dock(TOP)
 			f:SetHeight(300)
 
 			loadedexts = loadedexts < columns and loadedexts + 1 or 1
+			extpanels[v] = f
 		end
 	end
 end, "icon16/plugin.png", "Control Config Settings and Extensions")
+
+hook.Add("nzu_ExtensionLoaded", "nzu_SpawnmenuExtension", function(ext)
+	local pnl = extpanels[ext]
+	if pnl then
+		--[[local p = vgui.Create("DPanel")
+		p:SetBackgroundColor(Color(0,255,0))
+		p:SetSize(100,500)
+
+		extpanels[ext]:SetContents(p)]]
+
+		pnl.LoadedCheckbox:SetChecked(true)
+		local p = generatesettingspanel(ext)
+		timer.Simple(0, function()
+			if pnl:GetExpanded() then
+				pnl:SetTall(p:GetTall() + pnl.Header:GetTall())
+			else
+				pnl.OldHeight = p:GetTall() + pnl.Header:GetTall()
+				pnl:DoExpansion(true)
+			end
+			pnl:SetContents(p)
+		end)
+	end
+end)
+
+hook.Add("nzu_ExtensionSettingChanged", "nzu_SpawnmenuExtension", function(ext, setting, value)
+	local pnl = extpanels[ext]
+	if pnl and pnl.Contents.SettingPanels and pnl.Contents.SettingPanels[setting] then
+		pnl.Contents.SettingPanels[setting]:_SetValue(value)
+	end
+end)

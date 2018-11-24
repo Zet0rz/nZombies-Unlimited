@@ -25,13 +25,26 @@ local settings = {
 		end,
 		Default = {},
 	},
+	["TestString"] = {
+		Type = TYPE_COLOR,
+		Default = Color(255,0,0),
+	},
 }
 
 if CLIENT then
 	local panelfunc = function()
 		local p = vgui.Create("DPanel")
-		p:SetBackgroundColor(Color(255,0,0))
-		p:SetSize(100,500)
+		p:SetBackgroundColor(Color(100,100,100))
+		p:SetTall(300)
+
+		local pnl = SettingPanel("Enabled Powerups")
+		pnl:SetParent(p)
+		pnl:SetPos(20, 50)
+
+		local pnl2 = SettingPanel("TestString")
+		pnl2:SetParent(p)
+		--pnl2:SetWide(200)
+		pnl2:SetPos(20, 100)
 
 		return p
 	end

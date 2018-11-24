@@ -20,6 +20,7 @@ if SERVER then
 	AddCSLuaFile("spawnmenu_entities.lua")
 
 	AddCSLuaFile("extensions/extension_manager.lua")
+	AddCSLuaFile("extensions/extension_panels.lua")
 	AddCSLuaFile("spawnmenu_extensions.lua")
 
 	include("sv_saveload.lua")
@@ -32,6 +33,7 @@ else
 	include("cl_saveload.lua")
 	include("logic/cl_logicmap.lua")
 
+	include("extensions/extension_panels.lua")
 	include("extensions/extension_manager.lua")
 	include("spawnmenu_extensions.lua")
 end

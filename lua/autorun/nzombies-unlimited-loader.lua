@@ -1,8 +1,20 @@
 
 -- Temporary to try another structure
-if true then
-	AddCSLuaFile("nzombies-unlimited/core/loader.lua")
-	include("nzombies-unlimited/core/loader.lua")
+if not ConVarExists("nzu_sandbox_enable") then CreateConVar("nzu_sandbox_enable", 1, {FCVAR_REPLICATED, FCVAR_ARCHIVE, FCVAR_SERVER_CAN_EXECUTE}) end
+if GetConVar("nzu_sandbox_enable"):GetBool() then
+	if SERVER then
+		if engine.ActiveGamemode() == "sandbox" then
+			print("NZOMBIES UNLIMITED: Loading...")
+			AddCSLuaFile("nzombies-unlimited/core/loader.lua")
+			include("nzombies-unlimited/core/loader.lua")
+		end
+	else
+		hook.Add("PreGamemodeLoaded", "nzu_SandboxCheck", function()
+			print("NZOMBIES UNLIMITED: Loading...")
+			AddCSLuaFile("nzombies-unlimited/core/loader.lua")
+			include("nzombies-unlimited/core/loader.lua")
+		end)
+	end
 return end
 
 local mode = engine.ActiveGamemode()
