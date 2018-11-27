@@ -12,12 +12,12 @@ local powerups = {
 local settings = {
 	["Enabled Powerups"] = {
 		Type = TYPE_BOOL,
-		NetSend = function(self, val)
+		NetSend = function(val)
 			for k,v in pairs(powerups) do
 				net.WriteBool(val[v])
 			end
 		end,
-		NetRead = function(self)
+		NetRead = function()
 			local tbl = {}
 			for k,v in pairs(powerups) do
 				tbl[v] = net.ReadBool()
