@@ -5,10 +5,14 @@ if CLIENT then
 	local cornerlength = 15
 	local textcolor = Color(220,220,220)
 	local paintfunc = function(b, w, h) -- Draw the black button with the white corners
-		if b.Hovered then
-			surface.SetDrawColor(50,50,50,240)
+		if b.AdminOnly and not nzu.IsAdmin(LocalPlayer()) then
+			surface.SetDrawColor(50,25,25,230)
 		else
-			surface.SetDrawColor(0,0,0,220)
+			if b.Hovered then
+				surface.SetDrawColor(50,50,50,240)
+			else
+				surface.SetDrawColor(0,0,0,220)
+			end
 		end
 		b:DrawFilledRect()
 
@@ -25,7 +29,12 @@ if CLIENT then
 		surface.DrawRect(w - cornerlength,h - cornerthickness,cornerlength, cornerthickness)
 		surface.DrawRect(w - cornerthickness,h - cornerlength, cornerthickness, cornerlength - cornerthickness)
 	end
-	local function generatebutton(text)
+	local function buttondoclick(b)
+		if not b.AdminOnly or nzu.IsAdmin(LocalPlayer()) then
+			b:ClickFunction()
+		end
+	end
+	local function generatebutton(text,admin)
 		local b = vgui.Create("DButton")
 		b:SetFont("DermaLarge")
 		b:SetText(" " .. text .. " ") -- Append spaces around to free from edges
@@ -34,16 +43,19 @@ if CLIENT then
 		b:DockMargin(1,1,1,1)
 		b:SetTall(50)
 
+		b.AdminOnly = admin
+
 		b.Paint = paintfunc
+		b.DoClick = buttondoclick
 
 		return b
 	end
-	function SUBMENU:AddButton(text, zpos, func)
+	function SUBMENU:AddButton(text, zpos, func, admin)
 		if IsValid(self.List) then
-			local b = generatebutton(text)
+			local b = generatebutton(text, admin)
 			b:SetZPos(zpos)
 			b.SubMenu = self
-			b.DoClick = func
+			b.ClickFunction = func
 			self.List:Add(b)
 		end
 	end
@@ -54,13 +66,15 @@ if CLIENT then
 			local p = b.SubPanel
 			if IsValid(p) then
 				s:Hide()
+				s:OnHid()
+				p:OnShown()
 				p:Show()
 			end
 		end
 	end
-	function SUBMENU:AddSubMenu(text, zpos)
+	function SUBMENU:AddSubMenu(text, zpos, admin)
 		if IsValid(self.List) then
-			local b = generatebutton(text)
+			local b = generatebutton(text, admin)
 			b:SetZPos(zpos)
 
 			local submenu = vgui.Create("nzu_MenuPanel_SubMenu")
@@ -71,15 +85,15 @@ if CLIENT then
 			b.SubMenu = self
 			b.SubPanel = submenu
 			submenu:SetPrevious(text, self)
-			b.DoClick = submenuclick
+			b.ClickFunction = submenuclick
 			self.List:Add(b)
 
 			return submenu
 		end
 	end
-	function SUBMENU:AddPanel(text, zpos, panel)
+	function SUBMENU:AddPanel(text, zpos, panel, admin)
 		if IsValid(self.List) then
-			local b = generatebutton(text)
+			local b = generatebutton(text, admin)
 			b:SetZPos(zpos)
 
 			local submenu = vgui.Create("nzu_MenuPanel_SubMenu")
@@ -91,7 +105,7 @@ if CLIENT then
 			b.SubMenu = self
 			b.SubPanel = submenu
 			submenu:SetPrevious(text, self)
-			b.DoClick = submenuclick
+			b.ClickFunction = submenuclick
 			self.List:Add(b)
 
 			return submenu
@@ -120,10 +134,6 @@ if CLIENT then
 		self.List = self.Contents:Add("DListLayout")
 		self.List:Dock(FILL)
 
-		--self:AddButton("Ready up" .. i, 1, function() print("Ready!") end)
-		--i = i + 1
-		--timer.Simple(1, function() self:AddButton("Hi2", 1, function() print("nah") end) print("Added 2") end)
-
 		self:Hide()
 	end
 	function SUBMENU:SetPrevious(text, panel)
@@ -132,6 +142,7 @@ if CLIENT then
 			self.BackButton:SetText("  < ".. text .. " ")
 			self.BackButton:SizeToContents()
 			self.BackButton.SubPanel = panel
+			self.Previous = panel
 		else
 			self.BackButton:Hide()
 		end
@@ -145,21 +156,23 @@ if CLIENT then
 	function SUBMENU:GetContents()
 		return self.Contents
 	end
+	function SUBMENU:OnShown() end
+	function SUBMENU:OnHid() end
 	vgui.Register("nzu_MenuPanel_SubMenu", SUBMENU, "Panel")
 
 	local PANEL = {}
 
 	-- Important functions for you developers out there here at the top
-	function PANEL:AddButton(text, zpos, func)
-		self.MenuRoot:AddButton(text, zpos, func)
+	function PANEL:AddButton(text, zpos, func, admin)
+		return self.MenuRoot:AddButton(text, zpos, func, admin)
 	end
 
-	function PANEL:AddSubMenu(text, zpos)
-		return self.MenuRoot:AddSubMenu(text, zpos)
+	function PANEL:AddSubMenu(text, zpos, admin)
+		return self.MenuRoot:AddSubMenu(text, zpos, admin)
 	end
 	
-	function PANEL:AddPanel(text, zpos, panel)
-		self.MenuRoot:AddPanel(text, zpos, panel)
+	function PANEL:AddPanel(text, zpos, panel, admin)
+		return self.MenuRoot:AddPanel(text, zpos, panel, admin)
 	end
 	
 	--function PANEL:AddNetworkedButton(text, )
@@ -232,6 +245,11 @@ if CLIENT then
 		self.PlayerList:SetWide(600)
 		self.PlayerList:DockMargin(50,100,100,100)
 
+		-- Add a middle panel for parenting special displays right in the center of the menu (depending on space)
+		self.MiddleCanvas = self:Add("DDragBase")
+		self.MiddleCanvas:Dock(FILL)
+		self.MiddleCanvas:DockMargin(0,100,0,100)
+
 		self:SetConfig() -- unloaded
 
 		-- The menu list
@@ -242,7 +260,8 @@ if CLIENT then
 
 		-- Now populate!
 		self:AddButton("Ready up", 1, function() print("Readying") end)
-		local configs = self:AddSubMenu("Load config ...", 2)
+
+		local configs = self:AddSubMenu("Load config ...", 3, true)
 			configs:AddButton("gm_construct - or something")
 			configs:AddButton("Breakout")
 			configs:AddButton("Imprisoned")
@@ -251,7 +270,7 @@ if CLIENT then
 			end
 			
 		local ext = vgui.Create("DPanel")
-		self:AddPanel("Extension Settings...", 3, ext)
+		self:AddPanel("Extension Settings...", 4, ext, true)
 
 		self.MenuRoot:Show()
 		
@@ -274,6 +293,10 @@ if CLIENT then
 		self:Hide()
 	end
 
+	function PANEL:ParentPanelToCenter(panel)
+		panel:SetParent(self.MiddleCanvas)
+	end
+
 	--function PANEL:DoClick() print("hfiua") end
 
 	function PANEL:Toggle()
@@ -281,18 +304,32 @@ if CLIENT then
 	end
 	vgui.Register("nzu_MenuPanel", PANEL, "Panel")
 
+	local menuhooks = {}
 	local function togglemenu()
 		local mainmenu = nzu.Menu
 		if mainmenu then mainmenu:Remove() mainmenu = nil end
 		if not mainmenu then
 			mainmenu = vgui.Create("nzu_MenuPanel")
 			nzu.Menu = mainmenu
+			for k,v in pairs(menuhooks) do
+				v(mainmenu)
+			end
 			mainmenu:Open()
 		else
 			mainmenu:Toggle()
 		end
 	end
 	net.Receive("nzu_OpenMenu", togglemenu)
+
+	function nzu.AddMenuHook(id, func)
+		menuhooks[id] = func
+		if IsValid(nzu.Menu) then
+			func(nzu.Menu)
+		end
+	end
+	function nzu.RemoveMenuHook(id)
+		menuhooks[id] = nil
+	end
 
 else
 	util.AddNetworkString("nzu_OpenMenu")
