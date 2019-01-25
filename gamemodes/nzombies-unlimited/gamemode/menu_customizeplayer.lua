@@ -10,7 +10,7 @@ CreateConVar( "cl_playerbodygroups", "0", { FCVAR_ARCHIVE, FCVAR_USERINFO, FCVAR
 
 nzu.AddMenuHook("CustomizePlayer", function(menu)
 	-- Player color and model menu
-	local sheet = vgui.Create( "DCategoryList" )
+	local sheet = vgui.Create( "DPropertySheet" )
 	sheet:Dock(FILL)
 
 	local sub = menu:AddPanel("Customize Player ...", 2, sheet)
@@ -32,10 +32,12 @@ nzu.AddMenuHook("CustomizePlayer", function(menu)
 	end
 	function sub:OnHid()
 		mdl:Hide()
+		net.Start("nzu_CustomizePlayerDone")
+		net.SendToServer()
 	end
 
-	local modelcat = sheet:Add("Player Model")
-	local models = vgui.Create("DPanelSelect")
+	--local modelcat = sheet:Add("Player Model")
+	local models = vgui.Create("DPanelSelect", sheet)
 
 	for name, model in SortedPairs(player_manager.AllValidModels()) do
 		local icon = vgui.Create("SpawnIcon")
@@ -46,11 +48,11 @@ nzu.AddMenuHook("CustomizePlayer", function(menu)
 
 		models:AddPanel(icon, {cl_playermodel = name})
 	end
-	modelcat:SetContents(models)
+	sheet:AddSheet("Player Model", models, "icon16/user.png")
 
-	local bgcat = sheet:Add("Bodygroups")
-	local bglist = vgui.Create("DListLayout")
-	bgcat:SetContents(bglist)	
+	--local bgcat = sheet:Add("Bodygroups")
+	local bglist = vgui.Create("DListLayout", sheet)
+	sheet:AddSheet("Bodygroups", bglist, "icon16/wrench.png")
 
 	-- Helper functions
 
@@ -118,15 +120,14 @@ nzu.AddMenuHook("CustomizePlayer", function(menu)
 			skins.type = "skin"
 			skins.OnValueChanged = UpdateBodyGroups
 			
-			bdcontrolspanel:AddItem( skins )
+			bglist:Add( skins )
 
 			mdl.Entity:SetSkin(GetConVarNumber("cl_playerskin"))
-		else
-			bglist:Add(Label("There are no bodygroups for this model."))
 		end
 
 		local groups = string.Explode( " ", GetConVarString( "cl_playerbodygroups" ) )
-		for k = 0, mdl.Entity:GetNumBodyGroups() - 1 do
+		local groupnum = mdl.Entity:GetNumBodyGroups() - 1
+		for k = 0, groupnum do
 			if ( mdl.Entity:GetBodygroupCount( k ) <= 1 ) then continue end
 
 			local bgroup = bglist:Add("DNumSlider")
@@ -143,29 +144,31 @@ nzu.AddMenuHook("CustomizePlayer", function(menu)
 
 			mdl.Entity:SetBodygroup(k, groups[k + 1] or 0)
 		end
+		if groupnum == 0 then
+			bglist:Add(Label("There are no bodygroups for this model."))
+		end
 	end
 
-	local plycolcat = sheet:Add("Player Color")
-	local plycolp = vgui.Create("Panel")
+	--local plycolcat = sheet:Add("Player Color")
+	local plycolp = vgui.Create("Panel", sheet)
 	local plycol = plycolp:Add("DColorMixer")
 	plycol:SetAlphaBar(false)
 	plycol:SetPalette(false)
-	plycol:Dock(TOP)
+	plycol:Dock(FILL)
 	plycol:SetSize(200, 260)
-	plycolcat:SetContents(plycolp)
+	sheet:AddSheet("Player Color", plycolp, "icon16/palette.png")
 
-	local wepcolcat = sheet:Add("Weapon Color")
-	local wepcolp = vgui.Create("Panel")
+	--local wepcolcat = sheet:Add("Weapon Color")
+	local wepcolp = vgui.Create("Panel", sheet)
 	local wepcol = wepcolp:Add("DColorMixer")
 	wepcol:SetAlphaBar(false)
 	wepcol:SetPalette(false)
-	wepcol:Dock(TOP)
+	wepcol:Dock(FILL)
 	wepcol:SetSize(200, 260)
 	wepcol:SetVector(Vector(GetConVarString("cl_weaponcolor")))
-	wepcolcat:SetContents(wepcolp)
+	sheet:AddSheet("Weapon Color", wepcolp, "icon16/joystick.png")
 
 	local function UpdateFromConvars()
-
 		local model = LocalPlayer():GetInfo( "cl_playermodel" )
 		local modelname = player_manager.TranslatePlayerModel( model )
 		util.PrecacheModel( modelname )

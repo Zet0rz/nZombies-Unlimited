@@ -17,6 +17,12 @@ end
 -- Logic for loading modules from /lua/nzombies-unlimited
 nzu = nzu or {}
 
+function nzu.IsAdmin(ply) return ply:IsAdmin() end -- Replace this later
+
+-- Globals to act like SERVER and CLIENT (reversed when modules are loaded in the sandbox)
+NZU_SANDBOX = false
+NZU_NZOMBIES = true
+
 -- Logic for loading gamemode-specific entries
 loadfile("menu.lua")
 loadfile_c("menu_customizeplayer.lua")
