@@ -31,6 +31,7 @@ spawnmenu.AddCreationTab(tabname, function()
 		tab:AddSheet(k, p, v.icon, false, false, v.tooltip)
 		v.panel = p
 	end
+	tab:SetSkin("nZombies Unlimited")
 	return tab
 end, "icon16/control_repeat_blue.png", 1000, "nZombies Unlimited - Control Panel")
 

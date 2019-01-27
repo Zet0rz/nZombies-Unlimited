@@ -4,24 +4,24 @@ local Color = Color
 
 SKIN = {}
 
-SKIN.PrintName		= "Default Derma Skin"
-SKIN.Author		= "Garry Newman"
+SKIN.PrintName		= "nZombies Unlimited Skin"
+SKIN.Author		= "Zet0r"
 SKIN.DermaVersion	= 1
-SKIN.GwenTexture	= Material( "gwenskin/GModDefault.png" )
+SKIN.GwenTexture	= Material( "nzombies-unlimited/nzu_vguiskin.png" )
 
-SKIN.bg_color					= Color( 50, 50, 50, 255 )
-SKIN.bg_color_sleep				= Color( 30, 30, 30, 255 )
-SKIN.bg_color_dark				= Color( 20, 20, 20, 255 )
-SKIN.bg_color_bright			= Color( 50, 50, 50, 255 )
-SKIN.frame_border				= Color( 0, 0, 0, 255 )
+SKIN.bg_color					= Color( 101, 100, 105, 255 )
+SKIN.bg_color_sleep				= Color( 70, 70, 70, 255 )
+SKIN.bg_color_dark				= Color( 55, 57, 61, 255 )
+SKIN.bg_color_bright			= Color( 220, 220, 220, 255 )
+SKIN.frame_border				= Color( 50, 50, 50, 255 )
 
 SKIN.fontFrame					= "DermaDefault"
 
-SKIN.control_color				= Color( 50, 50, 50, 255 )
+SKIN.control_color				= Color( 120, 120, 120, 255 )
 SKIN.control_color_highlight	= Color( 150, 150, 150, 255 )
-SKIN.control_color_active		= Color( 50, 50, 50, 255 )
-SKIN.control_color_bright		= Color( 100, 100, 100, 255 )
-SKIN.control_color_dark			= Color( 20, 20, 20, 255 )
+SKIN.control_color_active		= Color( 110, 150, 250, 255 )
+SKIN.control_color_bright		= Color( 255, 200, 100, 255 )
+SKIN.control_color_dark			= Color( 100, 100, 100, 255 )
 
 SKIN.bg_alt1					= Color( 50, 50, 50, 255 )
 SKIN.bg_alt2					= Color( 55, 55, 55, 255 )
@@ -57,22 +57,16 @@ SKIN.colCategoryTextInactive	= Color( 200, 200, 200, 255 )
 SKIN.fontCategoryHeader			= "TabLarge"
 
 SKIN.colNumberWangBG			= Color( 255, 240, 150, 255 )
-SKIN.colTextEntryBG				= Color( 50, 50, 50, 255 )
-SKIN.colTextEntryBG_Disabled	= Color( 20, 20, 20, 255 )
-SKIN.colTextEntryBG_Focus		= Color( 75, 75, 75, 255 )
-SKIN.colTextEntryBorder			= Color( 0, 0, 0, 255 )
-SKIN.colTextEntryText			= Color( 200, 200, 200, 255 )
-SKIN.colTextEntryTextHighlight	= Color( 150, 150, 150, 255 )
+SKIN.colTextEntryBG				= Color( 240, 240, 240, 255 )
+SKIN.colTextEntryBorder			= Color( 20, 20, 20, 255 )
+SKIN.colTextEntryText			= Color( 20, 20, 20, 255 )
+SKIN.colTextEntryTextHighlight	= Color( 20, 200, 250, 255 )
 SKIN.colTextEntryTextCursor		= Color( 0, 0, 100, 255 )
-SKIN.colTextEntryTextPlaceholder= Color( 75, 75, 75, 255 )
+SKIN.colTextEntryTextPlaceholder= Color( 128, 128, 128, 255 )
 
 SKIN.colMenuBG					= Color( 255, 255, 255, 200 )
 SKIN.colMenuBorder				= Color( 0, 0, 0, 200 )
 
-SKIN.colButtonBG				= Color( 0, 0, 0, 255 )
-SKIN.colButtonBG_Disabled		= Color( 255, 255, 255, 255 )
-SKIN.colButtonBG_Hovered		= Color( 255, 255, 255, 255 )
-SKIN.colButtonBG_Down			= Color( 255, 255, 255, 255 )
 SKIN.colButtonText				= Color( 255, 255, 255, 255 )
 SKIN.colButtonTextDisabled		= Color( 255, 255, 255, 55 )
 SKIN.colButtonBorder			= Color( 20, 20, 20, 255 )
@@ -107,7 +101,7 @@ SKIN.tex.RadioButtonD				= GWEN.CreateTextureNormal( 464, 80, 15, 15 )
 SKIN.tex.TreePlus					= GWEN.CreateTextureNormal( 448, 96, 15, 15 )
 SKIN.tex.TreeMinus					= GWEN.CreateTextureNormal( 464, 96, 15, 15 )
 SKIN.tex.TextBox					= GWEN.CreateTextureBorder( 0, 150, 127, 21, 4, 4, 4, 4 )
-SKIN.tex.TextBox_Focus				= GWEN.CreateTextureBorder( 0, 150, 127, 21, 4, 4, 4, 4 )
+SKIN.tex.TextBox_Focus				= GWEN.CreateTextureBorder( 0, 172, 127, 21, 4, 4, 4, 4 )
 SKIN.tex.TextBox_Disabled			= GWEN.CreateTextureBorder( 0, 194, 127, 21, 4, 4, 4, 4 )
 SKIN.tex.MenuBG_Column				= GWEN.CreateTextureBorder( 128, 128, 127, 63, 24, 8, 8, 8 )
 SKIN.tex.MenuBG						= GWEN.CreateTextureBorder( 128, 192, 127, 63, 8, 8, 8, 8 )
@@ -249,10 +243,10 @@ SKIN.Colours.Window.TitleActive		= GWEN.TextureColor( 4 + 8 * 0, 508 )
 SKIN.Colours.Window.TitleInactive	= GWEN.TextureColor( 4 + 8 * 1, 508 )
 
 SKIN.Colours.Button = {}
-SKIN.Colours.Button.Normal			= SKIN.colButtonBG
-SKIN.Colours.Button.Hover			= SKIN.colButtonBG_Hovered
-SKIN.Colours.Button.Down			= SKIN.colButtonBG_Down
-SKIN.Colours.Button.Disabled		= SKIN.colButtonBG_Disabled
+SKIN.Colours.Button.Normal			= GWEN.TextureColor( 4 + 8 * 2, 508 )
+SKIN.Colours.Button.Hover			= GWEN.TextureColor( 4 + 8 * 3, 508 )
+SKIN.Colours.Button.Down			= GWEN.TextureColor( 4 + 8 * 2, 500 )
+SKIN.Colours.Button.Disabled		= GWEN.TextureColor( 4 + 8 * 3, 500 )
 
 SKIN.Colours.Tab = {}
 SKIN.Colours.Tab.Active = {}
@@ -312,6 +306,43 @@ SKIN.Colours.Category.LineAlt.Button_Selected	= GWEN.TextureColor( 4 + 8 * 25, 5
 
 SKIN.Colours.TooltipText = GWEN.TextureColor( 4 + 8 * 26, 500 )
 
+-- Background colors
+local BaseColor			= Color(0,0,0,220)
+
+-- Corner values
+local CornerColor		= Color(255,255,255,150)
+local CornerThickness 	= 3
+local CornerLength 		= 15
+
+local function drawcorners(panel,w,h,cornerthickness, cornerlength)
+	surface.SetDrawColor(150,150,150,255)
+	surface.DrawRect(0,0,cornerlength, cornerthickness)
+	surface.DrawRect(0,cornerthickness, cornerthickness, cornerlength - cornerthickness)
+
+	surface.DrawRect(w - cornerlength,0,cornerlength, cornerthickness)
+	surface.DrawRect(w - cornerthickness,cornerthickness, cornerthickness, cornerlength - cornerthickness)
+
+	surface.DrawRect(0,h - cornerthickness,cornerlength, cornerthickness)
+	surface.DrawRect(0,h - cornerlength, cornerthickness, cornerlength - cornerthickness)
+
+	surface.DrawRect(w - cornerlength,h - cornerthickness,cornerlength, cornerthickness)
+	surface.DrawRect(w - cornerthickness,h - cornerlength, cornerthickness, cornerlength - cornerthickness)
+end
+
+function nzu.TestWindow()
+	local f = vgui.Create("DFrame")
+	f:SetSize(400,200)
+	f:SetPos(ScrW()/2 - 200, ScrH()/2 - 100)
+	f:SetSkin("nZombies Unlimited")
+	f:MakePopup()
+	f:SetDeleteOnClose(true)
+	f:SetSizable(true)
+
+	local p = f:Add("DButton")
+	p:Dock(TOP)
+end
+
+
 --[[---------------------------------------------------------
 	Panel
 -----------------------------------------------------------]]
@@ -319,6 +350,7 @@ function SKIN:PaintPanel( panel, w, h )
 
 	if ( !panel.m_bBackground ) then return end
 	self.tex.Panels.Normal( 0, 0, w, h, panel.m_bgColor )
+	--drawcorners(panel,w,h, CornerThickness, CornerLength)
 
 end
 
@@ -360,21 +392,29 @@ end
 	Button
 -----------------------------------------------------------]]
 function SKIN:PaintButton( panel, w, h )
+
 	if ( !panel.m_bBackground ) then return end
 
 	if ( panel.Depressed || panel:IsSelected() || panel:GetToggle() ) then
-		return self.tex.Button_Down( 0, 0, w, h, self.colButtonBG_Down )
+		self.tex.Button_Down( 0, 0, w, h )
+		drawcorners(panel,w,h, CornerThickness, 10)
+		return 
 	end
 
 	if ( panel:GetDisabled() ) then
-		return self.tex.Button_Dead( 0, 0, w, h, self.colButtonBG_Disabled)
+		self.tex.Button_Dead( 0, 0, w, h )
+		drawcorners(panel,w,h, CornerThickness, 10)
+		return
 	end
 
 	if ( panel.Hovered ) then
-		return self.tex.Button_Hovered( 0, 0, w, h, self.colButtonBG_Hovered)
+		self.tex.Button_Hovered( 0, 0, w, h )
+		drawcorners(panel,w,h, CornerThickness, 10)
+		return
 	end
 
-	self.tex.Button( 0, 0, w, h, self.colButtonBG )
+	self.tex.Button( 0, 0, w, h )
+	drawcorners(panel, w,h, CornerThickness, 10)
 
 end
 
@@ -435,11 +475,11 @@ function SKIN:PaintTextEntry( panel, w, h )
 	if ( panel.m_bBackground ) then
 
 		if ( panel:GetDisabled() ) then
-			self.tex.TextBox_Disabled( 0, 0, w, h, self.colTextEntryBG_Disabled)
+			self.tex.TextBox_Disabled( 0, 0, w, h )
 		elseif ( panel:HasFocus() ) then
-			self.tex.TextBox_Focus( 0, 0, w, h, self.colTextEntryBG_Focus )
+			self.tex.TextBox_Focus( 0, 0, w, h )
 		else
-			self.tex.TextBox( 0, 0, w, h, self.colTextEntryBG )
+			self.tex.TextBox( 0, 0, w, h )
 		end
 
 	end
@@ -614,6 +654,7 @@ end
 function SKIN:PaintVScrollBar( panel, w, h )
 
 	self.tex.Scroller.TrackV( 0, 0, w, h )
+	drawcorners(panel,w,h, 2, 10)
 
 end
 
@@ -902,6 +943,7 @@ function SKIN:PaintProgress( panel, w, h )
 
 	self.tex.ProgressBar.Back( 0, 0, w, h )
 	self.tex.ProgressBar.Front( 0, 0, w * panel:GetFraction(), h )
+	drawcorners(panel,w,h, CornerThickness, CornerLength)
 
 end
 
@@ -970,6 +1012,7 @@ end
 function SKIN:PaintTooltip( panel, w, h )
 
 	self.tex.Tooltip( 0, 0, w, h )
+	drawcorners(panel,w,h, CornerThickness, CornerLength)
 
 end
 
