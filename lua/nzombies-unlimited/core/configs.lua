@@ -9,7 +9,7 @@
 	Description = Single long string providing a short description of the config
 	WorkshopID = ID of Workshop addon (if set)
 
-	Extensions = {
+	Settings = {
 		[ExtensionID] = {
 			[setting] = value
 		}
@@ -23,49 +23,55 @@
 	^ Lists all workshop addons required by this config
 ]]
 
+local configdirs = {
+	Official = "gamemodes/nzombies-unlimited/officialconfigs/",
+	Workshop = "lua/nzombies-unlimited/workshopconfigs/",
+	Local = "data/nzombies-unlimited/localconfigs/",
+}
+
 -- Making this shared. It has little meaning clientside, but could be used to determine what configs the client may have locally saved
 function nzu.GetConfigFromFolder(path, s)
+	local s = s or "GAME"
 	if file.IsDir(path, s) then
 		local codename = string.match(path, ".+/(.+)")
 		if not codename then
 			print("nzu_saveload: Could not get config codename from path: "..path)
 		return end
 
-		local worked, info = pcall(util.JSONToTable, file.Read(path.."/info.txt", s))
+		local worked, info = pcall(util.KeyValuesToTable, file.Read(path.."/info.txt", s))
 		if not worked then
 			print("nzu_saveload: Malformed info.txt from config '"..codename.."':\n"..info)
 			-- This should return nothing! It follows that the game also can't determine the map this config is played on!
 		return end
 
-		if not info.Map then
+		if not info.map then
 			print("nzu_saveload: No map found for config '"..codename.."'")
+		return end
+
+		local worked2, settings = pcall(util.JSONToTable, file.Read(path.."/settings.txt", s))
+		if not worked2 then
+			print("nzu_saveload: Malformed settings.txt from config '"..codename.."':\n"..settings)
+			-- This should return nothing! It follows that the game also can't determine what extensions to enable
 		return end
 
 		local config = {}
 		config.Codename = codename
-		config.Map = info.Map
-		config.Name = info.Name or codename
-		config.Authors = info.Authors
-		config.Description = info.Description
-		config.WorkshopID = info.WorkshopID
-		config.Extensions = info.Extensions
-		config.RequiredAddons = info.RequiredAddons
+		config.Map = info.map
+		config.Name = info.name or codename
+		config.Authors = info.authors
+		config.Description = info.description
+		config.WorkshopID = info.workshopid
+		config.Settings = settings
+		config.RequiredAddons = info.requiredaddons
 
 		config.Path = (s == "LUA" and "lua/" or s == "DATA" and "data/" or "")..path
-
-		if config.Path == "gamemodes/nzombies-unlimited/officialconfigs/"..codename then
-			config.Type = "Official"
-			--config.Path = path
-		elseif config.Path == "lua/nzombies-unlimited/workshopconfigs/"..codename then -- Replace when workshop config integration
-			config.Type = "Workshop"
-			--config.Path = "lua/"..path
-		elseif config.Path == "data/nzombies-unlimited/localconfigs/"..codename then
-			config.Type = "Local"
-			--config.Path = "data/"..path
-		else
-			config.Type = "Unknown"
-			--config.Path = path
+		for k,v in pairs(configdirs) do
+			if config.Path == v..codename then
+				config.Type = k
+				break
+			end
 		end
+		if not config.Type then config.Type = "Unknown" end
 
 		return config
 	end
@@ -75,45 +81,22 @@ end
 	Server-Side config discovering and networking
 ---------------------------------------------------------------------------]]
 if SERVER then
-	function nzu.GetOfficialConfig(f)
-		return nzu.GetConfigFromFolder("gamemodes/nzombies-unlimited/officialconfigs/"..f, "GAME")
-	end
-	function nzu.GetLocalConfig(f)
-		return nzu.GetConfigFromFolder("nzombies-unlimited/localconfigs/"..f, "DATA")
-	end
-	function nzu.GetWorkshopConfig(f)
-		return nzu.GetConfigFromFolder("nzombies-unlimited/workshopconfigs/"..f, "LUA")
-	end
-
-	function nzu.GetConfig(f)
+	function nzu.GetConfig(f, ctype)
 		-- Determines an order if configs should have the same name
-		return nzu.GetOfficialConfig(f) or nzu.GetLocalConfig(f) or nzu.GetWorkshopConfig(f)
+		if ctype then return nzu.GetConfigFromFolder(configdirs[ctype]..f) end
+		return nzu.GetConfigFromFolder(configdirs.Official..f) or nzu.GetConfigFromFolder(configdirs.Local..f) or nzu.GetConfigFromFolder(configdirs.Workshop..f)
 	end
 
 	function nzu.GetConfigs()
-		local configs = {Official = {}, Local = {}, Workshop = {}}
-
-		-- Official configs
-		local _,dirs = file.Find("gamemodes/nzombies-unlimited/officialconfigs/*", "GAME")
-		for k,v in pairs(dirs) do
-			local config = nzu.GetOfficialConfig(v)
-			if config then configs.Official[config.Codename] = config end
+		local configs = {}
+		for k,v in pairs(configdirs) do
+			configs[k] = {}
+			local _,dirs = file.Find(v.."*", "GAME")
+			for k2,v2 in pairs(dirs) do
+				local config = nzu.GetConfig(v2,k)
+				if config then configs[k][config.Codename] = config end
+			end
 		end
-
-		-- Local configs
-		local _,dirs = file.Find("nzombies-unlimited/localconfigs/*", "DATA")
-		for k,v in pairs(dirs) do
-			local config = nzu.GetLocalConfig(v)
-			if config then configs.Local[config.Codename] = config end
-		end
-
-		-- Workshop configs
-		local _,dirs = file.Find("nzombies-unlimited/workshopconfigs/*", "LUA")
-		for k,v in pairs(dirs) do
-			local config = nzu.GetWorkshopConfig(v)
-			if config then configs.Workshop[config.Codename] = config end
-		end
-
 		return configs
 	end
 
@@ -196,7 +179,7 @@ if CLIENT then
 		configs[ctype][config.Codename] = config
 		hasreceivedconfigs = true -- Now we won't request the server again (the rest will come through updates)
 
-		hook.Run("nzu_ConfigSaved", config) -- Call the same hook
+		hook.Run("nzu_ConfigInfoUpdated", config) -- Call the same hook
 	end)
 
 	local function requestconfigs()
@@ -228,4 +211,133 @@ if CLIENT then
 		if not hasreceivedconfigs then requestconfigs() return false end
 		return configs
 	end
+
+	function nzu.ConfigExists(f,ctype)
+		if ctype then return file.IsDir(configdirs[ctype]..f) end
+		return file.IsDir(configdirs.Official..f) or file.IsDir(configdirs.Local..f) or file.IsDir(configdirs.Workshop..f)
+	end
+
+	-- CONFIG PANEL
+	local CONFIGPANEL = {}
+	local emptyfunc = function() end
+	function CONFIGPANEL:Init()
+		self.Thumbnail = self:Add("DImage")
+		self.Thumbnail:Dock(LEFT)
+
+		local status = self:Add("Panel")
+		status:Dock(RIGHT)
+
+		self.Type = status:Add("DLabel")
+		self.Type:Dock(TOP)
+		self.Type:SetContentAlignment(3)
+
+		self.MapStatus = status:Add("DLabel")
+		self.MapStatus:Dock(BOTTOM)
+		self.MapStatus:SetContentAlignment(9)
+
+		local center = self:Add("Panel")
+		center:Dock(FILL)
+
+		self.Name = center:Add("DLabel")
+		self.Name:SetFont("Trebuchet24")
+		self.Name:Dock(FILL)
+		self.Name:SetContentAlignment(1)
+
+		self.Map = center:Add("DLabel")
+		self.Map:Dock(BOTTOM)
+		self.Map:SetContentAlignment(7)
+		self.Map:DockMargin(0,0,0,-5)
+
+		self.Button = self:Add("DButton")
+		self.Button:SetText("")
+		self.Button:SetSize(self:GetSize())
+		self.Button.Paint = emptyfunc
+
+		self:DockPadding(5,5,5,5)
+	end
+
+	local typecolors = {
+		Official = Color(255,0,0),
+		Local = Color(0,0,255),
+		Workshop = Color(150,0,255),
+	}
+	local mapinstalled,mapnotinstalled = Color(100,255,100), Color(255,100,100)
+
+	function CONFIGPANEL:SetConfig(config)
+		self.Config = config
+		self.Name:SetText(config.Name)
+		self.Map:SetText(config.Codename .. " || " .. config.Map)
+
+		local status = file.Find("maps/"..config.Map..".bsp", "GAME")[1] and true or false
+		self.MapStatus:SetText(status and "Map installed" or "Map not installed")
+		self.MapStatus:SetTextColor(status and mapinstalled or mapnotinstalled)
+
+		self.Type:SetText(config.Type)
+		self.Type:SetTextColor(typecolors[config.Type] or color_white)
+
+		--self.Thumbnail:SetImage("../"..config.Path.."/thumb.jpg\n.png")
+	end
+
+	function CONFIGPANEL:DoClick() end
+	function CONFIGPANEL:DoRightClick() end
+
+	function CONFIGPANEL:PerformLayout(w,h)
+		self.Button:SetSize(w,h)
+		self.Thumbnail:SetWide((h-10)*(16/9))
+	end
+	vgui.Register("nzu_ConfigPanel", CONFIGPANEL, "DPanel")
+
+	-- FUNCTIONS FOR UPDATING AND CREATING CONFIGS (Requests)
+	local function requestconfig(config)
+		if not nzu.IsAdmin(LocalPlayer()) then return end
+		net.Start("nzu_createconfig") -- We don't network type: It will always overwrite the local config of this codename
+			net.WriteString(config.Codename)
+			net.WriteString(config.Name)
+			net.WriteString(config.Authors or "")
+			net.WriteString(config.Description or "")
+			net.WriteString(config.WorkshopID or "")
+
+			local num = table.Count(config.RequiredAddons)
+			net.WriteUInt(num, 8) -- I don't expect more than 255 addons for a simple config
+			for k,v in pairs(config.RequiredAddons) do
+				net.WriteString(k)
+				net.WriteString(v)
+			end
+		net.SendToServer()
+	end
+end
+
+if SERVER then
+	-- Receiving client requests
+	net.Receive("nzu_createconfig", function(len, ply)
+		if not nzu.IsAdmin(ply) then return end -- Of course servers need to check too!
+
+		local codename = net.ReadString()
+		if nzu.ConfigExists(codename, "Local") and nzu.CurrentConfig.Codename ~= codename then
+			print("nzu_saveload: Client attempted to save to an existing config without it being loaded first.", ply, codename)
+		return end
+
+		local config = {}
+		config.Codename = codename
+		config.Type = "Local" 
+		config.Name = net.ReadString()
+		config.Map = game.GetMap()
+		config.Authors = net.ReadString()
+		config.Description = net.ReadString()
+
+		local numaddons = net.ReadUInt(8)
+		if numaddons > 0 then
+			config.RequiredAddons = {}
+			for i = 1,numaddons do
+				local id = net.ReadString()
+				local name = net.ReadString()
+				config.RequiredAddons[id] = name
+			end
+		end
+
+		-- If we happened to have an Official or Workshop loaded config by this same name,
+		-- then this will result in a local copy saved
+		-- We need to load this local copy from now on but without reloading everything
+
+	end)
 end

@@ -1,98 +1,12 @@
-
-local officialconfigs = {
-	["nzu_breakout"] = {
-		Name = "Breakout",
-		Icon = "maps/thumb/gm_construct.png",
-		Map = "ttt_kosovos",
-		Addons = {},
-	},
-	["nzu_stakes"] = {
-		Name = "High Stakes",
-		Icon = "maps/thumb/ttt_casino_b2.png",
-		Map = "ttt_casino_b2",
-	},
-}
-local localconfigs = {
-	["randomfile"] = {
-		Name = "My own beta config!",
-		Icon = "maps/thumb/gm_flatgrass.png",
-		Map = "gm_flatgrass",
-	},
-}
-local workshopconfigs = {
-	
-}
-
-local CONFIGPANEL = {}
-local emptyfunc = function() end
-function CONFIGPANEL:Init()
-	self.Thumbnail = self:Add("DImage")
-	self.Thumbnail:Dock(LEFT)
-
-	local status = self:Add("Panel")
-	status:Dock(RIGHT)
-
-	self.Type = status:Add("DLabel")
-	self.Type:Dock(TOP)
-	self.Type:SetContentAlignment(2)
-
-	self.MapStatus = status:Add("DLabel")
-	self.MapStatus:Dock(BOTTOM)
-	self.MapStatus:SetContentAlignment(8)
-
-	local center = self:Add("Panel")
-	center:Dock(FILL)
-
-	self.Name = center:Add("DLabel")
-	self.Name:Dock(TOP)
-	self.Name:SetContentAlignment(1)
-
-	self.Map = center:Add("DLabel")
-	self.Map:Dock(BOTTOM)
-	self.Map:SetContentAlignment(7)
-
-	self.Button = self:Add("DButton")
-	self.Button:SetText("")
-	self.Button:SetSize(self:GetSize())
-	self.Button.Paint = emptyfunc
-
-	self:DockPadding(5,5,5,5)
-end
-
-local typecolors = {
-	Official = {Color(255,0,0), 1},
-	Local = {Color(0,0,255), 2},
-	Workshop = {Color(150,0,255), 3}
-}
-local mapinstalled,mapnotinstalled = Color(100,255,100), Color(255,100,100)
-
-function CONFIGPANEL:SetConfig(config)
-	self.Config = config
-	self.Name:SetText(config.Name)
-	self.Map:SetText(config.Codename .. " || " .. config.Map)
-
-	local status = file.Find("maps/"..config.Map..".bsp", "GAME")[1] and true or false
-	self.MapStatus:SetText(status and "Map installed" or "Map not installed")
-	self.MapStatus:SetTextColor(status and mapinstalled or mapnotinstalled)
-
-	self.Type:SetText(config.Type)
-	self.Type:SetTextColor(typecolors[config.Type][1] or color_white)
-
-	--self.Thumbnail:SetImage("../"..config.Path.."/thumb.jpg\n.png")
-end
-
-function CONFIGPANEL:DoClick() end
-function CONFIGPANEL:DoRightClick() end
-
-function CONFIGPANEL:PerformLayout(w,h)
-	self.Button:SetSize(w,h)
-	self.Thumbnail:SetWide((h-10)*(16/9))
-end
-vgui.Register("nzu_ConfigPanel", CONFIGPANEL, "DPanel")
-
 local headerfont = "Trebuchet24"
 local namefont = "Trebuchet24"
 local textfont = "Trebuchet18"
+
+local sortorder = {
+	Official = 1,
+	Local = 2,
+	Workshop = 3
+}
 
 nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	--panel:SetSkin("nZombies Unlimited")
@@ -113,7 +27,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 		local pnl = configlist:Add("nzu_ConfigPanel")
 		pnl:SetConfig(config)
 		pnl:SetTall(50)
-		pnl:SetZPos((config.Map == game.GetMap() and 0 or 5) + (typecolors[config.Type][2]))
+		pnl:SetZPos((config.Map == game.GetMap() and 0 or 5) + (sortorder[config.Type]))
 	end
 	local configs = nzu.GetConfigs()
 	if configs then
@@ -123,7 +37,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 			end
 		end
 	end
-	hook.Add("nzu_ConfigSaved", configpanel, addconfig)
+	hook.Add("nzu_ConfigInfoUpdated", configpanel, addconfig)
 	
 	local infopanel = panel:Add("DPanel")
 	infopanel:SetBackgroundColor(Color(50,40,40))

@@ -1,1 +1,11 @@
-{"Map":"gm_construct","Extensions":{"Powerups":{"Spawnrate":2.0,"Angle":"{90 0 0}"}},"RequiredAddons":{"12345":"Guns"},"Authors":"Zet0r","Description":"Test Official"}
+"TableToKeyValues"
+{
+	"map"		"gm_construct"
+	"authors"		"Zet0r"
+	"requiredaddons"
+	{
+		"1234"		"Some Guns"
+	}
+	"name"		"Test 1"
+	"description"		"Hey, this is a test"
+}

@@ -139,12 +139,7 @@ function nzu.UnloadConfig()
 end
 
 if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
-	function nzu.SaveConfig()
-		if not nzu.CurrentConfig then
-			Error("nzu_saveload: No current config exists to save to.")
-			return
-		end
-
+	local function getmapjson()
 		local tbl = {}	
 		local Ents = ents.GetAll()
 		for k,v in pairs(Ents) do
@@ -171,17 +166,48 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 			end
 		end
 
-		local json = util.TableToJSON(tbl)
-		if not json then Error("nzu_saveload: Could not write JSON of config save!") return end
-		
+		return util.TableToJSON(tbl)
+	end
+
+	local function getmetadata()
+		-- Save metadata
+		return util.TableToKeyValues({
+			name = nzu.CurrentConfig.Name,
+			map = nzu.CurrentConfig.Map,
+			authors = nzu.CurrentConfig.Authors,
+			description = nzu.CurrentConfig.Description,
+			workshopid = nzu.CurrentConfig.WorkshopID,
+			requiredaddons = nzu.CurrentConfig.RequiredAddons
+		})
+	end
+
+	local function getextensionsettings()
+		return util.TableToJSON(nzu.CurrentConfig.Settings)
+	end
+
+	local function checkdirs()
 		if not file.IsDir("nzombies-unlimited", "DATA") then file.CreateDir("nzombies-unlimited", "DATA") end
 		if not file.IsDir("nzombies-unlimited/localconfigs", "DATA") then file.CreateDir("nzombies-unlimited/localconfigs", "DATA") end
 		if not file.IsDir("nzombies-unlimited/localconfigs/"..nzu.CurrentConfig.Codename, "DATA") then file.CreateDir("nzombies-unlimited/localconfigs/"..nzu.CurrentConfig.Codename, "DATA") end
+	end
+
+	function nzu.SaveConfig()
+		if not nzu.CurrentConfig then
+			Error("nzu_saveload: No current config exists to save to.")
+			return
+		end
+
+		local json = getmapjson()
+		if not json then Error("nzu_saveload: Could not write JSON of config save!") return end
+		
+		checkdirs()
 
 		file.Write("nzombies-unlimited/localconfigs/"..nzu.CurrentConfig.Codename.."/config.dat", json)
-		file.Write("nzombies-unlimited/localconfigs/"..nzu.CurrentConfig.Codename.."/info.txt", util.TableToJSON(nzu.CurrentConfig.Info))
+		file.Write("nzombies-unlimited/localconfigs/"..nzu.CurrentConfig.Codename.."/info.txt", getmetadata())
+		file.Write("nzombies-unlimited/localconfigs/"..nzu.CurrentConfig.Codename.."/settings.txt", getextensionsettings())
 
-		hook.Run("nzu_ConfigSaved", nzu.CurrentConfig)
+		--hook.Run("nzu_ConfigSaved", nzu.CurrentConfig) -- This isn't used yet (?)
+		hook.Run("nzu_ConfigInfoUpdated", nzu.CurrentConfig)
 	end
 end
 
