@@ -23,117 +23,107 @@ local workshopconfigs = {
 	
 }
 
-local function createconfigpanel(k,v,rank)
-	local p = vgui.Create("DPanel")
-	p:SetTall(50)
-	p:SetBackgroundColor(Color(0,0,0))
-	p:DockPadding(5,5,5,5)
-	
-	p.Icon = p:Add("DImage")
-	p.Icon:SetImage(v.Icon)
-	p.Icon:SetWide(p:GetTall()*16/9)
-	p.Icon:Dock(LEFT)
-	p.Icon:DockMargin(0,0,5,0)
-	
-	local p2 = p:Add("DPanel")
-	p2:SetPaintBackground(false)
-	p2:SetBackgroundColor(Color(0,50,100))
-	--p2:SetTall(20)
-	p2:Dock(RIGHT)
-	p2:DockMargin(0,0,0,0)
-	
-	p.ConfigName = p:Add("DLabel")
-	p.ConfigName:SetFont("ChatFont")
-	p.ConfigName:SetText(v.Name)
-	p.ConfigName:SetContentAlignment(1)
-	p.ConfigName:Dock(TOP)
-	
-	p.MapName = p:Add("DLabel")
-	p.MapName:SetText(k .." || "..v.Map)
-	p.MapName:SetTextColor(Color(150,150,150))
-	p.MapName:Dock(TOP)
-	p.MapName:SetContentAlignment(7)
-	
-	p.MapStatus = p2:Add("DLabel")
-	local status = file.Find("maps/"..v.Map..".bsp", "GAME")[1] and true or false
-	p.MapStatus:SetText(status and "Map installed" or "Map not installed")
-	p.MapStatus:SetTextColor(status and Color(100,255,100) or Color(255,100,100))
-	p.MapStatus:Dock(BOTTOM)
-	
-	--[[local p3 = p:Add("DPanel")
-	p3:SetBackgroundColor(Color(100,50,0))
-	p3:Dock(BOTTOM)]]
-	
-	p.ConfigRank = p2:Add("DLabel")
-	p.ConfigRank:SetText(rank.Text)
-	p.ConfigRank:SetTextColor(rank.TextColor)
-	p.ConfigRank:SizeToContents()
-	p.ConfigRank:SetContentAlignment(9)
-	p.ConfigRank:Dock(TOP)
-	
-	p.DoClick = function(s) end -- Override this
-	
-	local but = vgui.Create("DButton", p)
-	but:SetSize(400, p:GetTall())
-	but:SetText("")
-	but.Paint = function() end
-	but.DoClick = function(s) p.DoClick() end
-	
-	return p
+local CONFIGPANEL = {}
+local emptyfunc = function() end
+function CONFIGPANEL:Init()
+	self.Thumbnail = self:Add("DImage")
+	self.Thumbnail:Dock(LEFT)
+
+	local status = self:Add("Panel")
+	status:Dock(RIGHT)
+
+	self.Type = status:Add("DLabel")
+	self.Type:Dock(TOP)
+	self.Type:SetContentAlignment(2)
+
+	self.MapStatus = status:Add("DLabel")
+	self.MapStatus:Dock(BOTTOM)
+	self.MapStatus:SetContentAlignment(8)
+
+	local center = self:Add("Panel")
+	center:Dock(FILL)
+
+	self.Name = center:Add("DLabel")
+	self.Name:Dock(TOP)
+	self.Name:SetContentAlignment(1)
+
+	self.Map = center:Add("DLabel")
+	self.Map:Dock(BOTTOM)
+	self.Map:SetContentAlignment(7)
+
+	self.Button = self:Add("DButton")
+	self.Button:SetText("")
+	self.Button:SetSize(self:GetSize())
+	self.Button.Paint = emptyfunc
+
+	self:DockPadding(5,5,5,5)
 end
+
+local typecolors = {
+	Official = {Color(255,0,0), 1},
+	Local = {Color(0,0,255), 2},
+	Workshop = {Color(150,0,255), 3}
+}
+local mapinstalled,mapnotinstalled = Color(100,255,100), Color(255,100,100)
+
+function CONFIGPANEL:SetConfig(config)
+	self.Config = config
+	self.Name:SetText(config.Name)
+	self.Map:SetText(config.Codename .. " || " .. config.Map)
+
+	local status = file.Find("maps/"..config.Map..".bsp", "GAME")[1] and true or false
+	self.MapStatus:SetText(status and "Map installed" or "Map not installed")
+	self.MapStatus:SetTextColor(status and mapinstalled or mapnotinstalled)
+
+	self.Type:SetText(config.Type)
+	self.Type:SetTextColor(typecolors[config.Type][1] or color_white)
+
+	--self.Thumbnail:SetImage("../"..config.Path.."/thumb.jpg\n.png")
+end
+
+function CONFIGPANEL:DoClick() end
+function CONFIGPANEL:DoRightClick() end
+
+function CONFIGPANEL:PerformLayout(w,h)
+	self.Button:SetSize(w,h)
+	self.Thumbnail:SetWide((h-10)*(16/9))
+end
+vgui.Register("nzu_ConfigPanel", CONFIGPANEL, "DPanel")
 
 local headerfont = "Trebuchet24"
 local namefont = "Trebuchet24"
 local textfont = "Trebuchet18"
 
 nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
-	panel:SetSkin("nZombies Unlimited")
-	panel:SetBackgroundColor(Color(150,150,150))
+	--panel:SetSkin("nZombies Unlimited")
+	--panel:SetBackgroundColor(Color(150,150,150))
 	
 	local configpanel = panel:Add("DPanel")
 	configpanel:SetWidth(400)
-	configpanel:SetBackgroundColor(Color(40,30,30))
+	--configpanel:SetBackgroundColor(Color(40,30,30))
 	configpanel:Dock(LEFT)
+
+	local configscroll = configpanel:Add("DScrollPanel")
+	configscroll:Dock(FILL)
+	local configlist = configscroll:Add("DListLayout")
+	configlist:Dock(FILL)
 	
-	local header = configpanel:Add("DLabel")
-	header:SetText("Configs")
-	header:SetFont("DermaLarge")
-	header:SetTextColor(Color(0,0,0))
-	header:SizeToContents()
-	header:SetContentAlignment(5)
-	header:Dock(TOP)
-	
-	local cfglist = configpanel:Add("DScrollPanel")
-	cfglist:Dock(FILL)
-	
-	local official = cfglist:Add("DCollapsibleCategory")
-	official:Dock(TOP)
-	official.Header:Remove()
-	official.Header = vgui.Create("DPanel", official)
-	official.Header:SetTall(50)
-	official.Header:SetBackgroundColor(Color(255,0,0))
-	official.Header:Dock(TOP)
-	local otxt = official.Header:Add("DLabel")
-	otxt:SetFont("DermaBold")
-	otxt:SetText("Official Configs")
-	otxt:SizeToContents()
-	otxt:Dock(FILL)
-	otxt:SetTextInset(5,0)
-	local b = official.Header:Add("DButton")
-	b.DoClick = function(s) official:Toggle() end
-	b:SetText("")
-	b.Paint = function() end
-	b:Dock(FILL)
-	
-	official.List = vgui.Create("DListLayout")
-	official.List:SetPaintBackground(true)
-	official.List:SetBackgroundColor(Color(0,50,0))
-	official:SetContents(official.List)
-	local officialrank = {Text = "Official", TextColor = Color(255,0,0)}
-	for k,v in pairs(officialconfigs) do
-		local p = createconfigpanel(k,v,officialrank)
-		official.List:Add(p)
+	-- Populate configs
+	local function addconfig(_, config)
+		local pnl = configlist:Add("nzu_ConfigPanel")
+		pnl:SetConfig(config)
+		pnl:SetTall(50)
+		pnl:SetZPos((config.Map == game.GetMap() and 0 or 5) + (typecolors[config.Type][2]))
 	end
+	local configs = nzu.GetConfigs()
+	if configs then
+		for k,v in pairs(configs) do
+			for k2,v2 in pairs(v) do
+				addconfig(nil, v2)
+			end
+		end
+	end
+	hook.Add("nzu_ConfigSaved", configpanel, addconfig)
 	
 	local infopanel = panel:Add("DPanel")
 	infopanel:SetBackgroundColor(Color(50,40,40))

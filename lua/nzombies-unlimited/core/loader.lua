@@ -14,6 +14,7 @@ if SERVER then
 	AddCSLuaFile("logicmap.lua")
 	AddCSLuaFile("configsettings.lua")
 	AddCSLuaFile("cl_saveload.lua")
+	AddCSLuaFile("configs.lua")
 	AddCSLuaFile("cl_vgui_configtree.lua")
 	AddCSLuaFile("logic/logic_manager.lua")
 	AddCSLuaFile("logic/cl_logicmap.lua")
@@ -23,6 +24,7 @@ if SERVER then
 	AddCSLuaFile("extensions/extension_panels.lua")
 	AddCSLuaFile("spawnmenu_extensions.lua")
 
+	include("configs.lua")
 	include("sv_saveload.lua")
 	include("logic/sv_logicmap.lua")
 	include("extensions/extension_manager.lua")
@@ -30,6 +32,7 @@ else
 	include("cl_nzombies_skin.lua")
 	include("cl_spawnmenu.lua")
 	include("cl_vgui_configtree.lua")
+	include("configs.lua")
 	include("cl_saveload.lua")
 	include("logic/cl_logicmap.lua")
 

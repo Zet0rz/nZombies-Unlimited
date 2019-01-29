@@ -5,7 +5,7 @@ local Color = Color
 SKIN = {}
 
 SKIN.PrintName		= "nZombies Unlimited Skin"
-SKIN.Author		= "Zet0r"
+SKIN.Author			= "Zet0r"
 SKIN.DermaVersion	= 1
 SKIN.GwenTexture	= Material( "nzombies-unlimited/nzu_vguiskin.png" )
 
@@ -30,9 +30,9 @@ SKIN.listview_hover				= Color( 70, 70, 70, 255 )
 SKIN.listview_selected			= Color( 100, 170, 220, 255 )
 
 SKIN.text_bright				= Color( 255, 255, 255, 255 )
-SKIN.text_normal				= Color( 180, 180, 180, 255 )
-SKIN.text_dark					= Color( 20, 20, 20, 255 )
-SKIN.text_highlight				= Color( 255, 20, 20, 255 )
+SKIN.text_normal				= Color( 225, 225, 225, 255 )
+SKIN.text_dark					= Color( 150, 150, 150, 255 )
+SKIN.text_highlight				= Color( 255, 100, 100, 255 )
 
 SKIN.texGradientUp				= Material( "gui/gradient_up" )
 SKIN.texGradientDown			= Material( "gui/gradient_down" )

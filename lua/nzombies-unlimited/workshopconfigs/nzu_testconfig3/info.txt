@@ -1,0 +1,1 @@
+{"Map":"gm_construct","Extensions":{"Powerups":{"Spawnrate":3.0,"Angle":"{50 0 0}"}},"RequiredAddons":{"123456":"Guns 2"},"Authors":"Zet0r 2","Description":"Test Workshop"}
