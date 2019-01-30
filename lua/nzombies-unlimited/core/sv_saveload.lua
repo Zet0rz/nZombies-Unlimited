@@ -209,5 +209,25 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 		--hook.Run("nzu_ConfigSaved", nzu.CurrentConfig) -- This isn't used yet (?)
 		hook.Run("nzu_ConfigInfoUpdated", nzu.CurrentConfig)
 	end
+
+	-- Just in case you only want to write to the metadata or settings files
+	function nzu.SaveConfigInfo()
+		if not nzu.CurrentConfig then
+			Error("nzu_saveload: No current config exists to save to.")
+			return
+		end		
+		checkdirs()
+		file.Write("nzombies-unlimited/localconfigs/"..nzu.CurrentConfig.Codename.."/info.txt", getmetadata())
+
+		hook.Run("nzu_ConfigInfoUpdated", nzu.CurrentConfig)
+	end
+	function nzu.SaveConfigSettings()
+		if not nzu.CurrentConfig then
+			Error("nzu_saveload: No current config exists to save to.")
+			return
+		end		
+		checkdirs()
+		file.Write("nzombies-unlimited/localconfigs/"..nzu.CurrentConfig.Codename.."/settings.txt", getextensionsettings())
+	end
 end
 

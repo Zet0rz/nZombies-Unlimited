@@ -350,7 +350,8 @@ function SKIN:PaintPanel( panel, w, h )
 
 	if ( !panel.m_bBackground ) then return end
 	self.tex.Panels.Normal( 0, 0, w, h, panel.m_bgColor )
-	--drawcorners(panel,w,h, CornerThickness, CornerLength)
+
+	if panel.m_bDrawCorners then drawcorners(panel,w,h, CornerThickness, CornerLength) end
 
 end
 

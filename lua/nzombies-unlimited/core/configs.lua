@@ -101,7 +101,7 @@ if SERVER then
 	end
 
 	util.AddNetworkString("nzu_configs")
-	local function networkconfig(config, ply)
+	local function networkconfig(config, ply, loaded)
 		net.Start("nzu_configs")
 			net.WriteString(config.Type)
 			net.WriteString(config.Codename)
@@ -118,15 +118,22 @@ if SERVER then
 				net.WriteString(k)
 				net.WriteString(v)
 			end
-
 			-- Extensions and Path need not be networked, only server needs to know that
+
+			net.WriteBool(loaded) -- Tells clients this is the current config
 		net.Send(ply)
 	end
 
 	-- Client requesting config list
+	util.AddNetworkString("nzu_configsnetworked")
 	net.Receive("nzu_configs", function(len, ply)
 		if nzu.IsAdmin(ply) then -- Only admins can access config lists
-			ply.nzu_ConfigsRequested = true -- From now on, network to this player whenever a config is saved/updated
+			if not ply.nzu_ConfigsRequested then
+				ply.nzu_ConfigsRequested = true -- From now on, network to this player whenever a config is saved/updated
+				net.Start("nzu_configsnetworked")
+					net.WriteBool(true)
+				net.Send(ply)
+			end
 
 			for k,v in pairs(nzu.GetConfigs()) do
 				for k2,v2 in pairs(v) do
@@ -136,7 +143,10 @@ if SERVER then
 		end
 	end)
 
+	local dontnetwork = false
 	hook.Add("nzu_ConfigSaved", "nzu_NetworkUpdatedConfigs", function(config)
+		if dontnetwork then return end
+
 		local plys = {}
 		for k,v in pairs(player.GetAll()) do
 			if nzu.IsAdmin(ply) and ply.nzu_ConfigsRequested then
@@ -145,6 +155,55 @@ if SERVER then
 		end
 		networkconfig(config, plys) -- Network this updated config to all players
 	end)
+
+	-- Receiving client requests
+	net.Receive("nzu_saveconfig", function(len, ply)
+		if not nzu.IsAdmin(ply) then return end -- Of course servers need to check too!
+
+		local codename = net.ReadString()
+		if nzu.ConfigExists(codename, "Local") and nzu.CurrentConfig.Path ~= configdirs.Local..codename then
+			print("nzu_saveload: Client attempted to save to an existing config without it being loaded first.", ply, codename)
+		return end
+
+		local config -- What we're saving to
+		local tonetwork
+		if nzu.CurrentConfig and nzu.CurrentConfig.Type == "Local" then -- We already have a local config loaded: Save to that
+			config = nzu.CurrentConfig
+		else
+			-- We're saving a new config; Either new local, or new local copy of the one loaded
+			config = {}
+			config.Codename = codename
+			config.Type = "Local"
+
+			nzu.CurrentConfig = config
+			tonetwork = true
+		end
+
+		config.Name = net.ReadString()
+		config.Map = game.GetMap()
+		config.Authors = net.ReadString()
+		config.Description = net.ReadString()
+
+		local numaddons = net.ReadUInt(8)
+		if numaddons > 0 then
+			config.RequiredAddons = {}
+			for i = 1,numaddons do
+				local id = net.ReadString()
+				local name = net.ReadString()
+				config.RequiredAddons[id] = name
+			end
+		end
+
+		if tonetwork then
+			dontnetwork = true -- We want to network manually
+		end
+		nzu.SaveConfigSettings()
+		nzu.SaveConfigInfo() -- This triggers a networking
+		if tonetwork then
+			networkconfig(nzu.CurrentConfig, player.GetAll(), true)
+			dontnetwork = false
+		end
+	end)
 end
 
 --[[-------------------------------------------------------------------------
@@ -152,6 +211,10 @@ end
 ---------------------------------------------------------------------------]]
 if CLIENT then
 	local hasreceivedconfigs = false
+	net.Receive("nzu_configsnetworked", function(len)
+		hasreceivedconfigs = net.ReadBool()
+	end)
+
 	local configs = {} -- Clients cache configs and only further get networks from individual config updates
 	net.Receive("nzu_configs", function(len)
 		local ctype = net.ReadString()
@@ -178,6 +241,11 @@ if CLIENT then
 
 		configs[ctype][config.Codename] = config
 		hasreceivedconfigs = true -- Now we won't request the server again (the rest will come through updates)
+
+		if net.ReadBool() then -- Currently loaded
+			nzu.CurrentConfig = config
+			hook.Run("nzu_CurrentConfigChanged", config)
+		end
 
 		hook.Run("nzu_ConfigInfoUpdated", config) -- Call the same hook
 	end)
@@ -237,6 +305,7 @@ if CLIENT then
 
 		local center = self:Add("Panel")
 		center:Dock(FILL)
+		center:DockMargin(5,0,5,0)
 
 		self.Name = center:Add("DLabel")
 		self.Name:SetFont("Trebuchet24")
@@ -252,6 +321,7 @@ if CLIENT then
 		self.Button:SetText("")
 		self.Button:SetSize(self:GetSize())
 		self.Button.Paint = emptyfunc
+		self.Button.DoClick = function() self:DoClick() end
 
 		self:DockPadding(5,5,5,5)
 	end
@@ -275,7 +345,8 @@ if CLIENT then
 		self.Type:SetText(config.Type)
 		self.Type:SetTextColor(typecolors[config.Type] or color_white)
 
-		--self.Thumbnail:SetImage("../"..config.Path.."/thumb.jpg\n.png")
+		self.Thumbnail:SetImage("../"..configdirs[config.Type].."/"..config.Codename.."/thumb.jpg")
+		hook.Add("nzu_ConfigInfoUpdated", self, self.SetConfig) -- Auto-update ourselves whenever updates arrive to this config
 	end
 
 	function CONFIGPANEL:DoClick() end
@@ -288,9 +359,9 @@ if CLIENT then
 	vgui.Register("nzu_ConfigPanel", CONFIGPANEL, "DPanel")
 
 	-- FUNCTIONS FOR UPDATING AND CREATING CONFIGS (Requests)
-	local function requestconfig(config)
-		if not nzu.IsAdmin(LocalPlayer()) then return end
-		net.Start("nzu_createconfig") -- We don't network type: It will always overwrite the local config of this codename
+	function nzu.RequestSaveConfig(config)
+		if not nzu.IsAdmin(LocalPlayer()) then return false end
+		net.Start("nzu_saveconfig") -- We don't network type: It will always overwrite the local config of this codename
 			net.WriteString(config.Codename)
 			net.WriteString(config.Name)
 			net.WriteString(config.Authors or "")
@@ -304,40 +375,6 @@ if CLIENT then
 				net.WriteString(v)
 			end
 		net.SendToServer()
+		return true
 	end
-end
-
-if SERVER then
-	-- Receiving client requests
-	net.Receive("nzu_createconfig", function(len, ply)
-		if not nzu.IsAdmin(ply) then return end -- Of course servers need to check too!
-
-		local codename = net.ReadString()
-		if nzu.ConfigExists(codename, "Local") and nzu.CurrentConfig.Codename ~= codename then
-			print("nzu_saveload: Client attempted to save to an existing config without it being loaded first.", ply, codename)
-		return end
-
-		local config = {}
-		config.Codename = codename
-		config.Type = "Local" 
-		config.Name = net.ReadString()
-		config.Map = game.GetMap()
-		config.Authors = net.ReadString()
-		config.Description = net.ReadString()
-
-		local numaddons = net.ReadUInt(8)
-		if numaddons > 0 then
-			config.RequiredAddons = {}
-			for i = 1,numaddons do
-				local id = net.ReadString()
-				local name = net.ReadString()
-				config.RequiredAddons[id] = name
-			end
-		end
-
-		-- If we happened to have an Official or Workshop loaded config by this same name,
-		-- then this will result in a local copy saved
-		-- We need to load this local copy from now on but without reloading everything
-
-	end)
 end

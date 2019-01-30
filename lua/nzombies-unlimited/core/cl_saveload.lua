@@ -8,41 +8,72 @@ local sortorder = {
 	Workshop = 3
 }
 
+local configpaneltall = 60
 nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	--panel:SetSkin("nZombies Unlimited")
 	--panel:SetBackgroundColor(Color(150,150,150))
+	local selectedconfig
 	
 	local configpanel = panel:Add("DPanel")
 	configpanel:SetWidth(400)
 	--configpanel:SetBackgroundColor(Color(40,30,30))
 	configpanel:Dock(LEFT)
 
-	local configscroll = configpanel:Add("DScrollPanel")
-	configscroll:Dock(FILL)
-	local configlist = configscroll:Add("DListLayout")
-	configlist:Dock(FILL)
-	
-	-- Populate configs
-	local function addconfig(_, config)
-		local pnl = configlist:Add("nzu_ConfigPanel")
-		pnl:SetConfig(config)
-		pnl:SetTall(50)
-		pnl:SetZPos((config.Map == game.GetMap() and 0 or 5) + (sortorder[config.Type]))
-	end
-	local configs = nzu.GetConfigs()
-	if configs then
-		for k,v in pairs(configs) do
-			for k2,v2 in pairs(v) do
-				addconfig(nil, v2)
-			end
-		end
-	end
-	hook.Add("nzu_ConfigInfoUpdated", configpanel, addconfig)
-	
 	local infopanel = panel:Add("DPanel")
 	infopanel:SetBackgroundColor(Color(50,40,40))
 	infopanel:Dock(FILL)
 	infopanel:DockPadding(30,30,30,30)
+
+	-- Top of the config scroll list, we find info about currently loaded configs or new configs
+	local curpanel = configpanel:Add("DPanel")
+	curpanel:Dock(TOP)
+	curpanel:SetTall(70 + configpaneltall)
+	curpanel.m_bDrawCorners = true
+	curpanel:DockMargin(5,5,0,25)
+	local curloaded = curpanel:Add("DLabel")
+	curloaded:SetText("Currently loaded:")
+	curloaded:SetFont(headerfont)
+	curloaded:DockMargin(5,5,5,5)
+	curloaded:Dock(TOP)
+	local loadedpnl = curpanel:Add("DPanel")
+	loadedpnl:Dock(TOP)
+	loadedpnl:SetTall(configpaneltall)
+	loadedpnl.Paint = function(s,w,h)
+		surface.SetDrawColor(50,50,50,230)
+		surface.DrawRect(0,0,w,h)
+	end
+	local loadedcfg = loadedpnl:Add("nzu_ConfigPanel")
+	loadedcfg:Dock(FILL)
+	loadedcfg:SetVisible(false)
+	local noloaded = loadedpnl:Add("DLabel")
+	noloaded:SetText("No Config currently loaded.")
+	noloaded:Dock(FILL)
+	noloaded:SetContentAlignment(5)
+	noloaded:SetFont(textfont)
+
+	local createbutton = curpanel:Add("DButton")
+	createbutton:Dock(FILL)
+	createbutton:SetText("Create new Config ...")
+	createbutton:DockMargin(10,7,10,7)
+
+	hook.Add("nzu_CurrentConfigChanged", curpanel, function(s, config)
+		loadedcfg:SetConfig(config)
+		if config then
+			loadedcfg:SetVisible(true)
+			createbutton:SetText("Create new local copy ...")
+		else
+			loadedcfg:SetVisible(false)
+			createbutton:SetText("Create new Config ...")
+		end
+	end)
+
+	local configscroll = configpanel:Add("DScrollPanel")
+	configscroll:Dock(FILL)
+	configscroll:DockMargin(5,0,0,5)
+	local configlist = configscroll:Add("DListLayout")
+	configlist:Dock(FILL)
+	
+	
 	
 	local img = infopanel:Add("DImage")
 	img:SetImage("maps/thumb/gm_construct.png")
@@ -104,7 +135,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 				local c = p:Add("DCheckBox")
 				c:Dock(LEFT)
 				c:DockMargin(0,0,5,0)
-				c:SetChecked(selected and selected.Addons[v.wsid] or false)
+				c:SetChecked(selected and selected.RequiredAddons[v.wsid] or false)
 				function c:PerformLayout()
 					self:SetWide(self:GetTall())
 				end
@@ -125,7 +156,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	end
 	function addonlist:Recheck()
 		for k,v in pairs(self.Addons) do
-			v.CheckBox:SetChecked(selected and selected.Addons[k] or false)
+			v.CheckBox:SetChecked(selected and selected.RequiredAddons[k] or false)
 		end
 	end
 	addonlist:Refresh()
@@ -221,5 +252,116 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 		reload:StretchToParent(0,0,w,0)
 		save:StretchToParent(w,0,0,0)
 	end
+
+	infopanel:SetZPos(2)
+	infopanel:SetVisible(false)
+	local noshow = panel:Add("DLabel")
+	noshow:Dock(FILL)
+	noshow:SetContentAlignment(5)
+	noshow:SetFont(headerfont)
+	noshow:SetText("<-- Click a Config to display.")
+
+	local addonlist2_Scroll = addonarea:Add("DScrollPanel")
+	addonlist2_Scroll:Dock(FILL)
+	local addonlist2 = addonlist2_Scroll:Add("DListLayout")
+	addonlist2:Dock(FILL)
+
+	-- Control selecting configs
+	local function doconfigclick(pnl)
+		if IsValid(selectedconfig) then selectedconfig:SetBackgroundColor(Color(0,0,0)) end
+		selectedconfig = pnl
+		selectedconfig:SetBackgroundColor(Color(0,150,255))
+		infopanel:SetVisible(true)
+
+		local cfg = pnl.Config
+		configname:SetText(cfg.Name)
+		authors:SetText(cfg.Authors)
+		desc:SetText(cfg.Description)
+		mapname:SetText("File: " .. cfg.Codename .. " || Map: "..cfg.Map)
+		widentry:SetText(cfg.WorkshopID or "")
+
+		-- Addon list
+		if cfg == nzu.CurrentConfig then
+			addonscroll:SetVisible(true)
+			addonlist2_Scroll:SetVisible(false)
+
+			save:SetEnabled(true)
+			reload:SetText("Reload last saved version")
+		else
+			addonscroll:SetVisible(false)
+			addonlist2_Scroll:SetVisible(true)
+
+			save:SetEnabled(false)
+			reload:SetText("Load Config")
+
+			addonlist2:Clear()
+			for k,v in pairs(cfg.RequiredAddons) do
+				local lbl = addonlist2:Add("DLabelURL")
+				lbl:SetText(v)
+				lbl:SetURL("https://steamcommunity.com/sharedfiles/filedetails/?id="..k)
+				lbl:SetTextColor(steamworks.ShouldMountAddon(k) and Color(0,255,0) or Color(255,0,0))
+			end
+		end
+	end
+
+	-- Create new config button
+	-- REDO THIS PART. It's not really robust or clean, probably better to our own panel
+	function createbutton:DoClick()
+		local pnl,txt,lbl
+		local function dotest(text)
+			if nzu.ConfigExists(text, "Official") then
+				lbl:SetText("A Local config by that name already exists.")
+				txt.HighlightRed = 255
+				lbl.HighlightRed = 255
+				return false
+			end
+
+			return true
+		end
+		pnl = Derma_StringRequest("Enter new Config Codename",
+			"Enter Config folder name. Must be a valid directory name.",
+			"",
+			nil,nil,"Create Config"
+		)
+		txt = pnl:GetChild(4):GetChild(1)
+		lbl = pnl:GetChild(4):GetChild(0)
+
+		pnl:GetChild(5):GetChild(0).DoClick = function(s) if dotest(txt:GetValue()) then pnl:Close() end end
+		txt.OnEnter = function(s) if dotest(s:GetValue()) then pnl:Close() end end
+
+		local function errorlight(s,w,h)
+			if s.HighlightRed then
+				surface.SetDrawColor(255,0,0,s.HighlightRed)
+				local x2,y2 = s:GetSize()
+				surface.DrawRect(-50, -50, x2+50, y2+50)
+				s.HighlightRed = s.HighlightRed - FrameTime() * 100
+				if s.HighlightRed <= 0 then
+					s.HighlightRed = nil
+				end
+			end
+		end
+		txt.PaintOver = errorlight
+		lbl.PaintOver = errorlight
+	end
+
+	-- Populate configs
+	local function addconfig(_, config)
+		local pnl = configlist:Add("nzu_ConfigPanel")
+		pnl:SetConfig(config)
+		pnl:SetTall(configpaneltall)
+		pnl:SetZPos((config.Map == game.GetMap() and 0 or 5) + (sortorder[config.Type]))
+		pnl.DoClick = doconfigclick
+	end
+	local configs = nzu.GetConfigs()
+	if configs then
+		for k,v in pairs(configs) do
+			for k2,v2 in pairs(v) do
+				for i = 1,20 do addconfig(nil, v2) end
+			end
+		end
+	end
+	hook.Add("nzu_ConfigInfoUpdated", configpanel, addconfig)
+	loadedcfg.DoClick = doconfigclick
+
 	
 end, "icon16/disk.png", "Save your Config or load another")
