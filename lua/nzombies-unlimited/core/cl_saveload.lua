@@ -12,7 +12,7 @@ local configpaneltall = 60
 nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	--panel:SetSkin("nZombies Unlimited")
 	--panel:SetBackgroundColor(Color(150,150,150))
-	local selectedconfig
+	local selectedconfig, editedconfig
 	
 	local configpanel = panel:Add("DPanel")
 	configpanel:SetWidth(400)
@@ -30,11 +30,22 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	curpanel:SetTall(70 + configpaneltall)
 	curpanel.m_bDrawCorners = true
 	curpanel:DockMargin(5,5,0,25)
-	local curloaded = curpanel:Add("DLabel")
-	curloaded:SetText("Currently loaded:")
+	local curtop = curpanel:Add("Panel")
+	curtop:Dock(TOP)
+	curtop:SetTall(35)
+	local curloaded = curtop:Add("DLabel")
+	curloaded:SetText("Current Config:")
 	curloaded:SetFont(headerfont)
 	curloaded:DockMargin(5,5,5,5)
-	curloaded:Dock(TOP)
+	curloaded:Dock(FILL)
+
+	local unload = curtop:Add("DButton")
+	unload:SetText("Unload")
+	unload:SetVisible(false)
+	unload:Dock(RIGHT)
+	unload:SetWide(100)
+	unload:DockMargin(5,5,10,5)
+
 	local loadedpnl = curpanel:Add("DPanel")
 	loadedpnl:Dock(TOP)
 	loadedpnl:SetTall(configpaneltall)
@@ -45,6 +56,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	local loadedcfg = loadedpnl:Add("nzu_ConfigPanel")
 	loadedcfg:Dock(FILL)
 	loadedcfg:SetVisible(false)
+	loadedcfg.m_bDrawCorners = false
 	local noloaded = loadedpnl:Add("DLabel")
 	noloaded:SetText("No Config currently loaded.")
 	noloaded:Dock(FILL)
@@ -56,24 +68,36 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	createbutton:SetText("Create new Config ...")
 	createbutton:DockMargin(10,7,10,7)
 
-	hook.Add("nzu_CurrentConfigChanged", curpanel, function(s, config)
+	local function updateloadedconfig(s,config)
 		loadedcfg:SetConfig(config)
+		editedconfig = config
 		if config then
 			loadedcfg:SetVisible(true)
-			createbutton:SetText("Create new local copy ...")
+			noloaded:SetVisible(false)
+			createbutton:SetText("Create new editable copy ...")
+			unload:SetVisible(true)
 		else
 			loadedcfg:SetVisible(false)
+			noloaded:SetVisible(true)
 			createbutton:SetText("Create new Config ...")
+			unload:SetVisible(false)
 		end
-	end)
+	end
+	if nzu.CurrentConfig then updateloadedconfig(nil, nzu.CurrentConfig) end
+	hook.Add("nzu_CurrentConfigChanged", curpanel, updateloadedconfig)
+
+	local installed = configpanel:Add("DLabel")
+	installed:SetText("Installed Configs:")
+	installed:SetFont(headerfont)
+	installed:DockMargin(10,5,5,5)
+	installed:Dock(TOP)
 
 	local configscroll = configpanel:Add("DScrollPanel")
 	configscroll:Dock(FILL)
 	configscroll:DockMargin(5,0,0,5)
+	configscroll:SetPaintBackground(true)
 	local configlist = configscroll:Add("DListLayout")
 	configlist:Dock(FILL)
-	
-	
 	
 	local img = infopanel:Add("DImage")
 	img:SetImage("maps/thumb/gm_construct.png")
@@ -180,9 +204,9 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	nhh:DockMargin(3,0,0,0)
 	
 	local mapname = nameheader:Add("DLabel")
-	mapname:SetText("File: nzu_breakout || Map: ttt_kosovos")
+	mapname:SetText("File:          || Map: ")
 	mapname:SetFont(textfont)
-	mapname:Dock(LEFT)
+	mapname:Dock(FILL)
 	mapname:DockMargin(10,0,0,0)
 	mapname:SizeToContents()
 	mapname:SetContentAlignment(1)
@@ -280,19 +304,24 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 		mapname:SetText("File: " .. cfg.Codename .. " || Map: "..cfg.Map)
 		widentry:SetText(cfg.WorkshopID or "")
 
-		-- Addon list
-		if cfg == nzu.CurrentConfig then
+		-- Edits and stuff
+		if cfg == editedconfig and cfg.Type == "Local" then
 			addonscroll:SetVisible(true)
 			addonlist2_Scroll:SetVisible(false)
 
 			save:SetEnabled(true)
 			reload:SetText("Reload last saved version")
+
+			configname:SetEnabled(true)
+			authors:SetEnabled(true)
+			desc:SetEnabled(true)
+			widentry:SetEnabled(true)
 		else
 			addonscroll:SetVisible(false)
 			addonlist2_Scroll:SetVisible(true)
 
 			save:SetEnabled(false)
-			reload:SetText("Load Config")
+			reload:SetText(cfg == nzu.CurrentConfig and "Reload Config" or "Load Config")
 
 			addonlist2:Clear()
 			for k,v in pairs(cfg.RequiredAddons) do
@@ -301,67 +330,156 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 				lbl:SetURL("https://steamcommunity.com/sharedfiles/filedetails/?id="..k)
 				lbl:SetTextColor(steamworks.ShouldMountAddon(k) and Color(0,255,0) or Color(255,0,0))
 			end
+
+			configname:SetEnabled(false)
+			authors:SetEnabled(false)
+			desc:SetEnabled(false)
+			widentry:SetEnabled(false)
 		end
 	end
 
 	-- Create new config button
-	-- REDO THIS PART. It's not really robust or clean, probably better to our own panel
 	function createbutton:DoClick()
-		local pnl,txt,lbl
-		local function dotest(text)
-			if nzu.ConfigExists(text, "Official") then
-				lbl:SetText("A Local config by that name already exists.")
-				txt.HighlightRed = 255
-				lbl.HighlightRed = 255
-				return false
-			end
+		local frame = vgui.Create("DFrame", panel)
+		--frame:SetSkin("nZombies Unlimited")
+		frame:SetTitle("Enter Config Codename")
+		frame:SetSize(400,130)
+		frame:SetDeleteOnClose(true)
+		frame:ShowCloseButton(false)
+		frame:SetBackgroundBlur(true)
+		frame:SetDrawOnTop(true)
 
-			return true
-		end
-		pnl = Derma_StringRequest("Enter new Config Codename",
-			"Enter Config folder name. Must be a valid directory name.",
-			"",
-			nil,nil,"Create Config"
-		)
-		txt = pnl:GetChild(4):GetChild(1)
-		lbl = pnl:GetChild(4):GetChild(0)
+		local t1 = frame:Add("DLabel")
+		t1:Dock(TOP)
+		t1:SetText("Enter Config Codename. Must be a valid folder name.")
+		t1:SetContentAlignment(5)
 
-		pnl:GetChild(5):GetChild(0).DoClick = function(s) if dotest(txt:GetValue()) then pnl:Close() end end
-		txt.OnEnter = function(s) if dotest(s:GetValue()) then pnl:Close() end end
-
+		local errorval
 		local function errorlight(s,w,h)
-			if s.HighlightRed then
-				surface.SetDrawColor(255,0,0,s.HighlightRed)
+			if errorval then
+				surface.SetDrawColor(255,0,0,errorval)
 				local x2,y2 = s:GetSize()
 				surface.DrawRect(-50, -50, x2+50, y2+50)
-				s.HighlightRed = s.HighlightRed - FrameTime() * 100
-				if s.HighlightRed <= 0 then
-					s.HighlightRed = nil
+				errorval= errorval - FrameTime() * 100
+				if errorval <= 0 then
+					errorval = nil
 				end
 			end
 		end
-		txt.PaintOver = errorlight
-		lbl.PaintOver = errorlight
+
+		local entry = frame:Add("DTextEntry")
+		entry:Dock(TOP)
+		entry:SetPlaceholderText("Codename (Config folder name)...")
+		entry.PaintOver = errorlight
+
+		local t2 = frame:Add("DLabel")
+		t2:Dock(TOP)
+		t2:SetText("")
+		t2:SetTextColor(Color(255,100,100))
+		t2:SetContentAlignment(5)
+		t2.PaintOver = errorlight
+
+		local buts = frame:Add("Panel")
+		buts:Dock(BOTTOM)
+		buts:SetTall(20)
+
+		local save = buts:Add("DButton")
+		save:Dock(LEFT)
+		save:SetText("Confirm")
+		save:SetWide(frame:GetWide()/2 - 10)
+
+		local function doconfirm()
+			local val = entry:GetValue()
+			if not val or val == "" or string.match(val, "[^%w_%-]") then
+				errorval = 255
+				t2:SetText("Invalid Codename")
+				return
+			end
+
+			local result = nzu.ConfigExists(val, "Local")
+			if result then
+				errorval = 255
+				t2:SetText("Local Config by that Codename already exists.")
+				return
+			elseif result == false then
+				t2:SetText("Getting Configs from Server - Try again in a moment ...")
+			end
+
+			editedconfig = nzu.CurrentConfig and table.Copy(nzu.CurrentConfig) or {}
+			editedconfig.Codename = val
+			editedconfig.Type = "Local"
+			editedconfig.Name = editedconfig.Name or val
+			editedconfig.Map = game.GetMap()
+			editedconfig.Authors = editedconfig.Authors or ""
+			editedconfig.Description = editedconfig.Description or ""
+			editedconfig.RequiredAddons = editedconfig.RequiredAddons or {}
+
+			updateloadedconfig(nil, editedconfig)
+			loadedcfg:DoClick()
+
+			frame:Close()
+		end
+		save.DoClick = doconfirm
+		entry.OnEnter = doconfirm
+
+		local cancel = buts:Add("DButton")
+		cancel:Dock(RIGHT)
+		cancel:SetText("Cancel")
+		cancel:SetWide(frame:GetWide()/2 - 10)
+		cancel.DoClick = function() frame:Close() end
+
+		frame:SetPos(panel:ScreenToLocal(ScrW()/2 - 200, ScrH()/2 + 65))
+		frame:MakePopup()
+		frame:DoModal()
+
+		entry:RequestFocus()
 	end
 
 	-- Populate configs
-	local function addconfig(_, config)
-		local pnl = configlist:Add("nzu_ConfigPanel")
-		pnl:SetConfig(config)
-		pnl:SetTall(configpaneltall)
-		pnl:SetZPos((config.Map == game.GetMap() and 0 or 5) + (sortorder[config.Type]))
-		pnl.DoClick = doconfigclick
+	local function addconfig(_, config, new)
+		print("Then running here")
+		if new then
+			print("Adding panel for", config.Name, debug.traceback())
+			local pnl = configlist:Add("nzu_ConfigPanel")
+			pnl:SetConfig(config)
+			pnl:SetTall(configpaneltall)
+			pnl:SetZPos((config.Map == game.GetMap() and 0 or 5) + (sortorder[config.Type]))
+			pnl.DoClick = doconfigclick
+		end
 	end
 	local configs = nzu.GetConfigs()
+	print("Checking configs", configs)
 	if configs then
+		PrintTable(configs)
 		for k,v in pairs(configs) do
 			for k2,v2 in pairs(v) do
-				for i = 1,20 do addconfig(nil, v2) end
+				addconfig(nil, v2, true)
 			end
 		end
 	end
+	print("Adding hooks")
 	hook.Add("nzu_ConfigInfoUpdated", configpanel, addconfig)
 	loadedcfg.DoClick = doconfigclick
 
+	save.DoClick = function()
+		if editedconfig and editedconfig.Type == "Local" then nzu.RequestSaveConfig(editedconfig) end
+	end
+	reload.DoClick = function()
+		if selectedconfig.Config then
+			local txt = "Are you sure you want to load?"
+			if nzu.CurrentConfig then txt = txt .. " This will reload the server." end
+			Derma_Query(txt, "Config load confirmation",
+				"Load the Config", function() nzu.RequestLoadConfig(selectedconfig.Config) end,
+				"Cancel"
+			):SetSkin("nZombies Unlimited")
+		end
+	end
+
+	unload.DoClick = function()
+		Derma_Query("Are you sure you want to unload?\nThis will reload the server.", "Config load confirmation",
+			"Unload", function() nzu.RequestUnloadConfig() end,
+			"Cancel"
+		):SetSkin("nZombies Unlimited")
+	end
 	
 end, "icon16/disk.png", "Save your Config or load another")

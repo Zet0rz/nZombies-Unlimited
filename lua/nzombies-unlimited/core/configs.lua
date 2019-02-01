@@ -78,7 +78,7 @@ function nzu.GetConfigFromFolder(path, s)
 end
 
 --[[-------------------------------------------------------------------------
-	Server-Side config discovering and networking
+	Server-Side Config discovering
 ---------------------------------------------------------------------------]]
 if SERVER then
 	function nzu.GetConfig(f, ctype)
@@ -100,114 +100,14 @@ if SERVER then
 		return configs
 	end
 
-	util.AddNetworkString("nzu_configs")
-	local function networkconfig(config, ply, loaded)
-		net.Start("nzu_configs")
-			net.WriteString(config.Type)
-			net.WriteString(config.Codename)
-			net.WriteString(config.Name)
-			net.WriteString(config.Map)
-			net.WriteString(config.Authors or "")
-			net.WriteString(config.Description or "")
-			net.WriteString(config.WorkshopID or "")
-
-			-- Send list of required addons
-			local num = table.Count(config.RequiredAddons)
-			net.WriteUInt(num, 8) -- I don't expect more than 255 addons for a simple config
-			for k,v in pairs(config.RequiredAddons) do
-				net.WriteString(k)
-				net.WriteString(v)
-			end
-			-- Extensions and Path need not be networked, only server needs to know that
-
-			net.WriteBool(loaded) -- Tells clients this is the current config
-		net.Send(ply)
+	function nzu.ConfigExists(f,ctype)
+		if ctype then return file.IsDir(configdirs[ctype]..f, "GAME") end
+		return file.IsDir(configdirs.Official..f, "GAME") or file.IsDir(configdirs.Local..f, "GAME") or file.IsDir(configdirs.Workshop..f, "GAME")
 	end
-
-	-- Client requesting config list
-	util.AddNetworkString("nzu_configsnetworked")
-	net.Receive("nzu_configs", function(len, ply)
-		if nzu.IsAdmin(ply) then -- Only admins can access config lists
-			if not ply.nzu_ConfigsRequested then
-				ply.nzu_ConfigsRequested = true -- From now on, network to this player whenever a config is saved/updated
-				net.Start("nzu_configsnetworked")
-					net.WriteBool(true)
-				net.Send(ply)
-			end
-
-			for k,v in pairs(nzu.GetConfigs()) do
-				for k2,v2 in pairs(v) do
-					networkconfig(v2, ply)
-				end
-			end
-		end
-	end)
-
-	local dontnetwork = false
-	hook.Add("nzu_ConfigSaved", "nzu_NetworkUpdatedConfigs", function(config)
-		if dontnetwork then return end
-
-		local plys = {}
-		for k,v in pairs(player.GetAll()) do
-			if nzu.IsAdmin(ply) and ply.nzu_ConfigsRequested then
-				table.insert(plys, v)
-			end
-		end
-		networkconfig(config, plys) -- Network this updated config to all players
-	end)
-
-	-- Receiving client requests
-	net.Receive("nzu_saveconfig", function(len, ply)
-		if not nzu.IsAdmin(ply) then return end -- Of course servers need to check too!
-
-		local codename = net.ReadString()
-		if nzu.ConfigExists(codename, "Local") and nzu.CurrentConfig.Path ~= configdirs.Local..codename then
-			print("nzu_saveload: Client attempted to save to an existing config without it being loaded first.", ply, codename)
-		return end
-
-		local config -- What we're saving to
-		local tonetwork
-		if nzu.CurrentConfig and nzu.CurrentConfig.Type == "Local" then -- We already have a local config loaded: Save to that
-			config = nzu.CurrentConfig
-		else
-			-- We're saving a new config; Either new local, or new local copy of the one loaded
-			config = {}
-			config.Codename = codename
-			config.Type = "Local"
-
-			nzu.CurrentConfig = config
-			tonetwork = true
-		end
-
-		config.Name = net.ReadString()
-		config.Map = game.GetMap()
-		config.Authors = net.ReadString()
-		config.Description = net.ReadString()
-
-		local numaddons = net.ReadUInt(8)
-		if numaddons > 0 then
-			config.RequiredAddons = {}
-			for i = 1,numaddons do
-				local id = net.ReadString()
-				local name = net.ReadString()
-				config.RequiredAddons[id] = name
-			end
-		end
-
-		if tonetwork then
-			dontnetwork = true -- We want to network manually
-		end
-		nzu.SaveConfigSettings()
-		nzu.SaveConfigInfo() -- This triggers a networking
-		if tonetwork then
-			networkconfig(nzu.CurrentConfig, player.GetAll(), true)
-			dontnetwork = false
-		end
-	end)
 end
 
 --[[-------------------------------------------------------------------------
-	Clientside caching and receiving of configs
+	Clientside caching and receiving of Configs
 ---------------------------------------------------------------------------]]
 if CLIENT then
 	local hasreceivedconfigs = false
@@ -215,13 +115,19 @@ if CLIENT then
 		hasreceivedconfigs = net.ReadBool()
 	end)
 
-	local configs = {} -- Clients cache configs and only further get networks from individual config updates
-	net.Receive("nzu_configs", function(len)
+	local configs = {Official = {}, Local = {}, Workshop = {}} -- Clients cache configs and only further get networks from individual config updates
+	net.Receive("nzu_saveconfig", function(len)
 		local ctype = net.ReadString()
 		if not configs[ctype] then configs[ctype] = {} end
 
-		local config = {Type = ctype}
-		config.Codename = net.ReadString()
+		local codename = net.ReadString()
+		local config = configs[ctype][codename]
+		local new = false
+		if not config then
+			config = {Type = ctype, Codename = codename}
+			configs[ctype][config.Codename] = config
+			new = true
+		end
 		config.Name = net.ReadString()
 		config.Map = net.ReadString()
 		config.Authors = net.ReadString()
@@ -230,8 +136,8 @@ if CLIENT then
 		if config.WorkshopID == "" then config.WorkshopID = nil end
 
 		local numaddons = net.ReadUInt(8)
+		config.RequiredAddons = {}
 		if numaddons > 0 then
-			config.RequiredAddons = {}
 			for i = 1,numaddons do
 				local id = net.ReadString()
 				local name = net.ReadString()
@@ -239,50 +145,33 @@ if CLIENT then
 			end
 		end
 
-		configs[ctype][config.Codename] = config
-		hasreceivedconfigs = true -- Now we won't request the server again (the rest will come through updates)
+		print("Running here")
+		hook.Run("nzu_ConfigInfoUpdated", config, new) -- Call the same hook
 
 		if net.ReadBool() then -- Currently loaded
 			nzu.CurrentConfig = config
 			hook.Run("nzu_CurrentConfigChanged", config)
 		end
 
-		hook.Run("nzu_ConfigInfoUpdated", config) -- Call the same hook
+		print("Received Config networking: " ..config.Codename .." ("..config.Type..") New: "..(new and "true" or "false"))
 	end)
 
 	local function requestconfigs()
-		net.Start("nzu_configs")
+		net.Start("nzu_configsnetworked")
 		net.SendToServer()
 	end
 
 	-- Replica of the SERVER structure, but loading from cache
-	function nzu.GetOfficialConfig(f)
-		if not hasreceivedconfigs then requestconfigs() return false end
-		return configs.Official and configs.Official[f]
+	function nzu.GetConfig(f,ctype)
+		if not hasreceivedconfigs then requestconfigs() end -- Not nil! Can be used to check
+		if ctype then return configs[ctype][f] end
+		return configs.Official[f] or configs.Local[f] or configs.Workshop[f]
 	end
-	function nzu.GetLocalConfig(f)
-		if not hasreceivedconfigs then requestconfigs() return false end
-		return configs.Local and configs.Local[f]
-	end
-	function nzu.GetWorkshopConfig(f)
-		if not hasreceivedconfigs then requestconfigs() return false end
-		return configs.Workshop and configs.Workshop[f]
-	end
-
-	function nzu.GetConfig(f)
-		-- Determines an order if configs should have the same name
-		if not hasreceivedconfigs then requestconfigs() return false end
-		return nzu.GetOfficialConfig(f) or nzu.GetLocalConfig(f) or nzu.GetWorkshopConfig(f)
-	end
+	nzu.ConfigExists = nzu.GetConfig -- Just an alias when working with cache anyway
 
 	function nzu.GetConfigs()
-		if not hasreceivedconfigs then requestconfigs() return false end
+		if not hasreceivedconfigs then requestconfigs() end
 		return configs
-	end
-
-	function nzu.ConfigExists(f,ctype)
-		if ctype then return file.IsDir(configdirs[ctype]..f) end
-		return file.IsDir(configdirs.Official..f) or file.IsDir(configdirs.Local..f) or file.IsDir(configdirs.Workshop..f)
 	end
 
 	-- CONFIG PANEL
@@ -324,6 +213,7 @@ if CLIENT then
 		self.Button.DoClick = function() self:DoClick() end
 
 		self:DockPadding(5,5,5,5)
+		self.m_bDrawCorners = true
 	end
 
 	local typecolors = {
@@ -332,21 +222,27 @@ if CLIENT then
 		Workshop = Color(150,0,255),
 	}
 	local mapinstalled,mapnotinstalled = Color(100,255,100), Color(255,100,100)
+	function CONFIGPANEL:Update(config)
+		--print(self, config.Name, self.Config.Name)
+		if self.Config == config then
+			self.Name:SetText(config.Name or "")
+			self.Map:SetText(config.Codename .. " || " .. config.Map)
+
+			local status = file.Find("maps/"..config.Map..".bsp", "GAME")[1] and true or false
+			self.MapStatus:SetText(status and "Map installed" or "Map not installed")
+			self.MapStatus:SetTextColor(status and mapinstalled or mapnotinstalled)
+
+			self.Type:SetText(config.Type)
+			self.Type:SetTextColor(typecolors[config.Type] or color_white)
+
+			self.Thumbnail:SetImage("../"..configdirs[config.Type].."/"..config.Codename.."/thumb.jpg")
+		end
+	end
 
 	function CONFIGPANEL:SetConfig(config)
 		self.Config = config
-		self.Name:SetText(config.Name)
-		self.Map:SetText(config.Codename .. " || " .. config.Map)
-
-		local status = file.Find("maps/"..config.Map..".bsp", "GAME")[1] and true or false
-		self.MapStatus:SetText(status and "Map installed" or "Map not installed")
-		self.MapStatus:SetTextColor(status and mapinstalled or mapnotinstalled)
-
-		self.Type:SetText(config.Type)
-		self.Type:SetTextColor(typecolors[config.Type] or color_white)
-
-		self.Thumbnail:SetImage("../"..configdirs[config.Type].."/"..config.Codename.."/thumb.jpg")
-		hook.Add("nzu_ConfigInfoUpdated", self, self.SetConfig) -- Auto-update ourselves whenever updates arrive to this config
+		self:Update(config)
+		hook.Add("nzu_ConfigInfoUpdated", self, self.Update) -- Auto-update ourselves whenever updates arrive to this config
 	end
 
 	function CONFIGPANEL:DoClick() end
@@ -376,5 +272,19 @@ if CLIENT then
 			end
 		net.SendToServer()
 		return true
+	end
+
+	function nzu.RequestLoadConfig(config)
+		net.Start("nzu_loadconfig")
+			net.WriteBool(true)
+			net.WriteString(config.Codename)
+			net.WriteString(config.Type)
+		net.SendToServer()
+	end
+
+	function nzu.RequestUnloadConfig()
+		net.Start("nzu_loadconfig")
+			net.WriteBool(false)
+		net.SendToServer()
 	end
 end
