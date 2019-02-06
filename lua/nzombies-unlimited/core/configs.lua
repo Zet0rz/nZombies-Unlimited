@@ -28,6 +28,7 @@ local configdirs = {
 	Workshop = "lua/nzombies-unlimited/workshopconfigs/",
 	Local = "data/nzombies-unlimited/localconfigs/",
 }
+function nzu.GetConfigDir(ctype) return configdirs[ctype] end
 
 -- Making this shared. It has little meaning clientside, but could be used to determine what configs the client may have locally saved
 function nzu.GetConfigFromFolder(path, s)
@@ -146,7 +147,7 @@ if CLIENT then
 		end
 
 		print("Running here")
-		hook.Run("nzu_ConfigInfoUpdated", config, new) -- Call the same hook
+		hook.Run("nzu_ConfigInfoSaved", config, new) -- Call the same hook
 
 		if net.ReadBool() then -- Currently loaded
 			nzu.CurrentConfig = config
@@ -235,14 +236,14 @@ if CLIENT then
 			self.Type:SetText(config.Type)
 			self.Type:SetTextColor(typecolors[config.Type] or color_white)
 
-			self.Thumbnail:SetImage("../"..configdirs[config.Type].."/"..config.Codename.."/thumb.jpg")
+			self.Thumbnail:SetImage("../"..configdirs[config.Type]..config.Codename.."/thumb.jpg")
 		end
 	end
 
 	function CONFIGPANEL:SetConfig(config)
 		self.Config = config
 		self:Update(config)
-		hook.Add("nzu_ConfigInfoUpdated", self, self.Update) -- Auto-update ourselves whenever updates arrive to this config
+		timer.Simple(0, function() hook.Add("nzu_ConfigInfoSaved", self, self.Update) end) -- Auto-update ourselves whenever updates arrive to this config
 	end
 
 	function CONFIGPANEL:DoClick() end
@@ -255,26 +256,8 @@ if CLIENT then
 	vgui.Register("nzu_ConfigPanel", CONFIGPANEL, "DPanel")
 
 	-- FUNCTIONS FOR UPDATING AND CREATING CONFIGS (Requests)
-	function nzu.RequestSaveConfig(config)
-		if not nzu.IsAdmin(LocalPlayer()) then return false end
-		net.Start("nzu_saveconfig") -- We don't network type: It will always overwrite the local config of this codename
-			net.WriteString(config.Codename)
-			net.WriteString(config.Name)
-			net.WriteString(config.Authors or "")
-			net.WriteString(config.Description or "")
-			net.WriteString(config.WorkshopID or "")
-
-			local num = table.Count(config.RequiredAddons)
-			net.WriteUInt(num, 8) -- I don't expect more than 255 addons for a simple config
-			for k,v in pairs(config.RequiredAddons) do
-				net.WriteString(k)
-				net.WriteString(v)
-			end
-		net.SendToServer()
-		return true
-	end
-
 	function nzu.RequestLoadConfig(config)
+		if not nzu.IsAdmin(LocalPlayer()) then return end
 		net.Start("nzu_loadconfig")
 			net.WriteBool(true)
 			net.WriteString(config.Codename)
@@ -283,8 +266,71 @@ if CLIENT then
 	end
 
 	function nzu.RequestUnloadConfig()
+		if not nzu.IsAdmin(LocalPlayer()) then return end
 		net.Start("nzu_loadconfig")
 			net.WriteBool(false)
 		net.SendToServer()
+	end
+
+	if NZU_SANDBOX then -- SAVING ONLY IN SANDBOX
+		function nzu.RequestSaveConfig(config)
+			if not nzu.IsAdmin(LocalPlayer()) then return end
+			net.Start("nzu_saveconfig") -- We don't network type: It will always overwrite the local config of this codename
+				net.WriteString(config.Codename)
+				net.WriteString(config.Name)
+				net.WriteString(config.Authors or "")
+				net.WriteString(config.Description or "")
+				net.WriteString(config.WorkshopID or "")
+
+				local num = table.Count(config.RequiredAddons)
+				net.WriteUInt(num, 8) -- I don't expect more than 255 addons for a simple config
+				for k,v in pairs(config.RequiredAddons) do
+					net.WriteString(k)
+					net.WriteString(v)
+				end
+
+				print("Requesting to save map")
+				net.WriteBool(true) -- Save the entire map!
+			net.SendToServer()
+		end
+
+		function nzu.RequestSaveConfigInfo(config)
+			if not nzu.IsAdmin(LocalPlayer()) then return end
+			net.Start("nzu_saveconfig") -- We don't network type: It will always overwrite the local config of this codename
+				net.WriteString(config.Codename)
+				net.WriteString(config.Name)
+				net.WriteString(config.Authors or "")
+				net.WriteString(config.Description or "")
+				net.WriteString(config.WorkshopID or "")
+
+				local num = table.Count(config.RequiredAddons)
+				net.WriteUInt(num, 8) -- I don't expect more than 255 addons for a simple config
+				for k,v in pairs(config.RequiredAddons) do
+					net.WriteString(k)
+					net.WriteString(v)
+				end
+
+				net.WriteBool(false) -- Only save settings and info
+			net.SendToServer()
+		end
+
+		function nzu.RequestDeleteConfig(config)
+			if not nzu.IsAdmin(LocalPlayer()) then return end
+			net.Start("nzu_deleteconfig")
+				net.WriteString(config.Codename)
+			net.SendToServer()
+		end
+
+		net.Receive("nzu_deleteconfig", function(len)
+			local ctype = net.ReadString()
+			if not configs[ctype] then return end
+
+			local codename = net.ReadString()
+			local config = configs[ctype][codename]
+			configs[ctype][codename] = nil
+			hook.Run("nzu_ConfigDeleted", config)
+
+			print("Received Config deletion: " ..codename .." ("..ctype..")")
+		end)
 	end
 end

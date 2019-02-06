@@ -49,7 +49,7 @@ local function loadmap(config)
 		DisablePropCreateEffect = true
 		
 		duplicator.RemoveMapCreatedEntities() -- Keep this? Maybe look for a way to reset map-created entities (like doors)
-		duplicator.Paste(nil, tab.Entities, tab.Constraints)
+		duplicator.Paste(nil, tab.Map.Entities, tab.Map.Constraints)
 		
 		local loadedents = {} -- Empty and prepare for new wave (should already be empty though)
 		for k,v in pairs(tab.SaveExtensions) do
@@ -82,11 +82,28 @@ end
 
 
 
+local function getplystonetworkto()
+	local plys = {}
+	for k,v in pairs(player.GetAll()) do
+		if nzu.IsAdmin(v) and v.nzu_ConfigsRequested then
+			table.insert(plys, v)
+		end
+	end
+	return plys
+end
+
+
+
+
 
 
 --[[-------------------------------------------------------------------------
 Networking of Configs
 ---------------------------------------------------------------------------]]
+util.AddNetworkString("nzu_saveconfig") -- SERVER: Update clients' config cache || CLIENT: Request a config save
+util.AddNetworkString("nzu_configsnetworked") -- SERVER: Tell client request received || CLIENT: Request full list of configs for cache
+util.AddNetworkString("nzu_deleteconfig") -- SERVER: Remove from clients' config cache || CLIENT: Request config deletion
+
 local function networkconfig(config, ply, loaded)
 	net.Start("nzu_saveconfig")
 		net.WriteString(config.Type)
@@ -112,8 +129,14 @@ local function networkconfig(config, ply, loaded)
 	net.Send(ply)
 end
 
+local function unnetwork(config)
+	net.Start("nzu_deleteconfig")
+		net.WriteString(config.Type)
+		net.WriteString(config.Codename)
+	net.Broadcast()
+end
+
 -- Client requesting config list
-util.AddNetworkString("nzu_configsnetworked")
 net.Receive("nzu_configsnetworked", function(len, ply)
 	if nzu.IsAdmin(ply) then -- Only admins can access config lists
 		if not ply.nzu_ConfigsRequested then
@@ -134,82 +157,7 @@ end)
 local dontnetwork = false
 hook.Add("nzu_ConfigSaved", "nzu_NetworkUpdatedConfigs", function(config)
 	if dontnetwork then return end
-
-	local plys = {}
-	for k,v in pairs(player.GetAll()) do
-		if nzu.IsAdmin(v) and v.nzu_ConfigsRequested then
-			table.insert(plys, v)
-		end
-	end
-	networkconfig(config, plys) -- Network this updated config to all players
-end)
-
--- Receiving client requests
-util.AddNetworkString("nzu_saveconfig")
-net.Receive("nzu_saveconfig", function(len, ply)
-	if not nzu.IsAdmin(ply) then return end -- Of course servers need to check too!
-
-	local codename = net.ReadString()
-	if nzu.ConfigExists(codename, "Local") and (nzu.CurrentConfig.Type ~= "Local" or nzu.CurrentConfig.Codename ~= codename) then
-		print("nzu_saveload: Client attempted to save to an existing config without it being loaded first.", ply, codename)
-	return end
-
-	local config -- What we're saving to
-	local tonetwork
-	if nzu.CurrentConfig and nzu.CurrentConfig.Type == "Local" then -- We already have a local config loaded: Save to that
-		config = nzu.CurrentConfig
-	else
-		-- We're saving a new config; Either new local, or new local copy of the one loaded
-		config = {}
-		config.Codename = codename
-		config.Type = "Local"
-
-		nzu.CurrentConfig = config
-		tonetwork = true
-	end
-
-	config.Name = net.ReadString()
-	config.Map = game.GetMap()
-	config.Authors = net.ReadString()
-	config.Description = net.ReadString()
-
-	local numaddons = net.ReadUInt(8)
-	if numaddons > 0 then
-		config.RequiredAddons = {}
-		for i = 1,numaddons do
-			local id = net.ReadString()
-			local name = net.ReadString()
-			config.RequiredAddons[id] = name
-		end
-	end
-
-	if tonetwork then
-		dontnetwork = true -- We want to network manually
-	end
-	nzu.SaveConfigSettings()
-	nzu.SaveConfigInfo() -- This triggers a networking
-	if tonetwork then
-		networkconfig(nzu.CurrentConfig, player.GetAll(), true)
-		dontnetwork = false
-	end
-end)
-
-util.AddNetworkString("nzu_loadconfig")
-net.Receive("nzu_loadconfig", function(len, ply)
-	if not nzu.IsAdmin(ply) then return end -- Of course servers need to check too!
-
-	if net.ReadBool() then -- Load a config
-		local codename = net.ReadString()
-		local ctype = net.ReadString()
-		local config = nzu.GetConfig(codename, ctype)
-		if not config then
-			print("nzu_saveload: Client attempted to load to a non-existing config.", ply, codename, type)
-		return end
-		
-		nzu.LoadConfig(config)
-	else -- Unload!
-		nzu.UnloadConfig()
-	end
+	networkconfig(config, getplystonetworkto()) -- Network this updated config to all players
 end)
 
 
@@ -224,6 +172,7 @@ end)
 --[[-------------------------------------------------------------------------
 Loading a Config
 ---------------------------------------------------------------------------]]
+util.AddNetworkString("nzu_loadconfig") -- SERVER: Load a config || CLIENT: None
 
 function nzu.LoadConfig(config, ctype)
 	if type(config) == "string" then config = nzu.GetConfig(config, ctype) end -- Compatibility with string arguments (codenames)
@@ -276,6 +225,26 @@ function nzu.UnloadConfig()
 
 	print("nzu_saveload: Couldn't delete config_to_load.txt after 5 attempts. Manually delete the file and reload the map.")
 end
+
+net.Receive("nzu_loadconfig", function(len, ply)
+	if not nzu.IsAdmin(ply) then return end -- Of course servers need to check too!
+
+	if net.ReadBool() then -- Load a config
+		local codename = net.ReadString()
+		local ctype = net.ReadString()
+		local config = nzu.GetConfig(codename, ctype)
+		if not config then
+			print("nzu_saveload: Client attempted to load to a non-existing config.", ply, codename, type)
+		return end
+		
+		nzu.LoadConfig(config)
+	else -- Unload!
+		nzu.UnloadConfig()
+	end
+end)
+
+
+
 
 
 
@@ -333,7 +302,7 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 				duplicator.StoreEntityModifier(v, "nzu_saveid", {id = k})
 			end
 		end
-		tbl.Entities = duplicator.CopyEnts(Ents)
+		tbl.Map = duplicator.CopyEnts(Ents)
 		
 		tbl.SaveExtensions = {}
 		for k,v in pairs(savefuncs) do
@@ -375,7 +344,7 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 		if not file.IsDir("nzombies-unlimited/localconfigs/"..nzu.CurrentConfig.Codename, "DATA") then file.CreateDir("nzombies-unlimited/localconfigs/"..nzu.CurrentConfig.Codename, "DATA") end
 	end
 
-	function nzu.SaveConfig()
+	function nzu.SaveConfigMap()
 		if not nzu.CurrentConfig then
 			Error("nzu_saveload: No current config exists to save to.")
 			return
@@ -391,7 +360,7 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 		file.Write("nzombies-unlimited/localconfigs/"..nzu.CurrentConfig.Codename.."/settings.txt", getextensionsettings())
 
 		--hook.Run("nzu_ConfigSaved", nzu.CurrentConfig) -- This isn't used yet (?)
-		hook.Run("nzu_ConfigInfoUpdated", nzu.CurrentConfig)
+		hook.Run("nzu_ConfigMapSaved", nzu.CurrentConfig)
 	end
 
 	-- Just in case you only want to write to the metadata or settings files
@@ -403,7 +372,7 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 		checkdirs()
 		file.Write("nzombies-unlimited/localconfigs/"..nzu.CurrentConfig.Codename.."/info.txt", getmetadata())
 
-		hook.Run("nzu_ConfigInfoUpdated", nzu.CurrentConfig)
+		hook.Run("nzu_ConfigInfoSaved", nzu.CurrentConfig)
 	end
 	function nzu.SaveConfigSettings()
 		if not nzu.CurrentConfig then
@@ -412,6 +381,118 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 		end		
 		checkdirs()
 		file.Write("nzombies-unlimited/localconfigs/"..nzu.CurrentConfig.Codename.."/settings.txt", getextensionsettings())
+
+		hook.Run("nzu_ConfigSettingsSaved", nzu.CurrentConfig)
 	end
+
+	function nzu.SaveConfig()
+		nzu.SaveConfigMap()
+		nzu.SaveConfigInfo()
+		nzu.SaveConfigSettings()
+	end
+
+	-- Receiving client requests
+	net.Receive("nzu_saveconfig", function(len, ply)
+		if not nzu.IsAdmin(ply) then return end -- Of course servers need to check too!
+
+		local codename = net.ReadString()
+		if nzu.ConfigExists(codename, "Local") and (nzu.CurrentConfig.Type ~= "Local" or nzu.CurrentConfig.Codename ~= codename) then
+			print("nzu_saveload: Client attempted to save to an existing config without it being loaded first.", ply, codename)
+		return end
+
+		local config -- What we're saving to
+		local tonetwork
+		if nzu.CurrentConfig and nzu.CurrentConfig.Type == "Local" then -- We already have a local config loaded: Save to that
+			config = nzu.CurrentConfig
+		else
+			-- We're saving a new config; Either new local, or new local copy of the one loaded
+			config = {}
+			config.Codename = codename
+			config.Type = "Local"
+			config.Path = nzu.GetConfigDir("Local")..codename
+
+			nzu.CurrentConfig = config
+			print("Changed config: ", config.Codename)
+			tonetwork = true
+		end
+
+		config.Name = net.ReadString()
+		config.Map = game.GetMap()
+		config.Authors = net.ReadString()
+		config.Description = net.ReadString()
+		local wid = net.ReadString()
+		config.WorkshopID = wid ~= "" and wid or nil
+
+		local numaddons = net.ReadUInt(8)
+		if numaddons > 0 then
+			config.RequiredAddons = {}
+			for i = 1,numaddons do
+				local id = net.ReadString()
+				local name = net.ReadString()
+				config.RequiredAddons[id] = name
+			end
+		end
+
+		if net.ReadBool() then
+			-- Save the map, settings, and all!
+			nzu.SaveConfigMap()
+		end
+
+		if tonetwork then
+			dontnetwork = true -- We want to network manually
+		end
+		nzu.SaveConfigSettings()
+		nzu.SaveConfigInfo() -- This triggers a networking
+		if tonetwork then
+			networkconfig(nzu.CurrentConfig, player.GetAll(), true)
+			dontnetwork = false
+		end
+	end)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	--[[-------------------------------------------------------------------------
+	Deleting a Config - Sandbox only
+	---------------------------------------------------------------------------]]
+	function nzu.DeleteConfig(config)
+		if type(config) == "string" then config = nzu.GetConfig(config, "Local") end -- Compatibility with string arguments (codenames)
+
+		local path = config and string.match(config.Path, "data/(.+)")
+		if not path then
+			Error("nzu_saveload: Attempted to delete non-existing or non-Local config.")
+			return
+		end
+
+		local f = file.Find(path.."/*", "DATA")
+		for k,v in pairs(f) do
+			file.Delete(path.."/"..v)
+		end
+		file.Delete(path)
+
+		unnetwork(config)
+
+		hook.Run("nzu_ConfigDeleted", config)
+		print("nzu_saveload: Successfully deleted Config: "..path)
+
+		if nzu.CurrentConfig and config.Path == nzu.CurrentConfig.Path then
+			nzu.UnloadConfig()
+		end
+	end
+
+	net.Receive("nzu_deleteconfig", function(len, ply)
+		if not nzu.IsAdmin(ply) then return end -- Of course only admins can delete folders and files!!
+		nzu.DeleteConfig(net.ReadString())
+	end)
 end
 

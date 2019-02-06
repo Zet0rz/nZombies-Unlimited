@@ -262,9 +262,14 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	desc:Dock(FILL)
 	
 	local saveload = infopanel:Add("Panel")
-	saveload:DockMargin(0,30,0,0)
+	saveload:DockMargin(0,5,0,0)
 	saveload:SetTall(30)
 	saveload:Dock(BOTTOM)
+
+	local saveload2 = infopanel:Add("Panel")
+	saveload2:DockMargin(0,30,0,0)
+	saveload2:SetTall(20)
+	saveload2:Dock(BOTTOM)
 	
 	local reload = saveload:Add("DButton")
 	reload:SetText("Reload last saved version")
@@ -276,6 +281,16 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 		reload:StretchToParent(0,0,w,0)
 		save:StretchToParent(w,0,0,0)
 	end
+
+	local delete = saveload2:Add("DButton")
+	delete:Dock(LEFT)
+	delete:SetText("Delete Config")
+	delete:SetWide(150)
+
+	local savemeta = saveload2:Add("DButton")
+	savemeta:Dock(RIGHT)
+	savemeta:SetText("Save Info")
+	savemeta:SetWide(150)
 
 	infopanel:SetZPos(2)
 	infopanel:SetVisible(false)
@@ -311,6 +326,8 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 
 			save:SetEnabled(true)
 			reload:SetText("Reload last saved version")
+			savemeta:SetEnabled(true)
+			delete:SetEnabled(true)
 
 			configname:SetEnabled(true)
 			authors:SetEnabled(true)
@@ -322,6 +339,8 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 
 			save:SetEnabled(false)
 			reload:SetText(cfg == nzu.CurrentConfig and "Reload Config" or "Load Config")
+			savemeta:SetEnabled(false)
+			delete:SetEnabled(cfg.Type == "Local")
 
 			addonlist2:Clear()
 			for k,v in pairs(cfg.RequiredAddons) do
@@ -436,15 +455,22 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	end
 
 	-- Populate configs
-	local function addconfig(_, config, new)
+	local configpanels = {}
+	local function addconfig(_, config)
 		print("Then running here")
-		if new then
-			print("Adding panel for", config.Name, debug.traceback())
-			local pnl = configlist:Add("nzu_ConfigPanel")
+		if not configpanels[config] then
+			print("Adding panel for", config.Codename, debug.traceback())
+			local pnl = vgui.Create("nzu_ConfigPanel", configlist)
+			--configlist:Add(pnl)
 			pnl:SetConfig(config)
 			pnl:SetTall(configpaneltall)
 			pnl:SetZPos((config.Map == game.GetMap() and 0 or 5) + (sortorder[config.Type]))
 			pnl.DoClick = doconfigclick
+			pnl:Dock(TOP)
+
+			configpanels[config] = pnl
+			configscroll:InvalidateChildren()
+			timer.Simple(0.1, function() configscroll:InvalidateLayout() end)
 		end
 	end
 	local configs = nzu.GetConfigs()
@@ -458,8 +484,18 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 		end
 	end
 	print("Adding hooks")
-	hook.Add("nzu_ConfigInfoUpdated", configpanel, addconfig)
+	hook.Add("nzu_ConfigInfoSaved", configpanel, addconfig)
 	loadedcfg.DoClick = doconfigclick
+
+	hook.Add("nzu_ConfigDeleted", configpanel, function(_, config)
+		if configpanels[config] then
+			configpanels[config]:Remove()
+			configpanels[config] = nil
+
+			configscroll:InvalidateChildren()
+			timer.Simple(0.1, function() configscroll:InvalidateLayout() end)
+		end
+	end)
 
 	save.DoClick = function()
 		if editedconfig and editedconfig.Type == "Local" then nzu.RequestSaveConfig(editedconfig) end
@@ -473,6 +509,21 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 				"Cancel"
 			):SetSkin("nZombies Unlimited")
 		end
+	end
+
+	delete.DoClick = function()
+		if selectedconfig.Config then
+			local txt = "Are you sure you want to delete this Config?"
+			if selectedconfig.Config == nzu.CurrentConfig then txt = txt .. " This will reload the server." end
+			Derma_Query(txt, "Config deletion confirmation",
+				"Delete the Config", function() nzu.RequestDeleteConfig(selectedconfig.Config) end,
+				"Cancel"
+			):SetSkin("nZombies Unlimited")
+		end
+	end
+
+	savemeta.DoClick = function()
+		if editedconfig and editedconfig.Type == "Local" then nzu.RequestSaveConfigInfo(editedconfig) end
 	end
 
 	unload.DoClick = function()
