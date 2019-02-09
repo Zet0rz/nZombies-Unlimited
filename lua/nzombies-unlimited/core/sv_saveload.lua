@@ -10,7 +10,7 @@ function nzu.AddSaveExtension(id, tbl)
 	-- Can optionally contain PreSave and PreLoad functions which do the same (but without entity support)
 end
 
-local loadedents = {}
+local loadedents
 duplicator.RegisterEntityModifier("nzu_saveid", function(ply, ent, data)
 	local id = data.id
 	if not id then return end
@@ -18,7 +18,21 @@ duplicator.RegisterEntityModifier("nzu_saveid", function(ply, ent, data)
 	loadedents[id] = ent -- Doesn't actually modify the entity, just registers who it used to be
 end)
 
-local function loadmap(config)
+local function loadconfig(config)
+
+	-- 1) Load Extensions
+	if file.Exists(config.Path.."/settings.txt", "GAME") then
+		local tbl = util.JSONToTable(file.Read(config.Path.."/settings.txt", "GAME"))
+		if tbl then
+			for k,v in pairs(tbl) do
+				-- Load extensions with specified settings (rather than defaults)
+				-- These are loaded in the order they were saved (unless the .txt was modified)
+				nzu.LoadExtension(v.ID, v.Settings)
+			end
+		end
+	end
+
+	-- 2) Load Map + Save Extensions
 	-- Mostly copied from gmsave module
 	if not file.Exists(config.Path.."/config.dat", "GAME") then return end -- Not error, just load nothing
 	local str = file.Read(config.Path.."/config.dat", "GAME")
@@ -51,7 +65,7 @@ local function loadmap(config)
 		duplicator.RemoveMapCreatedEntities() -- Keep this? Maybe look for a way to reset map-created entities (like doors)
 		duplicator.Paste(nil, tab.Map.Entities, tab.Map.Constraints)
 		
-		local loadedents = {} -- Empty and prepare for new wave (should already be empty though)
+		loadedents = {} -- Empty and prepare for new wave (should already be empty though)
 		for k,v in pairs(tab.SaveExtensions) do
 			if savefuncs[k] then
 				local data = v.Data
@@ -69,14 +83,11 @@ local function loadmap(config)
 				print("nzu_saveload: Attempted to load non-existent Save Extension: "..k.."!")
 			end
 		end
-		--loadedents = {} -- Empty to clean up
+		loadedents = nil -- Clean up
 		
 		DisablePropCreateEffect = nil
 	end)
 end
-
-
-
 
 
 
@@ -184,7 +195,7 @@ function nzu.LoadConfig(config, ctype)
 
 	if not nzu.CurrentConfig and config.Map == game.GetMap() then
 		-- Allow immediate loading if no config has previously been loaded (default gamemode state)
-		loadmap(config)
+		loadconfig(config)
 		nzu.CurrentConfig = config
 		networkconfig(config, player.GetAll(), true)
 		return
@@ -335,7 +346,12 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 	end
 
 	local function getextensionsettings()
-		return util.TableToJSON(nzu.CurrentConfig.Settings)
+		local tbl = {}
+		for k,v in pairs(nzu.GetLoadedExtensionOrder()) do
+			local ext = nzu.GetExtension(v)
+			table.insert(tbl, {ID = ext.ID, Settings = ext.Settings})
+		end
+		return util.TableToJSON(tbl)
 	end
 
 	local function checkdirs()
