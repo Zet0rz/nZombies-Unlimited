@@ -15,7 +15,7 @@ duplicator.RegisterEntityModifier("nzu_saveid", function(ply, ent, data)
 	local id = data.id
 	if not id then return end
 	
-	loadedents[id] = ent -- Doesn't actually modify the entity, just registers who it used to be
+	if loadedents then loadedents[id] = ent end -- Doesn't actually modify the entity, just registers who it used to be
 end)
 
 local function loadconfig(config)
@@ -198,6 +198,7 @@ function nzu.LoadConfig(config, ctype)
 		loadconfig(config)
 		nzu.CurrentConfig = config
 		networkconfig(config, player.GetAll(), true)
+		hook.Run("nzu_ConfigLoaded", config)
 		return
 	end
 	
@@ -345,11 +346,26 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 		})
 	end
 
+	local loadparse = {
+		[TYPE_COLOR] = function(v)
+			return Color(v.r, v.g, v.b, v.a)
+		end,
+	}
 	local function getextensionsettings()
 		local tbl = {}
 		for k,v in pairs(nzu.GetLoadedExtensionOrder()) do
 			local ext = nzu.GetExtension(v)
-			table.insert(tbl, {ID = ext.ID, Settings = ext.Settings})
+			if ext then
+				local t = {}
+				-- Loop through the settings meta; If any have a "Save" we will save the value of that function instead
+				for k,v in pairs(ext.GetSettingsMeta()) do
+					local tosave = ext.Settings[k]
+					if v.Save then tosave = v.Save(tosave) end
+					t[k] = tosave
+				end
+
+				table.insert(tbl, {ID = ext.ID, Settings = t})
+			end
 		end
 		return util.TableToJSON(tbl)
 	end
@@ -462,6 +478,7 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 		if tonetwork then
 			networkconfig(nzu.CurrentConfig, player.GetAll(), true)
 			dontnetwork = false
+			hook.Run("nzu_ConfigLoaded", config)
 		end
 	end)
 

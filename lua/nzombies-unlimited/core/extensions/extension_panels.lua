@@ -2,12 +2,11 @@
 -- You can provide your own of this by setting the field CustomPanel to a table of this structure
 local paneltypes = {
 	[TYPE_STRING] = {
-		Create = function()
-			local p = vgui.Create("DTextEntry")
+		Create = function(parent)
+			local p = vgui.Create("DTextEntry", parent)
 			p:SetTall(40)
 
 			function p:OnFocusChanged(b)
-				print(b)
 				if not b then p:Send() end -- Trigger networking on text field focus lost
 			end
 
@@ -17,8 +16,8 @@ local paneltypes = {
 		Get = function(p) return p:GetText() end
 	},
 	[TYPE_NUMBER] = {
-		Create = function()
-			local p = vgui.Create("Panel")
+		Create = function(parent)
+			local p = vgui.Create("Panel", parent)
 			p.N = p:Add("DNumberWang")
 			p.N:Dock(FILL)
 			p.N:SetMinMax(nil,nil)
@@ -34,8 +33,8 @@ local paneltypes = {
 		Get = function(p) return p.N:GetValue() end
 	},
 	[TYPE_BOOL] = {
-		Create = function()
-			local p = vgui.Create("DCheckBoxLabel")
+		Create = function(parent)
+			local p = vgui.Create("DCheckBoxLabel", parent)
 			p:SetText("Enabled") p:SetTall(15)
 			p:SetTextColor(color_black)
 
@@ -48,8 +47,8 @@ local paneltypes = {
 	},
 	--[TYPE_ENTITY]		= function end,
 	[TYPE_VECTOR] = {
-		Create = function()
-			local p = vgui.Create("Panel")
+		Create = function(parent)
+			local p = vgui.Create("Panel", parent)
 
 			p.S = p:Add("DButton")
 			p.S:SetText("Save")
@@ -69,8 +68,8 @@ local paneltypes = {
 		Get = function(p) return p.V:GetVector() end
 	},
 	[TYPE_ANGLE] = {
-		Create = function()
-			local p = vgui.Create("Panel")
+		Create = function(parent)
+			local p = vgui.Create("Panel", parent)
 
 			p.S = p:Add("DButton")
 			p.S:SetText("Save")
@@ -90,8 +89,8 @@ local paneltypes = {
 		Get = function(p) return p.A:GetAngles() end
 	},
 	[TYPE_MATRIX] = {
-		Create = function()
-			local p = vgui.Create("Panel")
+		Create = function(parent)
+			local p = vgui.Create("Panel", parent)
 
 			p.S = p:Add("DButton")
 			p.S:SetText("Save")
@@ -111,8 +110,8 @@ local paneltypes = {
 		Get = function(p) return p.M:GetMatrix() end
 	},
 	[TYPE_COLOR] = {
-		Create = function()
-			local p = vgui.Create("Panel")
+		Create = function(parent)
+			local p = vgui.Create("Panel", parent)
 
 			p.S = p:Add("DButton")
 			p.S:SetText("Save")
@@ -138,12 +137,12 @@ local function sendnetwork(p)
 end
 
 local bext, bset, bsetpnl
-local function nwpanel(id)
+local function nwpanel(id, parent)
 	local setting = bset[id]
 	if setting then
 		local build = setting.CustomPanel or paneltypes[setting.Type]
 		if build then
-			local p = build.Create()
+			local p = build.Create(parent)
 			p._SetValue = build.Set
 			p._GetValue = build.Get
 
@@ -159,25 +158,45 @@ local function nwpanel(id)
 	end
 end
 
-function nzu.GetExtensionPanel(ext)
-	local extension = nzu.GetExtensionPanelFunction(ext)
-	if not extension then return end
-	
-	-- Set SettingPanel global function only for this
-	local oldval = SettingPanel
-	SettingPanel = nwpanel
-
-	-- Build the panel
-	bext = nzu.GetExtension(ext)
-	bset = nzu.GetExtensionSettings(ext)
-	bsetpnl = {}
-	local panel = extension()
-	panel.SettingPanels = bsetpnl -- Store this so hooks can access them by ID
-	bext = nil
-	bset = nil
-	bsetpnl = nil
-
-	-- Reset old values and return the panel
-	SettingPanel = oldval
-	return panel
+local PANEL = {}
+function PANEL:_HookUpdate(ext, setting, value)
+	if ext == self.Extension then
+		if self.SettingPanels[setting] then self.SettingPanels[setting]:_SetValue(value) end
+	end
 end
+function PANEL:SetExtension(ext)
+	self:Clear()
+	if type(ext) == "string" then
+		
+	else -- We received the actual extension table
+		self.Extension = ext
+		if ext then
+			local pf = ext.GetPanelFunction()
+			if not pf then
+				local l = self:Add("DLabel")
+				l:SetText("This Extension has no settings.")
+				l:Dock(TOP)
+				l:SetContentAlignment(5)
+			return end
+
+			-- Build the panel
+			bext = ext
+			bset = ext.GetSettingsMeta()
+			bsetpnl = {}
+			local panel = pf(self, nwpanel)
+			panel.SettingPanels = bsetpnl -- Store this so hooks can access them by ID
+			bext = nil
+			bset = nil
+			bsetpnl = nil
+
+			hook.Add("nzu_ExtensionSettingChanged", self, self._HookUpdate)
+		else
+			hook.Remove("nzu_ExtensionSettingChanged", self)
+		end
+	end
+
+	self:InvalidateLayout(true)
+	self:SizeToChildren(true, true)
+end
+
+vgui.Register("nzu_ExtensionPanel", PANEL, "DPanel")

@@ -84,7 +84,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 		end
 	end
 	if nzu.CurrentConfig then updateloadedconfig(nil, nzu.CurrentConfig) end
-	hook.Add("nzu_CurrentConfigChanged", curpanel, updateloadedconfig)
+	hook.Add("nzu_ConfigLoaded", curpanel, updateloadedconfig)
 
 	local installed = configpanel:Add("DLabel")
 	installed:SetText("Installed Configs:")

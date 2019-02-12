@@ -25,7 +25,7 @@ function nzu.GetExtensionList()
 
 	local _,dirs = file.Find(prefix..extensionpath.."*", searchpath)
 	for k,v in pairs(dirs) do
-		if not loaded_extensions[v] and nzu.IsExtensionInstalled(v) then
+		if not loaded_extensions[v] and nzu.IsValidExtension(v) then
 			table.insert(tbl, v)
 		end
 	end
@@ -79,11 +79,20 @@ end
 --[[-------------------------------------------------------------------------
 Generating Extensions from files
 ---------------------------------------------------------------------------]]
-local loadingextension
-function nzu.Extension() return loadingextension end
-local function loadextension(name, st)
-	loadingextension = {ID = name}
+local loadparse = {
+	[TYPE_COLOR] = function(t)
+		return IsColor(t) and t or Color(t.r, t.g, t.b, t.a)
+	end,
+}
 
+local loadingextension2
+function nzu.Extension() return loadingextension2 end
+
+-- This function prepares the settings meta
+-- "loadextension" should be called with the return of this value once settings are loaded/prepared (if any)
+-- To use defaults, these can just be chained [loadextension(loadextensionprepare(name))]
+local function loadextensionprepare(name)
+	local loadingextension = {ID = name}
 	local settings, panelfunc
 	local filename = extensionpath..name.."/settings.lua"
 	if file.Exists(prefix..filename, searchpath) then
@@ -93,10 +102,6 @@ local function loadextension(name, st)
 		if settings then
 			if SERVER then
 				local t = {}
-				for k,v in pairs(settings) do
-					t[k] = st and st[k] or v.Default
-				end
-
 				if NZU_SANDBOX then
 					-- Calling the settings table with a field as first argument and value as second will set it and network it
 					-- In Sandbox, it always does this with all settings
@@ -132,13 +137,37 @@ local function loadextension(name, st)
 			else
 				loadingextension.Settings = {} -- Empty for clients by default; we wait expected networking here
 			end
-
 		end
 	end
 	loadingextension.GetSettingsMeta = function() return settings end
 	if CLIENT then loadingextension.GetPanelFunction = function() return panelfunc end end
 
+	return loadingextension
+end
+
+-- This function applies a table of settings, and loads the code of the extension afterwards
+-- After calling this function, the Extension will be ready and active
+local function loadextension(loadingextension, st)
+	loadingextension2 = loadingextension
+
+	print(st)
+	local t = loadingextension.Settings
+	if t then
+		if SERVER or NZU_SANDBOX then -- On Server or in Sandbox: Read every settings field
+			for k,v in pairs(loadingextension.GetSettingsMeta()) do
+				t[k] = st and st[k] or v.Default
+				local parse = v.Load or loadparse[v.Type]
+				if parse then t[k] = parse(t[k]) end
+			end
+		elseif CLIENT and st then -- On Client and not in Sandbox: Only read settings in the 'st' table
+			for k,v in pairs(st) do
+				t[k] = st[k]
+			end
+		end
+	end
+
 	-- Load the actual files
+	local name = loadingextension.ID
 	if NZU_SANDBOX then
 		local filename = extensionpath..name.."/sandbox.lua"
 		if file.Exists(prefix..filename, searchpath) then
@@ -156,7 +185,7 @@ local function loadextension(name, st)
 	end
 
 	loaded_extensions[name] = loadingextension
-	loadingextension = nil
+	loadingextension2 = nil
 
 	hook.Run("nzu_ExtensionLoaded", name)
 
@@ -212,7 +241,7 @@ if SERVER then
 			end
 		end
 
-		local ext = loadextension(name, settings)
+		local ext = loadextension(loadextensionprepare(name), settings)
 		if NZU_SANDBOX then
 			table.insert(load_order, ext.ID)
 		end
@@ -221,14 +250,36 @@ if SERVER then
 		net.Broadcast()
 	end
 
+	function nzu.UnloadExtensions(names)
+		for k,v in pairs(names) do
+			loaded_extensions[v] = nil
+		end
+
+		-- Cause a reboot to unload the code
+		nzu.SaveConfig()
+		nzu.LoadConfig(nzu.CurrentConfig)
+	end
+
 	net.Receive("nzu_extension_load", function(len, ply)
-		if not nzu.IsAdmin(ply) then return end
-		nzu.LoadExtension(net.ReadString())
+		if not nzu.IsAdmin(ply) or not nzu.CurrentConfig then return end
+
+		if net.ReadBool() then
+			nzu.LoadExtension(net.ReadString())
+		else
+			local num = net.ReadUInt(8)
+			if num > 0 then
+				local t = {}
+				for i = 1,num do
+					table.insert(t, net.ReadString())
+				end
+				nzu.UnloadExtensions(t)
+			end
+		end
 	end)
 
 	hook.Add("PlayerInitialSpawn", "nzu_ExtensionLoad", function(ply)
 		for k,v in pairs(loaded_extensions) do
-			net.Start("nzu_extension_fullsync")
+			net.Start("nzu_extension_load")
 				networkextension(v)
 			net.Send(ply)
 		end
@@ -244,17 +295,21 @@ else
 	net.Receive("nzu_extension_load", function()
 		local name = net.ReadString()
 		if net.ReadBool() then
-			local ext = loadextension(name)
+			local ext = loadextensionprepare(name)
 
-			if ext.Settings then
-				local sm  = ext.GetSettingsMeta()
+			local sm = ext.GetSettingsMeta()
+			local settings
+			if sm then
+				settings = {}
 				while net.ReadBool() do
 					local k = net.ReadString()
 					if sm[k] then
-						ext.Settings[k] = netreadsetting(sm[k])
+						settings[k] = netreadsetting(sm[k])
 					end
 				end
 			end
+
+			loadextension(ext, settings)
 		elseif loaded_extensions[name] then
 			loaded_extensions[name] = nil
 		end
@@ -313,5 +368,24 @@ else
 				netwritesetting(settingtbl,setting,value)
 			net.SendToServer()
 		end
+	end
+
+	function nzu.RequestLoadExtension(name)
+		if not nzu.IsAdmin(LocalPlayer()) then return end
+		net.Start("nzu_extension_load")
+			net.WriteBool(true)
+			net.WriteString(name)
+		net.SendToServer()
+	end
+
+	function nzu.RequestUnloadExtensions(names)
+		if not nzu.IsAdmin(LocalPlayer()) then return end
+		net.Start("nzu_extension_load")
+			net.WriteBool(false)
+			net.WriteUInt(#names, 8)
+			for k,v in pairs(names) do
+				net.WriteString(v)
+			end
+		net.SendToServer()
 	end
 end

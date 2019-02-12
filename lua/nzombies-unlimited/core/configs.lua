@@ -151,7 +151,7 @@ if CLIENT then
 
 		if net.ReadBool() then -- Currently loaded
 			nzu.CurrentConfig = config
-			hook.Run("nzu_CurrentConfigChanged", config)
+			hook.Run("nzu_ConfigLoaded", config)
 		end
 
 		print("Received Config networking: " ..config.Codename .." ("..config.Type..") New: "..(new and "true" or "false"))
@@ -188,10 +188,12 @@ if CLIENT then
 		self.Type = status:Add("DLabel")
 		self.Type:Dock(TOP)
 		self.Type:SetContentAlignment(3)
+		self.Type:SetText("")
 
 		self.MapStatus = status:Add("DLabel")
 		self.MapStatus:Dock(BOTTOM)
 		self.MapStatus:SetContentAlignment(9)
+		self.MapStatus:SetText("")
 
 		local center = self:Add("Panel")
 		center:Dock(FILL)
@@ -201,11 +203,13 @@ if CLIENT then
 		self.Name:SetFont("Trebuchet24")
 		self.Name:Dock(FILL)
 		self.Name:SetContentAlignment(1)
+		self.Name:SetText("No Config loaded")
 
 		self.Map = center:Add("DLabel")
 		self.Map:Dock(BOTTOM)
 		self.Map:SetContentAlignment(7)
 		self.Map:DockMargin(0,0,0,-5)
+		self.Map:SetText("")
 
 		self.Button = self:Add("DButton")
 		self.Button:SetText("")
@@ -289,7 +293,6 @@ if CLIENT then
 					net.WriteString(v)
 				end
 
-				print("Requesting to save map")
 				net.WriteBool(true) -- Save the entire map!
 			net.SendToServer()
 		end

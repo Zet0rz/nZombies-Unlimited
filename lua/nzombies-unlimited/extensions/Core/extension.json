@@ -1,0 +1,5 @@
+{
+  "Name": "Core",
+  "Description": "Provides the core nZombies functionality. Includes Points, Round, Weapon Management, HUD+Sounds.",
+  "Author": "Zet0r"
+}
