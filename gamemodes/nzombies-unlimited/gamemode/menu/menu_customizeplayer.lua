@@ -12,6 +12,7 @@ nzu.AddMenuHook("CustomizePlayer", function(menu)
 	-- Player color and model menu
 	local sheet = vgui.Create( "DPropertySheet" )
 	sheet:Dock(FILL)
+	sheet:SetSkin("nZombies Unlimited")
 
 	local sub = menu:AddPanel("Customize Player ...", 2, sheet)
 	local mdl = vgui.Create("DModelPanel")

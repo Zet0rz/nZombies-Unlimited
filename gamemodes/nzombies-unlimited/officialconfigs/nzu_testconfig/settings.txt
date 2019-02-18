@@ -1,1 +1,0 @@
-{"Powerups":{"Spawnrate":3.0,"Angle":"{50 0 0}"}}

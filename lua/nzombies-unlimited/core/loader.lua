@@ -13,7 +13,7 @@ if SERVER then
 	AddCSLuaFile("entities.lua")
 	AddCSLuaFile("logicmap.lua")
 	AddCSLuaFile("configsettings.lua")
-	AddCSLuaFile("cl_saveload.lua")
+	AddCSLuaFile("spawnmenu_saveload.lua")
 	AddCSLuaFile("configs.lua")
 	AddCSLuaFile("cl_vgui_configtree.lua")
 	AddCSLuaFile("logic/logic_manager.lua")
@@ -33,7 +33,7 @@ else
 	include("cl_spawnmenu.lua")
 	include("cl_vgui_configtree.lua")
 	include("configs.lua")
-	include("cl_saveload.lua")
+	include("spawnmenu_saveload.lua")
 	include("logic/cl_logicmap.lua")
 
 	include("extensions/extension_panels.lua")

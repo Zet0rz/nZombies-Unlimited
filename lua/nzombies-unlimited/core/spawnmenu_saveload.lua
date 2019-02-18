@@ -2,12 +2,6 @@ local headerfont = "Trebuchet24"
 local namefont = "Trebuchet24"
 local textfont = "Trebuchet18"
 
-local sortorder = {
-	Official = 1,
-	Local = 2,
-	Workshop = 3
-}
-
 local configpaneltall = 60
 nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	--panel:SetSkin("nZombies Unlimited")
@@ -174,13 +168,8 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 				p:Dock(TOP)
 				
 				p.CheckBox = c
-				self.Addons[v.wsid] = p
+				self.Addons[v.wsid] = {v.title, c}
 			end
-		end
-	end
-	function addonlist:Recheck()
-		for k,v in pairs(self.Addons) do
-			v.CheckBox:SetChecked(selected and selected.RequiredAddons[k] or false)
 		end
 	end
 	addonlist:Refresh()
@@ -464,13 +453,21 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 			--configlist:Add(pnl)
 			pnl:SetConfig(config)
 			pnl:SetTall(configpaneltall)
-			pnl:SetZPos((config.Map == game.GetMap() and 0 or 5) + (sortorder[config.Type]))
+			pnl:Sort()
 			pnl.DoClick = doconfigclick
 			pnl:Dock(TOP)
 
 			configpanels[config] = pnl
 			configscroll:InvalidateChildren()
 			timer.Simple(0.1, function() configscroll:InvalidateLayout() end)
+		end
+
+		-- Update the main one if it is that one
+		if editedconfig and editedconfig.Codename == config.Codename and editedconfig.Type == config.Type then
+			configname:SetText(config.Name)
+			desc:SetText(config.Description)
+			authors:SetText(config.Authors)
+			widentry:SetText(config.WorkshopID or "")
 		end
 	end
 	local configs = nzu.GetConfigs()
@@ -497,8 +494,24 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 		end
 	end)
 
+	local function applyinfo()
+		if editedconfig then
+			editedconfig.Name = configname:GetValue()
+			editedconfig.Description = desc:GetValue()
+			editedconfig.Authors = authors:GetValue()
+			editedconfig.WorkshopID = widentry:GetValue()
+			
+			editedconfig.RequiredAddons = {}
+			for k,v in pairs(addonlist.Addons) do
+				if v[2]:GetChecked() then
+					editedconfig.RequiredAddons[k] = v[1]
+				end
+			end
+		end
+	end
+
 	save.DoClick = function()
-		if editedconfig and editedconfig.Type == "Local" then nzu.RequestSaveConfig(editedconfig) end
+		if editedconfig and editedconfig.Type == "Local" then applyinfo() nzu.RequestSaveConfig(editedconfig) end
 	end
 	reload.DoClick = function()
 		if selectedconfig.Config then
@@ -523,7 +536,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	end
 
 	savemeta.DoClick = function()
-		if editedconfig and editedconfig.Type == "Local" then nzu.RequestSaveConfigInfo(editedconfig) end
+		if editedconfig and editedconfig.Type == "Local" then applyinfo() nzu.RequestSaveConfigInfo(editedconfig) end
 	end
 
 	unload.DoClick = function()

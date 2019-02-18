@@ -9,9 +9,12 @@
 	Description = Single long string providing a short description of the config
 	WorkshopID = ID of Workshop addon (if set)
 
-	Settings = {
-		[ExtensionID] = {
-			[setting] = value
+	Extensions = {
+		[Number] = {
+			ID = Extension Name,
+			Settings = {
+				["Setting"] = value
+			}
 		}
 	}
 	^ Also determines what extensions are enabled for this config
@@ -29,6 +32,9 @@ local configdirs = {
 	Local = "data/nzombies-unlimited/localconfigs/",
 }
 function nzu.GetConfigDir(ctype) return configdirs[ctype] end
+function nzu.GetConfigThumbnail(config)
+	return "../"..configdirs[config.Type]..config.Codename.."/thumb.jpg"
+end
 
 -- Making this shared. It has little meaning clientside, but could be used to determine what configs the client may have locally saved
 function nzu.GetConfigFromFolder(path, s)
@@ -62,7 +68,7 @@ function nzu.GetConfigFromFolder(path, s)
 		config.Authors = info.authors
 		config.Description = info.description
 		config.WorkshopID = info.workshopid
-		config.Settings = settings
+		config.Extensions = settings
 		config.RequiredAddons = info.requiredaddons
 
 		config.Path = (s == "LUA" and "lua/" or s == "DATA" and "data/" or "")..path
@@ -240,7 +246,7 @@ if CLIENT then
 			self.Type:SetText(config.Type)
 			self.Type:SetTextColor(typecolors[config.Type] or color_white)
 
-			self.Thumbnail:SetImage("../"..configdirs[config.Type]..config.Codename.."/thumb.jpg")
+			self.Thumbnail:SetImage(nzu.GetConfigThumbnail(config))
 		end
 	end
 
@@ -257,6 +263,19 @@ if CLIENT then
 		self.Button:SetSize(w,h)
 		self.Thumbnail:SetWide((h-10)*(16/9))
 	end
+
+	local sortorder = {
+		Official = 1,
+		Local = 2,
+		Workshop = 3
+	}
+	function CONFIGPANEL:Sort()
+		if self.Config then
+			self:SetZPos((self.Config.Map == game.GetMap() and 0 or 5) + (sortorder[self.Config.Type] or 0))
+		else
+			self:SetZPos(-1)
+		end
+	end
 	vgui.Register("nzu_ConfigPanel", CONFIGPANEL, "DPanel")
 
 	-- FUNCTIONS FOR UPDATING AND CREATING CONFIGS (Requests)
@@ -266,6 +285,7 @@ if CLIENT then
 			net.WriteBool(true)
 			net.WriteString(config.Codename)
 			net.WriteString(config.Type)
+			net.WriteBool(false)
 		net.SendToServer()
 	end
 
@@ -315,6 +335,8 @@ if CLIENT then
 
 				net.WriteBool(false) -- Only save settings and info
 			net.SendToServer()
+			print("Networked to server")
+			PrintTable(config)
 		end
 
 		function nzu.RequestDeleteConfig(config)
@@ -334,6 +356,102 @@ if CLIENT then
 			hook.Run("nzu_ConfigDeleted", config)
 
 			print("Received Config deletion: " ..codename .." ("..ctype..")")
-		end)
+		end)		
 	end
+
+	-- Receive missing addons list
+	net.Receive("nzu_loadconfig", function(len)
+		local listentryheight = 25
+		local maxheight = 300
+
+		local codename = net.ReadString()
+		local ctype = net.ReadString()
+
+		local t = {}
+		local num = net.ReadUInt(8)
+		for i = 1,num do
+			local k = net.ReadString()
+			t[k] = net.ReadString()
+		end
+
+		-- Make the popup
+		local f = vgui.Create("DFrame")
+		f:SetSkin("nZombies Unlimited")
+		f:SetTitle("Missing Addons ["..num.."]")
+		f:SetSize(400, 180 + math.Min(listentryheight * num, maxheight))
+		f:ShowCloseButton(true)
+		f:SetBackgroundBlur(true)
+
+		local l = f:Add("DLabel")
+		l:SetText("This Config requires Addons that the server does not have installed or enabled.")
+		l:Dock(TOP)
+		l:SetTextColor(Color(255,100,100))
+		l:SetContentAlignment(5)
+		l:DockMargin(0,0,0,5)
+
+		local l2 = f:Add("DLabel")
+		l2:SetText("Go through the list and ensure they are enabled.")
+		l2:Dock(TOP)
+		l2:SetContentAlignment(5)
+		l2:DockMargin(0,0,0,-5)
+
+		local l3 = f:Add("DLabel")
+		l3:SetText("Click 'Load anyway' to continue loading the Config.")
+		l3:Dock(TOP)
+		l3:SetContentAlignment(5)
+
+		local l4 = f:Add("DLabel")
+		l4:SetText("Click an entry to open it on Steam Workshop.")
+		l4:Dock(TOP)
+		l4:SetContentAlignment(5)
+		l4:DockMargin(0,10,0,0)
+
+		local buttonarea = f:Add("Panel")
+		buttonarea:Dock(BOTTOM)
+		buttonarea:SetTall(30)
+		buttonarea:DockPadding(10,0,10,0)
+
+		local load = buttonarea:Add("DButton")
+		load:Dock(LEFT)
+		load:SetWide(175)
+		load:SetText("Load anyway")
+		load.DoClick = function()
+			net.Start("nzu_loadconfig")
+				net.WriteBool(true)
+				net.WriteString(codename)
+				net.WriteString(ctype)
+				net.WriteBool(true) -- This bool means ignore the addon list
+			net.SendToServer()
+
+			f:Close()
+		end
+		local cancel = buttonarea:Add("DButton")
+		cancel:Dock(RIGHT)
+		cancel:SetWide(175)
+		cancel:SetText("Cancel")
+		cancel.DoClick = function() f:Close() end
+
+		-- Fill the addon list
+		local scroll = f:Add("DScrollPanel")
+		scroll:Dock(FILL)
+		scroll:DockMargin(5,5,5,5)
+		local dlist = scroll:Add("DListLayout")
+		dlist:Dock(FILL)
+		for k,v in pairs(t) do
+			local p = dlist:Add("DButton")
+			p:SetTall(listentryheight)
+			p:Dock(TOP)
+			p:SetText(v)
+			p.DoClick = function()
+				steamworks.ViewFile(k)
+			end
+			p:DockMargin(0,0,0,1)
+		end
+
+		f:Center()
+		f:MakePopup()
+		f:DoModal()
+
+		print("Received Config deletion: " ..codename .." ("..ctype..")")
+	end)
 end

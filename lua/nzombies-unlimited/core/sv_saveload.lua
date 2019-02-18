@@ -27,7 +27,7 @@ local function loadconfig(config)
 			for k,v in pairs(tbl) do
 				-- Load extensions with specified settings (rather than defaults)
 				-- These are loaded in the order they were saved (unless the .txt was modified)
-				nzu.LoadExtension(v.ID, v.Settings)
+				nzu.LoadExtension(v.ID, v.Extensions)
 			end
 		end
 	end
@@ -66,6 +66,7 @@ local function loadconfig(config)
 		duplicator.Paste(nil, tab.Map.Entities, tab.Map.Constraints)
 		
 		loadedents = {} -- Empty and prepare for new wave (should already be empty though)
+		local postloads = {}
 		for k,v in pairs(tab.SaveExtensions) do
 			if savefuncs[k] then
 				local data = v.Data
@@ -79,6 +80,8 @@ local function loadconfig(config)
 					end
 				end
 				savefuncs[k].Load(data, entities)
+
+				if savefuncs[k].PostLoad then table.insert(postloads, savefuncs[k].PostLoad) end
 			else
 				print("nzu_saveload: Attempted to load non-existent Save Extension: "..k.."!")
 			end
@@ -86,6 +89,11 @@ local function loadconfig(config)
 		loadedents = nil -- Clean up
 		
 		DisablePropCreateEffect = nil
+
+		-- Post load
+		for k,v in pairs(postloads) do
+			v()
+		end
 	end)
 end
 
@@ -155,18 +163,18 @@ net.Receive("nzu_configsnetworked", function(len, ply)
 			net.Start("nzu_configsnetworked")
 				net.WriteBool(true)
 			net.Send(ply)
-		end
 
-		for k,v in pairs(nzu.GetConfigs()) do
-			for k2,v2 in pairs(v) do
-				networkconfig(v2, ply)
+			for k,v in pairs(nzu.GetConfigs()) do
+				for k2,v2 in pairs(v) do
+					networkconfig(v2, ply)
+				end
 			end
 		end
 	end
 end)
 
 local dontnetwork = false
-hook.Add("nzu_ConfigSaved", "nzu_NetworkUpdatedConfigs", function(config)
+hook.Add("nzu_ConfigInfoSaved", "nzu_NetworkUpdatedConfigs", function(config)
 	if dontnetwork then return end
 	networkconfig(config, getplystonetworkto()) -- Network this updated config to all players
 end)
@@ -183,7 +191,7 @@ end)
 --[[-------------------------------------------------------------------------
 Loading a Config
 ---------------------------------------------------------------------------]]
-util.AddNetworkString("nzu_loadconfig") -- SERVER: Load a config || CLIENT: None
+util.AddNetworkString("nzu_loadconfig") -- SERVER: Load a config || CLIENT: Receive list of missing addons
 
 function nzu.LoadConfig(config, ctype)
 	if type(config) == "string" then config = nzu.GetConfig(config, ctype) end -- Compatibility with string arguments (codenames)
@@ -248,6 +256,33 @@ net.Receive("nzu_loadconfig", function(len, ply)
 		if not config then
 			print("nzu_saveload: Client attempted to load to a non-existing config.", ply, codename, type)
 		return end
+
+		if not net.ReadBool() then --and config.RequiredAddons then
+			local t = {}
+			local addons = engine.GetAddons()
+			local c_addons = table.Copy(config.RequiredAddons)
+			for k,v in pairs(addons) do
+				if c_addons[v.wsid] and v.mounted then
+					c_addons[v.wsid] = nil
+				end
+			end
+
+			-- Some uninstalled addons are found!
+			local num = table.Count(c_addons)
+			if num > 0 then
+				net.Start("nzu_loadconfig")
+					net.WriteString(config.Codename)
+					net.WriteString(config.Type)
+
+					net.WriteUInt(num, 8)
+					for k,v in pairs(c_addons) do
+						net.WriteString(k)
+						net.WriteString(v)
+					end
+				net.Send(ply)
+				return
+			end
+		end
 		
 		nzu.LoadConfig(config)
 	else -- Unload!
@@ -316,6 +351,7 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 		end
 		tbl.Map = duplicator.CopyEnts(Ents)
 		
+		local postsaves = {}
 		tbl.SaveExtensions = {}
 		for k,v in pairs(savefuncs) do
 			local data, entities = v.Save()
@@ -329,6 +365,13 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 				end
 				tbl.SaveExtensions[k] = save
 			end
+
+			if v.PostSave then table.insert(postsaves, v.PostSave) end
+		end
+
+		-- Post save
+		for k,v in pairs(postsaves) do
+			v()
 		end
 
 		return util.TableToJSON(tbl)
@@ -419,8 +462,9 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 
 	function nzu.SaveConfig()
 		nzu.SaveConfigMap()
-		nzu.SaveConfigInfo()
 		nzu.SaveConfigSettings()
+		nzu.SaveConfigInfo()
+		hook.Run("nzu_ConfigSaved", nzu.CurrentConfig)
 	end
 
 	-- Receiving client requests
@@ -456,14 +500,14 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 		config.WorkshopID = wid ~= "" and wid or nil
 
 		local numaddons = net.ReadUInt(8)
-		if numaddons > 0 then
-			config.RequiredAddons = {}
-			for i = 1,numaddons do
-				local id = net.ReadString()
-				local name = net.ReadString()
-				config.RequiredAddons[id] = name
-			end
+		config.RequiredAddons = {}
+		for i = 1,numaddons do
+			local id = net.ReadString()
+			local name = net.ReadString()
+			config.RequiredAddons[id] = name
 		end
+
+		PrintTable(config)
 
 		if net.ReadBool() then
 			-- Save the map, settings, and all!
@@ -529,3 +573,9 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 	end)
 end
 
+
+
+-- Fixing up loading in nZombies
+if NZU_NZOMBIES then
+	duplicator.Allow("prop_physics")
+end

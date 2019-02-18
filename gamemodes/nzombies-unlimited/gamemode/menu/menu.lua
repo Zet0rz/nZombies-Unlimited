@@ -37,15 +37,17 @@ if CLIENT then
 	local function generatebutton(text,admin)
 		local b = vgui.Create("DButton")
 		b:SetFont("DermaLarge")
-		b:SetText(" " .. text .. " ") -- Append spaces around to free from edges
+		b:SetText(text) -- Append spaces around to free from edges
 		b:SetTextColor(textcolor)
 		b:SetContentAlignment(4)
-		b:DockMargin(1,1,1,1)
+		b:DockMargin(0,1,0,1)
 		b:SetTall(50)
+		b:SetTextInset(10,0)
 
 		b.AdminOnly = admin
 
-		b.Paint = paintfunc
+		--b.Paint = paintfunc
+		b:SetSkin("nZombies Unlimited")
 		b.DoClick = buttondoclick
 
 		return b
@@ -57,6 +59,8 @@ if CLIENT then
 			b.SubMenu = self
 			b.ClickFunction = func
 			self.List:Add(b)
+
+			return b
 		end
 	end
 
@@ -296,19 +300,65 @@ if CLIENT then
 	--function PANEL:AddNetworkedButton(text, )
 
 	-- Internal functions you don't really need to worry about
-	function PANEL:SetConfig(config)
-		local img = config and config.Icon or "maps/thumb/gm_construct.png"
-		local name = config and config.Name or "Some really long config name right here"
-		local authors = config and config.Authors or "Zet0r, other authors..."
-		local map = config and config.Map or "gm_construct"
+	local topbuttonfuncs = {
+		Ready = function(s)
+			print("Readying")
+		end,
+		DropIn = function(s)
 
-		self.ConfigPanel:SetImage(img)
-		self.ConfigPanel.Map:SetText(map)
-		self.ConfigPanel.Map:SizeToContents()
-		self.ConfigPanel.Name:SetText(name)
-		self.ConfigPanel.Name:SizeToContents()
-		self.ConfigPanel.Authors:SetText(authors)
-		self.ConfigPanel.Authors:SizeToContents()
+		end,
+		DropOut = function(s)
+
+		end,
+		Load = function(s)
+			if s.Menu.Config then
+				nzu.RequestLoadConfig(s.Menu.Config)
+			end
+		end,
+	}
+	local function updatereadybutton(self)
+		if self.Config then
+			if nzu.CurrentConfig and nzu.CurrentConfig.Codename == self.Config.Codename and nzu.CurrentConfig.Type == self.Config.Type then
+				-- Same config
+				self.ReadyButton:SetText("Toggle Ready")
+				self.ReadyButton.ClickFunction = topbuttonfuncs.Ready
+				self.ReadyButton.AdminOnly = false
+
+				-- Just for good measure
+				self.Config = nzu.CurrentConfig
+			else
+				-- Different config, only admins can trigger a load
+				self.ReadyButton:SetText("Load selected Config")
+				self.ReadyButton.ClickFunction = topbuttonfuncs.Load
+				self.ReadyButton.AdminOnly = true
+			end
+			self.ReadyButton:SetDisabled(false)
+		else
+			self.ReadyButton:SetText("")
+			self.ReadyButton:SetDisabled(true)
+		end
+	end
+
+	function PANEL:SetConfig(config)
+		self.Config = config
+		if config then
+			self.ConfigPanel:SetImage(nzu.GetConfigThumbnail(config))
+			self.ConfigPanel.Map:SetText(config.Map)
+			self.ConfigPanel.Map:SizeToContents()
+			self.ConfigPanel.Name:SetText(config.Name)
+			self.ConfigPanel.Name:SizeToContents()
+			self.ConfigPanel.Authors:SetText(config.Authors)
+			self.ConfigPanel.Authors:SizeToContents()			
+		else
+			self.ConfigPanel:SetImage("vgui/black")
+			self.ConfigPanel.Map:SetText("")
+			self.ConfigPanel.Map:SizeToContents()
+			self.ConfigPanel.Name:SetText("No Config selected")
+			self.ConfigPanel.Name:SizeToContents()
+			self.ConfigPanel.Authors:SetText("Use the Load Configs menu to select a Config to load.")
+			self.ConfigPanel.Authors:SizeToContents()
+		end
+		updatereadybutton(self)
 	end
 
 	function PANEL:Init()
@@ -332,7 +382,7 @@ if CLIENT then
 		self.ConfigPanel.InfoBar:Dock(BOTTOM)
 		self.ConfigPanel.InfoBar:SetTall(45)
 		function self.ConfigPanel.InfoBar.Paint(s)
-			surface.SetDrawColor(0,0,0,220)
+			surface.SetDrawColor(0,0,0,252)
 			s:DrawFilledRect()
 		end
 
@@ -415,7 +465,7 @@ if CLIENT then
 		self.MiddleCanvas:Dock(FILL)
 		self.MiddleCanvas:DockMargin(0,100,0,100)
 
-		self:SetConfig() -- unloaded
+		
 
 		-- The menu list
 		self.MenuRoot = self.LeftSide:Add("nzu_MenuPanel_SubMenu")
@@ -424,21 +474,12 @@ if CLIENT then
 		self.MenuRoot.Menu = self
 
 		-- Now populate!
-		self:AddButton("Ready up", 1, function() print("Readying") end)
+		local canready = true
+		self.ReadyButton = self:AddButton("Ready up", 1)
+		self.ReadyButton.Menu = self
 
-		local configs = self:AddSubMenu("Load config ...", 3, true)
-		configs:AddButton("gm_construct - or something")
-		configs:AddButton("Breakout")
-		configs:AddButton("Imprisoned")
-		for i = 1,15 do
-			configs:AddButton("Demonstrating scroll: ".. i)
-		end
-			
-		local ext = vgui.Create("DPanel")
-		self:AddPanel("Extension Settings...", 4, ext, true)
-
+		self:SetConfig(nzu.CurrentConfig) -- unloaded
 		self.MenuRoot:Show()
-		
 	end
 	
 	function PANEL:Paint()
@@ -475,6 +516,7 @@ if CLIENT then
 		if mainmenu then mainmenu:Remove() mainmenu = nil end
 		if not mainmenu then
 			mainmenu = vgui.Create("nzu_MenuPanel")
+			mainmenu:SetSkin("nZombies Unlimited")
 			nzu.Menu = mainmenu
 			for k,v in pairs(menuhooks) do
 				v(mainmenu)
@@ -516,5 +558,113 @@ else
 			col = Vector(0.001, 0.001, 0.001)
 		end
 		ply:SetWeaponColor(col)
+	end)
+end
+
+
+
+--[[-------------------------------------------------------------------------
+Config Loading
+---------------------------------------------------------------------------]]
+if CLIENT then
+	local configpaneltall = 60
+
+	nzu.AddMenuHook("LoadConfig", function(menu)
+		local scroll = vgui.Create("DScrollPanel")
+		scroll:Dock(FILL)
+		local clist = scroll:Add("DListLayout")
+		clist:Dock(FILL)
+
+		local sub = menu:AddPanel("Load Config ...", 3, scroll)
+
+		local function doconfigclick(p)
+			print(p.Config, p)
+			if p.Config then
+				PrintTable(p.Config)
+				net.Start("nzu_menu_loadconfigs")
+					net.WriteString(p.Config.Codename)
+					net.WriteString(p.Config.Type)
+				net.SendToServer()
+			end
+		end
+		
+		local function addconfig(_, config)
+			print("Adding panel for", config.Codename)
+			local pnl = vgui.Create("nzu_ConfigPanel", clist)
+			clist:Add(pnl)
+			pnl:SetConfig(config)
+			pnl:SetTall(configpaneltall)
+			--pnl:Sort()
+			pnl:Dock(TOP)
+			pnl:DockMargin(0,0,0,1)
+			pnl.DoClick = doconfigclick
+
+			scroll:InvalidateChildren()
+			timer.Simple(0.1, function() scroll:InvalidateLayout() end)
+		end
+
+		local hasshown = false
+		function sub:OnShown()
+			if not hasshown then
+				hook.Add("nzu_ConfigInfoSaved", scroll, addconfig)
+
+				local cfgs = nzu.GetConfigs()
+				for k,v in pairs(cfgs) do
+					for k2,v2 in pairs(v) do
+						addconfig(nil, v2)
+					end
+				end
+				hasshown = true
+			end
+		end
+
+		net.Receive("nzu_menu_loadconfigs", function()
+			local c = {}
+			c.Codename = net.ReadString()
+			c.Type = net.ReadString()
+			c.Name = net.ReadString()
+			c.Map = net.ReadString()
+			c.Authors = net.ReadString()
+
+			menu:SetConfig(c)
+		end)
+
+	end)
+end
+
+if SERVER then
+	util.AddNetworkString("nzu_menu_loadconfigs")
+
+	local configtoload
+	local function writeconfigtoload()
+		net.WriteString(configtoload.Codename)
+		net.WriteString(configtoload.Type)
+		net.WriteString(configtoload.Name)
+		net.WriteString(configtoload.Map)
+		net.WriteString(configtoload.Authors)
+	end
+
+	net.Receive("nzu_menu_loadconfigs", function(len, ply)
+		if not nzu.IsAdmin(ply) then return end
+
+		local codename = net.ReadString()
+		local ctype = net.ReadString()
+
+		local config = nzu.GetConfig(codename, ctype)
+		if config then
+			configtoload = config
+			net.Start("nzu_menu_loadconfigs")
+				writeconfigtoload()
+			net.Broadcast()
+		end
+	end)
+
+	-- Players that join should see this on the menu
+	hook.Add("PlayerInitialSpawn", "nzu_MenuLoadedConfig", function(ply)
+		if configtoload then
+			net.Start("nzu_menu_loadconfigs")
+				writeconfigtoload()
+			net.Send(ply)
+		end
 	end)
 end
