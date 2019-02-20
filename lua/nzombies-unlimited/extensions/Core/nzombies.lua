@@ -1,10 +1,8 @@
 local EXTENSION = nzu.Extension()
 
-local PLY = FindMetaTable("Player")
-function PLY:GetPoints() return self.nzu_Points end
+AddCSLuaFile("hudmanagement.lua")
+if CLIENT then include("hudmanagement.lua") end
 
-if SERVER then
-	
-else
-	
-end
+AddCSLuaFile("round.lua")
+include("round.lua")
+

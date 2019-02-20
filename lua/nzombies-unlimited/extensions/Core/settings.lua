@@ -1,6 +1,39 @@
 local EXTENSION = nzu.Extension()
 
 local settings = {
+	-- Round
+	["ZombieNumberRoundScale"] = {
+		Type = TYPE_NUMBER,
+		Default = 0.15,
+	},
+	["ZombieNumberBase"] = {
+		Type = TYPE_NUMBER,
+		Default = 18,
+	},
+	["ZombieNumberPlayerScale"] = {
+		Type = TYPE_NUMBER,
+		Default = 6,
+	},
+
+	["ZombieHealthScaleLinear"] = {
+		Type = TYPE_NUMBER,
+		Default = 100,
+	},
+	["ZombieHealthScalePower"] = {
+		Type = TYPE_NUMBER,
+		Default = 1.1,
+	},
+	["ZombieHealthBase"] = {
+		Type = TYPE_NUMBER,
+		Default = 150,
+	},
+
+
+	["StartWeapon"] = {
+		Type = TYPE_STRING,
+		Default = "weapon_pistol",
+	},
+
 	["Starting Points"] = {
 		Type = TYPE_NUMBER,
 		Default = 500,

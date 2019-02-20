@@ -86,7 +86,9 @@ local loadparse = {
 }
 
 local loadingextension2
-function nzu.Extension() return loadingextension2 end
+function nzu.Extension()
+	return loadingextension2
+end
 
 -- This function prepares the settings meta
 -- "loadextension" should be called with the return of this value once settings are loaded/prepared (if any)
@@ -106,8 +108,10 @@ local function loadextensionprepare(name)
 					-- Calling the settings table with a field as first argument and value as second will set it and network it
 					-- In Sandbox, it always does this with all settings
 					setmetatable(t, {__call = function(tbl,k,v)
-						if settings[k].Parse then v = settings[k].Parse(v) end
+						local s = settings[k]
+						if s.Parse then v = s.Parse(v) end
 						tbl[k] = v -- Actually set the value of course
+						if s.Notify then loadingextension[s.Notify](v) end -- Call the notify if it exists
 
 						net.Start("nzu_extension_setting")
 							net.WriteString(loadingextension.ID)
@@ -119,10 +123,12 @@ local function loadextensionprepare(name)
 				else
 					-- In nZombies, only network settings that are marked as Client = true
 					setmetatable(t, {__call = function(tbl,k,v)
-						if settings[k].Parse then v = settings[k].Parse(v) end
+						local s = settings[k]
+						if s.Parse then v = s.Parse(v) end
 						tbl[k] = v
+						if s.Notify then loadingextension[s.Notify](v) end -- Call the notify if it exists
 
-						if settings[k].Client then
+						if s.Client then
 							net.Start("nzu_extension_setting")
 								net.WriteString(loadingextension.ID)
 								netwritesetting(settings,k,v)
@@ -150,18 +156,25 @@ end
 local function loadextension(loadingextension, st)
 	loadingextension2 = loadingextension
 
-	print(st)
 	local t = loadingextension.Settings
+	local notifies
 	if t then
+		notifies = {}
 		if SERVER or NZU_SANDBOX then -- On Server or in Sandbox: Read every settings field
 			for k,v in pairs(loadingextension.GetSettingsMeta()) do
 				t[k] = st and st[k] or v.Default
-				local parse = v.Load or loadparse[v.Type]
-				if parse then t[k] = parse(t[k]) end
+
+				if SERVER then
+					local parse = v.Load or loadparse[v.Type]
+					if parse then t[k] = parse(t[k]) end
+				end
+
+				if v.Notify then notifies[k] = {v.Notify, t[k]} end
 			end
 		elseif CLIENT and st then -- On Client and not in Sandbox: Only read settings in the 'st' table
 			for k,v in pairs(st) do
 				t[k] = st[k]
+				if v.Notify then notifies[k] = {v.Notify, t[k]} end
 			end
 		end
 	end
@@ -181,6 +194,12 @@ local function loadextension(loadingextension, st)
 		if file.Exists(prefix..filename, searchpath) then
 			AddCSLuaFile(filename)
 			include(filename)
+		end
+	end
+
+	if notifies then
+		for k,v in pairs(notifies) do
+			loadingextension[v[1]](v[2])
 		end
 	end
 
@@ -347,8 +366,11 @@ else
 		local ext = loaded_extensions[net.ReadString()]
 		if ext and ext.Settings then
 			local k = net.ReadString()
-			local v = netreadsetting(ext.GetSettingsMeta()[k])
+			local s = ext.GetSettingsMeta()[k]
+			local v = netreadsetting(s)
 			ext.Settings[k] = v
+
+			if s.Notify then ext[s.Notify](v) end
 
 			hook.Run("nzu_ExtensionSettingChanged", ext.ID, k, v)
 		end
