@@ -45,9 +45,9 @@ function nzu.GetConfigFromFolder(path, s)
 			print("nzu_saveload: Could not get config codename from path: "..path)
 		return end
 
-		local worked, info = pcall(util.KeyValuesToTable, file.Read(path.."/info.txt", s))
-		if not worked then
-			print("nzu_saveload: Malformed info.txt from config '"..codename.."':\n"..info)
+		local worked, info = pcall(util.JSONToTable, file.Read(path.."/info.txt", s))
+		if not worked or not info then
+			print("nzu_saveload: Malformed info.txt from config '"..codename.."':\n", info or "Unable to parse any table.")
 			-- This should return nothing! It follows that the game also can't determine the map this config is played on!
 		return end
 

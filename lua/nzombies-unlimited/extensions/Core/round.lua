@@ -52,7 +52,9 @@ if SERVER then
 	function ROUND:SpawnZombie()
 		local z = ents.Create("npc_zombie")
 		z:SetPos(Vector(0,0,0))
-		z:SetHealth(self.ZombieHealth)
+		--z:SetModel("models/props_junk/wood_crate001a.mdl")
+		z:SetHealth(self:GetZombieHealth())
+		z:ShouldGivePoints(true)
 
 		self.NumberZombies = self.NumberZombies + 1
 		self.ZombiesToSpawn = self.ZombiesToSpawn - 1
@@ -101,14 +103,8 @@ if SERVER then
 
 		-- Change this later, the curve isn't quite accurate
 		-- Based on the Z = 0.15*R x (24 + 6*[P-1])
-		self.ZombiesToSpawn = math.Round(SETTINGS.ZombieNumberRoundScale * self.Round * (SETTINGS.ZombieNumberBase + SETTINGS.ZombieNumberPlayerScale * #self:GetPlayers()))
-		self.ZombieHealth =
-			self.Round < 10 and
-				SETTINGS.ZombieHealthBase + SETTINGS.ZombieHealthScaleLinear*self.Round
-			or
-				-- 950 for round 10, multiply 1.1 for each round after. Read settings instead of static numbers
-				(SETTINGS.ZombieHealthBase + SETTINGS.ZombieHealthScaleLinear*10)*(math.pow(SETTINGS.ZombieHealthScalePower, self.Round-10))
-
+		self.ZombiesToSpawn = self:CalculateZombieAmount()
+		self.ZombieHealth = self:CalculateZombieHealth()
 
 		self.CurrentZombies = 0
 		self.Zombies = {}
@@ -131,10 +127,22 @@ if SERVER then
 		self:SetRound(self:GetRound() + 1) -- This networks
 	end
 
-	
-
 	function ROUND:Start()
 		if self.State == ROUND_WAITING then self:SetRound(1) end
+	end
+
+	function ROUND:CalculateZombieHealth()
+		-- 950 for round 10, multiply 1.1 for each round after
+		return self.Round < 10 and 50 + 100*self.Round or 950*(math.pow(1.1, self.Round-10))
+	end
+
+	function ROUND:CalculateZombieAmount()
+		return math.Round(0.15 * self.Round * (18 + 6 * #self:GetPlayers()))
+	end
+
+	function ROUND:GetZombieHealth() return self.ZombieHealth end
+	function ROUND:GetZombieSpeed()
+		return 100
 	end
 end
 
@@ -183,11 +191,11 @@ if SERVER then
 end
 ROUND:SetUpTeam("Survivors", Color(100,255,150))
 
+-- Expose to other extensions
+EXTENSION.Round = ROUND
 
 
---[[-------------------------------------------------------------------------
-HUD Component
----------------------------------------------------------------------------]]
+-- Add HUD Component. Since this file only runs in nZombies, this component has been "ghost registered" in hudmanagement.lua
 if CLIENT then
 	local font = "nzu_RoundNumber"
 	surface.CreateFont(font, {
@@ -203,43 +211,44 @@ if CLIENT then
 	local lastdrawnround = 0
 	local transitioncomplete
 	local transitiontime = 3
-	EXTENSION.HUD.RegisterComponent(function()
-		local r = ROUND:GetRound()
-		surface.SetFont(font)
-		surface.SetTextPos(50, ScrH() - 150)
 
-		if r ~= lastdrawnround then
-			if not transitioncomplete then
-				transitioncomplete = CurTime() + transitiontime
-			end
-
-			local pct = (transitioncomplete - CurTime())/transitiontime
-			surface.SetTextColor(255,0,0,255*pct)
-			surface.DrawText(lastdrawnround)
-
-			render.ClearStencil()
-			render.SetStencilEnable(true)
-			render.ClearStencilBufferRectangle(50, ScrH() - 150, 200, ScrH() - 150*pct, 1)
-
-			render.SetStencilReferenceValue(1)
-			render.SetStencilCompareFunction(STENCIL_EQUAL)
-
-			surface.SetTextColor(255,pct*200,pct*100,255)
+	EXTENSION.HUD.RegisterComponentType("Round")
+	EXTENSION.HUD.RegisterComponent("Round", "Unlimited", {
+		Paint = function()
+			local r = ROUND:GetRound()
+			surface.SetFont(font)
 			surface.SetTextPos(50, ScrH() - 150)
-			surface.DrawText(r)
 
-			render.SetStencilEnable(false)
+			if r ~= lastdrawnround then
+				if not transitioncomplete then
+					transitioncomplete = CurTime() + transitiontime
+				end
 
-			if pct <= 0 then
-				lastdrawnround = r
-				transitioncomplete = nil
+				local pct = (transitioncomplete - CurTime())/transitiontime
+				surface.SetTextColor(255,0,0,255*pct)
+				surface.DrawText(lastdrawnround)
+
+				render.ClearStencil()
+				render.SetStencilEnable(true)
+				render.ClearStencilBufferRectangle(50, ScrH() - 150, 200, ScrH() - 150*pct, 1)
+
+				render.SetStencilReferenceValue(1)
+				render.SetStencilCompareFunction(STENCIL_EQUAL)
+
+				surface.SetTextColor(255,pct*200,pct*100,255)
+				surface.SetTextPos(50, ScrH() - 150)
+				surface.DrawText(r)
+
+				render.SetStencilEnable(false)
+
+				if pct <= 0 then
+					lastdrawnround = r
+					transitioncomplete = nil
+				end
+			else
+				surface.SetTextColor(255,0,0)
+				surface.DrawText(r)
 			end
-		else
-			surface.SetTextColor(255,0,0)
-			surface.DrawText(r)
 		end
-	end)
+	})
 end
-
--- Expose to other extensions
-EXTENSION.Round = ROUND

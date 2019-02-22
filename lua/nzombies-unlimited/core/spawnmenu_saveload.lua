@@ -62,7 +62,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	createbutton:SetText("Create new Config ...")
 	createbutton:DockMargin(10,7,10,7)
 
-	local function updateloadedconfig(s,config)
+	local function updateloadedconfig(s,config, unsaved)
 		loadedcfg:SetConfig(config)
 		editedconfig = config
 		if config then
@@ -70,6 +70,11 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 			noloaded:SetVisible(false)
 			createbutton:SetText("Create new editable copy ...")
 			unload:SetVisible(true)
+
+			if unsaved then
+				loadedcfg.Type:SetText("Unsaved")
+				loadedcfg.Type:SetTextColor(Color(255,200,100))
+			end
 		else
 			loadedcfg:SetVisible(false)
 			noloaded:SetVisible(true)
@@ -422,7 +427,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 			editedconfig.Description = editedconfig.Description or ""
 			editedconfig.RequiredAddons = editedconfig.RequiredAddons or {}
 
-			updateloadedconfig(nil, editedconfig)
+			updateloadedconfig(nil, editedconfig, true)
 			loadedcfg:DoClick()
 
 			frame:Close()

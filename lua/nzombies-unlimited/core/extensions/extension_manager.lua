@@ -111,7 +111,7 @@ local function loadextensionprepare(name)
 						local s = settings[k]
 						if s.Parse then v = s.Parse(v) end
 						tbl[k] = v -- Actually set the value of course
-						if s.Notify then loadingextension[s.Notify](v) end -- Call the notify if it exists
+						if s.ServerNotify then loadingextension[s.ServerNotify](v) end -- Call the notify if it exists
 
 						net.Start("nzu_extension_setting")
 							net.WriteString(loadingextension.ID)
@@ -126,7 +126,7 @@ local function loadextensionprepare(name)
 						local s = settings[k]
 						if s.Parse then v = s.Parse(v) end
 						tbl[k] = v
-						if s.Notify then loadingextension[s.Notify](v) end -- Call the notify if it exists
+						if s.ServerNotify then loadingextension[s.ServerNotify](v) end -- Call the notify if it exists
 
 						if s.Client then
 							net.Start("nzu_extension_setting")
@@ -146,7 +146,10 @@ local function loadextensionprepare(name)
 		end
 	end
 	loadingextension.GetSettingsMeta = function() return settings end
-	if CLIENT then loadingextension.GetPanelFunction = function() return panelfunc end end
+	if CLIENT then
+		loadingextension.GetPanelFunction = function() return panelfunc end
+		loadingextension.RebuildPanels = function() end
+	end
 
 	return loadingextension
 end
@@ -169,12 +172,12 @@ local function loadextension(loadingextension, st)
 					if parse then t[k] = parse(t[k]) end
 				end
 
-				if v.Notify then notifies[k] = {v.Notify, t[k]} end
+				if v.ServerNotify then notifies[k] = {v.ServerNotify, t[k]} end
 			end
 		elseif CLIENT and st then -- On Client and not in Sandbox: Only read settings in the 'st' table
 			for k,v in pairs(st) do
 				t[k] = st[k]
-				if v.Notify then notifies[k] = {v.Notify, t[k]} end
+				if v.ClientNotify then notifies[k] = {v.ClientNotify, t[k]} end
 			end
 		end
 	end
@@ -370,7 +373,7 @@ else
 			local v = netreadsetting(s)
 			ext.Settings[k] = v
 
-			if s.Notify then ext[s.Notify](v) end
+			if s.ClientNotify then ext[s.ClientNotify](v) end
 
 			hook.Run("nzu_ExtensionSettingChanged", ext.ID, k, v)
 		end

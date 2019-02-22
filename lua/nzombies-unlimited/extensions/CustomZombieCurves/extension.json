@@ -1,0 +1,8 @@
+{
+  "Name": "Custom Zombie Curves",
+  "Description": "Overrides Round functions determining Zombie Health, Numbers, and Speed to let you configure how these numbers are calculated.",
+  "Author": "Zet0r",
+  "Prerequisites": [
+  	"Core"
+  ]
+}

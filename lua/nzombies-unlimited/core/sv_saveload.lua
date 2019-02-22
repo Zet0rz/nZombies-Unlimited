@@ -18,17 +18,40 @@ duplicator.RegisterEntityModifier("nzu_saveid", function(ply, ent, data)
 	if loadedents then loadedents[id] = ent end -- Doesn't actually modify the entity, just registers who it used to be
 end)
 
+local coremodules = {
+	["Core"] = true,
+
+}
+
 local function loadconfig(config)
 
 	-- 1) Load Extensions
 	if file.Exists(config.Path.."/settings.txt", "GAME") then
 		local tbl = util.JSONToTable(file.Read(config.Path.."/settings.txt", "GAME"))
+		local toload = {}
+		local core = {}
 		if tbl then
 			for k,v in pairs(tbl) do
 				-- Load extensions with specified settings (rather than defaults)
 				-- These are loaded in the order they were saved (unless the .txt was modified)
-				nzu.LoadExtension(v.ID, v.Extensions)
+				nzu.LoadExtension(v.ID, v.Settings)
+				if coremodules[v.ID] then
+					core[v.ID] = v.Settings
+				else
+					table.insert(toload, v)
+				end
 			end
+		end
+
+		-- Core are always loaded first! Use settings found earlier (could be nil)
+		-- Order doesn't matter since there's no prerequisites here
+		for k,v in pairs(coremodules) do
+			nzu.LoadExtension(k, core[k])
+		end
+
+		-- Then load other Extensions in the order they were written to the file
+		for k,v in pairs(toload) do
+			nzu.LoadExtension(v.ID, v.Settings)
 		end
 	end
 
@@ -258,29 +281,30 @@ net.Receive("nzu_loadconfig", function(len, ply)
 		return end
 
 		if not net.ReadBool() then --and config.RequiredAddons then
-			local t = {}
-			local addons = engine.GetAddons()
 			local c_addons = table.Copy(config.RequiredAddons)
-			for k,v in pairs(addons) do
-				if c_addons[v.wsid] and v.mounted then
-					c_addons[v.wsid] = nil
-				end
-			end
-
-			-- Some uninstalled addons are found!
-			local num = table.Count(c_addons)
-			if num > 0 then
-				net.Start("nzu_loadconfig")
-					net.WriteString(config.Codename)
-					net.WriteString(config.Type)
-
-					net.WriteUInt(num, 8)
-					for k,v in pairs(c_addons) do
-						net.WriteString(k)
-						net.WriteString(v)
+			if c_addons then
+				local addons = engine.GetAddons()
+				for k,v in pairs(addons) do
+					if c_addons[v.wsid] and v.mounted then
+						c_addons[v.wsid] = nil
 					end
-				net.Send(ply)
-				return
+				end
+
+				-- Some uninstalled addons are found!
+				local num = table.Count(c_addons)
+				if num > 0 then
+					net.Start("nzu_loadconfig")
+						net.WriteString(config.Codename)
+						net.WriteString(config.Type)
+
+						net.WriteUInt(num, 8)
+						for k,v in pairs(c_addons) do
+							net.WriteString(k)
+							net.WriteString(v)
+						end
+					net.Send(ply)
+					return
+				end
 			end
 		end
 		
@@ -379,7 +403,7 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 
 	local function getmetadata()
 		-- Save metadata
-		return util.TableToKeyValues({
+		return util.TableToJSON({
 			name = nzu.CurrentConfig.Name,
 			map = nzu.CurrentConfig.Map,
 			authors = nzu.CurrentConfig.Authors,
@@ -472,7 +496,7 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 		if not nzu.IsAdmin(ply) then return end -- Of course servers need to check too!
 
 		local codename = net.ReadString()
-		if nzu.ConfigExists(codename, "Local") and (nzu.CurrentConfig.Type ~= "Local" or nzu.CurrentConfig.Codename ~= codename) then
+		if nzu.ConfigExists(codename, "Local") and (not nzu.CurrentConfig or nzu.CurrentConfig.Type ~= "Local" or nzu.CurrentConfig.Codename ~= codename) then
 			print("nzu_saveload: Client attempted to save to an existing config without it being loaded first.", ply, codename)
 		return end
 
@@ -486,6 +510,13 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 			config.Codename = codename
 			config.Type = "Local"
 			config.Path = nzu.GetConfigDir("Local")..codename
+
+			-- If this is new, then load basic modules
+			if not nzu.CurrentConfig then
+				for k,v in pairs(coremodules) do
+					nzu.LoadExtension(k)
+				end
+			end
 
 			nzu.CurrentConfig = config
 			print("Changed config: ", config.Codename)
