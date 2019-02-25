@@ -93,6 +93,11 @@ HUD Component
 if CLIENT then
 	local EXTENSION = nzu.Extension()
 
+	--local mat = Material("models/combine_dropship/combine_fenceglow")
+	--local mat = Material("models/props_combine/tpballglow")
+	local mat = Material("nzombies-unlimited/hud/points_shadow.png")
+	local mat2 = Material("nzombies-unlimited/hud/points_glow.vmt")
+
 	EXTENSION.HUD.RegisterComponentType("Points")
 	EXTENSION.HUD.RegisterComponent("Points", "Unlimited", {
 		Create = function()
@@ -107,16 +112,33 @@ if CLIENT then
 				local lteam = LocalPlayer():Team()
 				for k,v in pairs(team.GetPlayers(lteam)) do
 					if not IsValid(self.Players[v]) then
+						local b = v == LocalPlayer()
+
 						local p = self:Add("DPanel")
 						p:Dock(BOTTOM)
-						p:SetTall(50)
+						p:SetZPos(b and 0 or 1)
+						p:SetTall(b and 50 or 30)
 						p:SetPaintBackground(false)
 						p.Player = v
+						p:DockMargin(0,0,b and 0 or 20,2)
 
 						p.Avatar = p:Add("nzu_PlayerAvatar")
 						p.Avatar:SetPlayer(v)
 						p.Avatar:Dock(LEFT)
-						p.Avatar:SetWide(50)
+						p.Avatar:SetWide(b and 50 or 30)
+						p.Avatar:DockMargin(0,0,5,0)
+
+						--[[p.Name = p:Add("DLabel")
+						p.Name:SetText(v:Nick())
+						p.Name:Dock(TOP)
+						p.Name:SetFont("Trebuchet24")
+						p.Name:SetTall(22)
+						p.Name:SetContentAlignment(1)]]
+
+						p.Points = p:Add("DLabel")
+						p.Points:SetText(0)
+						p.Points:SetFont("DermaLarge")
+						p.Points:Dock(FILL)
 
 						function p.Think(s)
 							if v:Team() ~= lteam then
@@ -125,7 +147,21 @@ if CLIENT then
 							end
 						end
 
-						p:SetBackgroundColor(Color(255,0,0))
+						function p.Points.Think(s)
+							s:SetText(v:GetPoints())
+						end
+
+						function p.Paint(s,w,h)
+							surface.SetMaterial(mat)
+							surface.SetDrawColor(0,0,0,255)
+							surface.DrawTexturedRect(0,0,w,h)
+
+							surface.SetMaterial(mat2)
+							surface.SetDrawColor(p.Avatar.R - 100, p.Avatar.G - 100, p.Avatar.B - 100,255)
+							surface.DrawTexturedRect(b and 50 or 30,0,w-(b and 49 or 29),h)
+						end
+
+						--p:SetBackgroundColor(Color(255,0,0))
 						self.Players[v] = p
 					end
 				end

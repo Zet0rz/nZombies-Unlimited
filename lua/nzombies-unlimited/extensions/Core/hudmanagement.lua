@@ -48,9 +48,10 @@ if NZU_SANDBOX then
 else
 	local enabled = {}
 	local draws = {}
-	local function enable(type, new)
+	local function enable(type, name)
+		local new = components[type][name]
 		if new then
-			local t2 = {}
+			local t2 = {ID = name}
 			local value
 			if new.Create then
 				value = new.Create()
@@ -69,7 +70,18 @@ else
 		components[type][name] = component
 		EXTENSION:RebuildPanels() -- Cause an update so panels will show this component under this type
 
-		if queue[type] == name then enable(type, component) end
+		if queue[type] == name then
+			enable(type, name)
+			queue[type] = nil
+		else
+			-- Refresh
+			local v = enabled[type]
+			print(v and v.ID)
+			if v and v.ID == name then
+				if v.Remove then v.Remove(v.Value) end
+				enable(type, name)
+			end
+		end
 	end
 
 	function HUD.GetComponents(type)
@@ -86,19 +98,18 @@ else
 				if v.DrawIndex then table.remove(draws, v.DrawIndex) end
 
 				-- Now add the new one
-				enable(k, components[k][t[k]])
+				enable(k, t[k])
 			end
 		end
 
 		-- Enable all the ones that were previously not enabled
 		for k,v in pairs(t) do
-			if not enabled[k] then enable(k, components[k][t[k]]) end
+			if not enabled[k] then enable(k, t[k]) end
 		end
 	end
 	for k,v in pairs(EXTENSION.Settings.HUDComponents) do
-		local c = components[k] and components[k][v]
-		if c then
-			enable(k, c)
+		if components[k] then
+			enable(k, v)
 		else
 			queue[k] = v
 		end

@@ -168,6 +168,10 @@ if CLIENT then
 	function PLAYER_AVATAR:Init()
 		self.Icon = vgui.Create("ModelImage", self)
 		self.Icon:Dock(FILL)
+
+		self.R = 0
+		self.G = 0
+		self.B = 0
 	end
 	function PLAYER_AVATAR:SetPlayer(ply)
 		self.Player = ply
@@ -180,7 +184,15 @@ if CLIENT then
 			if mdl ~= self.Model then
 				self.Icon:SetModel(mdl)
 				self.Model = mdl
-			end			
+			end
+
+			local col = self.Player:GetPlayerColor()
+			if col ~= self.PlayerColor then
+				self.R = col.x * 150 + 100
+				self.G = col.y * 150 + 100
+				self.B = col.z * 150 + 100
+				self.PlayerColor = col
+			end
 		end
 	end
 	local glowmat = Material("particle/particle_glow_04")
@@ -188,13 +200,9 @@ if CLIENT then
 		surface.SetDrawColor(0,0,0,200)
 		self:DrawFilledRect()
 
-		if IsValid(self.Player) then
-			local col = self.Player:GetPlayerColor()
-
-			surface.SetDrawColor(col.x * 150 + 100, col.y * 150 + 100, col.z * 150 + 100, 200)
-			surface.SetMaterial(glowmat)
-			surface.DrawTexturedRect(-10,-10,w+20,h+20)
-		end
+		surface.SetDrawColor(self.R, self.G, self.B, 200)
+		surface.SetMaterial(glowmat)
+		surface.DrawTexturedRect(-10,-10,w+20,h+20)
 	end
 	vgui.Register("nzu_PlayerAvatar", PLAYER_AVATAR, "DPanel")
 
@@ -547,17 +555,7 @@ else
 
 	util.AddNetworkString("nzu_CustomizePlayerDone")
 	net.Receive("nzu_CustomizePlayerDone", function(len, ply)
-		local c_mdl = ply:GetInfo("cl_playermodel")
-		local mdl = player_manager.TranslatePlayerModel(c_mdl)
-		util.PrecacheModel(mdl)
-		ply:SetModel(mdl)
-		ply:SetPlayerColor(Vector(ply:GetInfo("cl_playercolor")))
-
-		local col = Vector(ply:GetInfo("cl_weaponcolor"))
-		if col:Length() == 0 then
-			col = Vector(0.001, 0.001, 0.001)
-		end
-		ply:SetWeaponColor(col)
+		ply:UpdateModel()
 	end)
 end
 

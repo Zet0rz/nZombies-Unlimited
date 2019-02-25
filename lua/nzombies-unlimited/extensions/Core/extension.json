@@ -1,5 +1,7 @@
 {
   "Name": "Core",
   "Description": "Provides the core nZombies functionality. Includes Points, Round, Weapon Management, HUD+Sounds.",
-  "Author": "Zet0r"
+  "Author": "Zet0r",
+  "ClientFiles_Sandbox": ["hudmanagement"],
+  "ClientFiles_nZombies": ["hudmanagement", "round", "points", "weapons"]
 }

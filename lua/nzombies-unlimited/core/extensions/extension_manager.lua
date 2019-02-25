@@ -14,7 +14,8 @@ function nzu.GetExtensionDetails(name)
 	end
 end
 
-local loaded_extensions = {}
+local loaded_extensions = nzu.Extensions or {}
+nzu.Extensions = loaded_extensions
 function nzu.GetLoadedExtensionList() return loaded_extensions end
 function nzu.GetExtensionList()
 	local tbl = {}
@@ -94,7 +95,7 @@ end
 -- "loadextension" should be called with the return of this value once settings are loaded/prepared (if any)
 -- To use defaults, these can just be chained [loadextension(loadextensionprepare(name))]
 local function loadextensionprepare(name)
-	local loadingextension = {ID = name}
+	local loadingextension = loaded_extensions[name] or {ID = name}
 	local settings, panelfunc
 	local filename = extensionpath..name.."/settings.lua"
 	if file.Exists(prefix..filename, searchpath) then
@@ -412,5 +413,40 @@ else
 				net.WriteString(v)
 			end
 		net.SendToServer()
+	end
+end
+
+
+
+
+
+
+--[[-------------------------------------------------------------------------
+AddCSLuaFile'ing
+
+Kinda sucks that you have to do this before clients connect, so we HAVE
+to AddCSLuaFile every possible file that a client could run :/
+---------------------------------------------------------------------------]]
+if SERVER then
+	local _,dirs = file.Find(prefix..extensionpath.."*", searchpath)
+	for k,v in pairs(dirs) do
+		if nzu.IsValidExtension(v) then
+			local details = nzu.GetExtensionDetails(v)
+			local files
+			if NZU_SANDBOX then
+				files = {"sandbox", "settings"}
+				if details.ClientFiles_Sandbox then table.Add(files, details.ClientFiles_Sandbox) end
+			elseif NZU_NZOMBIES then
+				files = {"nzombies", "settings"}
+				if details.ClientFiles_nZombies then table.Add(files, details.ClientFiles_nZombies) end
+			end
+
+			local prefix2 = extensionpath..v.."/"
+			for k2,v2 in pairs(files) do
+				if file.Exists(prefix..prefix2..v2..".lua", searchpath) then
+					AddCSLuaFile(prefix2..v2..".lua")
+				end
+			end
+		end
 	end
 end

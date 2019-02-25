@@ -1,0 +1,18 @@
+"UnlitGeneric"
+{
+	"$baseTexture" "nzombies-unlimited/hud/points_glow_anim"
+	"$Texture2" "nzombies-unlimited/hud/points_glow2"
+	"$additive" "1"
+	"$vertexcolor" "1"
+	"$vertexalpha" "1"
+
+	"Proxies"
+	{
+		"AnimatedTexture"
+		{
+			"animatedTextureVar" "$basetexture"
+			"animatedTextureFrameNumVar" "$frame"
+			"animatedTextureFrameRate" "20"
+		}
+	}
+}

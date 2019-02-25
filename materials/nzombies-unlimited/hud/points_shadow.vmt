@@ -1,0 +1,9 @@
+"UnlitGeneric"
+{
+	$baseTexture nzombies-unlimited/hud/points_glow
+//	$additive 1
+	$alpha 1
+	$translucent 1
+	$vertexcolor 1
+//	$color [0 0 0]
+}
