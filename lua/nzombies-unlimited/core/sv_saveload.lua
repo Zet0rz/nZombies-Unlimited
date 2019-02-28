@@ -18,11 +18,6 @@ duplicator.RegisterEntityModifier("nzu_saveid", function(ply, ent, data)
 	if loadedents then loadedents[id] = ent end -- Doesn't actually modify the entity, just registers who it used to be
 end)
 
-local coremodules = {
-	["Core"] = true,
-
-}
-
 local function loadconfig(config)
 
 	-- 1) Load Extensions
@@ -34,24 +29,13 @@ local function loadconfig(config)
 			for k,v in pairs(tbl) do
 				-- Load extensions with specified settings (rather than defaults)
 				-- These are loaded in the order they were saved (unless the .txt was modified)
-				nzu.LoadExtension(v.ID, v.Settings)
-				if coremodules[v.ID] then
-					core[v.ID] = v.Settings
+
+				if nzu.GetExtension(v.ID) then
+					nzu.UpdateExtension(v.ID, v.Settings) -- Update if already loaded (Core)
 				else
-					table.insert(toload, v)
+					nzu.LoadExtension(v.ID, v.Settings)
 				end
 			end
-		end
-
-		-- Core are always loaded first! Use settings found earlier (could be nil)
-		-- Order doesn't matter since there's no prerequisites here
-		for k,v in pairs(coremodules) do
-			nzu.LoadExtension(k, core[k])
-		end
-
-		-- Then load other Extensions in the order they were written to the file
-		for k,v in pairs(toload) do
-			nzu.LoadExtension(v.ID, v.Settings)
 		end
 	end
 

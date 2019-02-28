@@ -116,7 +116,7 @@ local function loadextensionprepare(name)
 
 						net.Start("nzu_extension_setting")
 							net.WriteString(loadingextension.ID)
-							netwritesetting(settings,k,v)
+							netwritesetting(settings[k],k,v)
 						net.Broadcast()
 
 						hook.Run("nzu_ExtensionSettingChanged", loadingextension.ID, k, v)
@@ -132,7 +132,7 @@ local function loadextensionprepare(name)
 						if s.Client then
 							net.Start("nzu_extension_setting")
 								net.WriteString(loadingextension.ID)
-								netwritesetting(settings,k,v)
+								netwritesetting(settings[k],k,v)
 							net.Broadcast()
 						end
 
@@ -143,6 +143,12 @@ local function loadextensionprepare(name)
 				loadingextension.Settings = t
 			else
 				loadingextension.Settings = {} -- Empty for clients by default; we wait expected networking here
+			end
+		end
+
+		if CLIENT and not NZU_SANDBOX then
+			for k,v in pairs(settings) do
+				if not v.Client then settings[k] = nil end -- Remove all non-networked from the table
 			end
 		end
 	end
@@ -230,9 +236,10 @@ Loading Extensions
 if SERVER then
 	util.AddNetworkString("nzu_extension_load") -- SERVER: Make clients load extension files/Full sync all settings || CLIENT: Request loading of extension (Sandbox), Request full setting sync (nZombies)
 
-	local function networkextension(ext)
+	local function networkextension(ext, update)
 		net.WriteString(ext.ID)
 		net.WriteBool(true)
+		net.WriteBool(not update)
 
 		if ext.Settings then
 			local sm = ext.GetSettingsMeta()
@@ -283,6 +290,19 @@ if SERVER then
 		nzu.LoadConfig(nzu.CurrentConfig)
 	end
 
+	function nzu.UpdateExtension(name, settings)
+		local ext = loaded_extensions[name]
+		if ext and ext.Settings then
+			for k,v in pairs(settings) do
+				ext.Settings[k] = v
+			end
+
+			net.Start("nzu_extension_load")
+				networkextension(ext, true)
+			net.Broadcast()
+		end
+	end
+
 	net.Receive("nzu_extension_load", function(len, ply)
 		if not nzu.IsAdmin(ply) or not nzu.CurrentConfig then return end
 
@@ -318,7 +338,8 @@ else
 	net.Receive("nzu_extension_load", function()
 		local name = net.ReadString()
 		if net.ReadBool() then
-			local ext = loadextensionprepare(name)
+			local b = net.ReadBool()
+			local ext = b and loadextensionprepare(name) or loaded_extensions[name]
 
 			local sm = ext.GetSettingsMeta()
 			local settings
@@ -332,7 +353,13 @@ else
 				end
 			end
 
-			loadextension(ext, settings)
+			if b then
+				loadextension(ext, settings)
+			else
+				for k,v in pairs(settings) do
+					ext.Settings[k] = v
+				end
+			end
 		elseif loaded_extensions[name] then
 			loaded_extensions[name] = nil
 		end
@@ -450,3 +477,12 @@ if SERVER then
 		end
 	end
 end
+
+--[[-------------------------------------------------------------------------
+Load Core extension at this point - this happens no matter what, and before any
+other Extension.
+
+The Core extension doesn't actually contain any code, instead just proxies
+settings used by the main gamemode.
+---------------------------------------------------------------------------]]
+loadextension(loadextensionprepare("Core"))

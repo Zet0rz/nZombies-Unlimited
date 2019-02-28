@@ -23,6 +23,7 @@ if SERVER then
 	AddCSLuaFile("extensions/extension_manager.lua")
 	AddCSLuaFile("extensions/extension_panels.lua")
 	AddCSLuaFile("spawnmenu_extensions.lua")
+	AddCSLuaFile("hudmanagement.lua")
 
 	include("configs.lua")
 	include("sv_saveload.lua")
@@ -38,6 +39,7 @@ else
 
 	include("extensions/extension_panels.lua")
 	include("extensions/extension_manager.lua")
+	include("hudmanagement.lua")
 	include("spawnmenu_extensions.lua")
 end
 include("entities.lua")

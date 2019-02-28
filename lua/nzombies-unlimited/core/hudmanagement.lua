@@ -1,9 +1,5 @@
 -- This file is CLIENT only
 
-local EXTENSION = nzu.Extension()
-local HUD = EXTENSION.HUD or {}
-EXTENSION.HUD = HUD
-
 --[[-------------------------------------------------------------------------
 Structure of a HUD Component:
 
@@ -17,34 +13,34 @@ Component = {
 Registration happens by pointing at an existing type, then giving the component a name and the component table
 Types have to be registered or it will error (this is purely to cause errors if a category is mistyped)
 ---------------------------------------------------------------------------]]
+local CORE = nzu.GetExtension("Core")
 
 local components = {}
-function HUD.GetComponentTypes()
+function nzu.GetHUDComponentTypes()
 	return table.GetKeys(components)
 end
 
-function HUD.RegisterComponentType(type)
+function nzu.RegisterHUDComponentType(type)
 	components[type] = components[type] or {}
-	EXTENSION:RebuildPanels() -- Cause a rebuild so that the panel will now display this new type
+	CORE:RebuildPanels() -- Cause a rebuild so that the panel will now display this new type
 end
 
 if NZU_SANDBOX then
-
 	-- In Sandbox, we only need to register possible types and option names
 	-- We can discard the actual component information
 
-	function HUD.RegisterComponent(type, name, component)
+	function nzu.RegisterHUDComponent(type, name, component)
 		assert(components[type], "Attempted to register HUD component to non-existing category '"..type.."'")
 
 		table.insert(components[type], name)
-		EXTENSION:RebuildPanels() -- Cause an update so panels will show this component under this type
+		CORE:RebuildPanels() -- Cause an update so panels will show this component under this type
 	end
 	
-	function HUD.GetComponents(type)
+	function nzu.GetHUDComponents(type)
 		return components[type]
 	end
 
-	function EXTENSION.OnHUDComponentsChanged(t) end -- Leave this empty just so it doesn't error but also does nothing
+	function CORE.OnHUDComponentsChanged(t) end -- Leave this empty just so it doesn't error but also does nothing
 else
 	local enabled = {}
 	local draws = {}
@@ -64,11 +60,11 @@ else
 	end
 
 	local queue = {}
-	function HUD.RegisterComponent(type, name, component)
+	function nzu.RegisterHUDComponent(type, name, component)
 		assert(components[type], "Attempted to register HUD component to non-existing category '"..type.."'")
 
 		components[type][name] = component
-		EXTENSION:RebuildPanels() -- Cause an update so panels will show this component under this type
+		CORE:RebuildPanels() -- Cause an update so panels will show this component under this type
 
 		if queue[type] == name then
 			enable(type, name)
@@ -76,7 +72,6 @@ else
 		else
 			-- Refresh
 			local v = enabled[type]
-			print(v and v.ID)
 			if v and v.ID == name then
 				if v.Remove then v.Remove(v.Value) end
 				enable(type, name)
@@ -84,11 +79,11 @@ else
 		end
 	end
 
-	function HUD.GetComponents(type)
+	function nzu.GetHUDComponents(type)
 		return table.GetKeys(components[type])
 	end
 
-	function EXTENSION.OnHUDComponentsChanged(t)
+	function CORE.OnHUDComponentsChanged(t)
 		print("It's changed!")
 		PrintTable(t)
 		for k,v in pairs(enabled) do
@@ -107,13 +102,6 @@ else
 			if not enabled[k] then enable(k, t[k]) end
 		end
 	end
-	for k,v in pairs(EXTENSION.Settings.HUDComponents) do
-		if components[k] then
-			enable(k, v)
-		else
-			queue[k] = v
-		end
-	end
 
 	hook.Add("HUDPaint", "nzu_HUDComponents", function()
 		for k,v in pairs(draws) do
@@ -122,8 +110,15 @@ else
 	end)
 end
 
--- Pre-register in Sandbox since round.lua is only run in nZombies
+-- Pre-register in Sandbox since the actual components are only registered in the gamemode
+-- This enables them appearing in the dropdown menues in Sandbox under settings
 if NZU_SANDBOX then
-	EXTENSION.HUD.RegisterComponentType("Round")
-	EXTENSION.HUD.RegisterComponent("Round", "Unlimited")
+	nzu.RegisterHUDComponentType("Round")
+	nzu.RegisterHUDComponent("Round", "Unlimited")
+
+	nzu.RegisterHUDComponentType("Points")
+	nzu.RegisterHUDComponent("Points", "Unlimited")
+
+	nzu.RegisterHUDComponentType("Weapons")
+	nzu.RegisterHUDComponent("Weapons", "Unlimited")
 end

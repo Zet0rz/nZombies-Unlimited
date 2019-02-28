@@ -1,7 +1,7 @@
 
-local EXTENSION = nzu.Extension()
-local ROUND = EXTENSION.Round or {}
-local SETTINGS = EXTENSION.Settings
+local ROUND = nzu.Round or {}
+nzu.Round = ROUND
+local SETTINGS = nzu.GetExtension("Core").Settings
 
 ROUND_INVALID = -1
 ROUND_WAITING = 0
@@ -49,22 +49,27 @@ if SERVER then
 	ROUND.ZombiesToSpawn = 0 -- Zombies still not spawned
 	function ROUND:GetRemainingZombies() return self.NumberZombies + self.ZombiesToSpawn end
 
-	function ROUND:SpawnZombie()
-		local z = ents.Create("npc_zombie")
+	local function dozombiespawn(z)
 		z:SetPos(Vector(0,0,0))
-		--z:SetModel("models/props_junk/wood_crate001a.mdl")
 		z:SetHealth(self:GetZombieHealth())
+
+		z:Spawn()
+	end
+	function ROUND:SpawnZombie()
+		local z = ents.Create("nzu_zombie_base")
+		--z:SetModel("models/props_junk/wood_crate001a.mdl")
 		z:ShouldGivePoints(true)
 
 		self.NumberZombies = self.NumberZombies + 1
 		self.ZombiesToSpawn = self.ZombiesToSpawn - 1
 		self.Zombies[z] = true
 
-		z:Spawn()
+		dozombiespawn(z)
+		return z
 	end
 	local function dozombiedeath(z)
 		if ROUND.Zombies[z] then
-			if z.nzu_Respawn then
+			if z.nzu_RefundOnDeath then
 				ROUND.ZombiesToSpawn = ROUND.ZombiesToSpawn + 1
 			end
 			ROUND.Zombies[z] = nil
@@ -77,6 +82,21 @@ if SERVER then
 	end
 	hook.Add("EntityRemoved", "nzu_Round_ZombieDeath", dozombiedeath)
 	--hook.Add("EntityRemoved", "nzu_Round_ZombieRemoved", dozombiedeath)
+
+	local ENTITY = FindMetaTable("Entity")
+	function ENTITY:Respawn() -- This respawns the specific zombie by simply restoring health and position
+		if ROUND.Zombies[self] then
+			dozombiespawn(self)
+		end
+	end
+	
+	function ROUND:RefundZombie(z) -- "Refunds" a Zombie by making it not count and adding a new zombie to spawn in its place
+		if self.Zombies[z] then
+			ROUND.Zombies[z] = nil
+			self.ZombiesToSpawn = self.ZombiesToSpawn + 1
+			self.NumberZombies = self.NumberZombies - 1
+		end
+	end
 
 	function ROUND:GetZombies()
 		return table.GetKeys(self.Zombies)
@@ -191,9 +211,6 @@ if SERVER then
 end
 ROUND:SetUpTeam("Survivors", Color(100,255,150))
 
--- Expose to other extensions
-EXTENSION.Round = ROUND
-
 
 -- Add HUD Component. Since this file only runs in nZombies, this component has been "ghost registered" in hudmanagement.lua
 if CLIENT then
@@ -212,8 +229,8 @@ if CLIENT then
 	local transitioncomplete
 	local transitiontime = 3
 
-	EXTENSION.HUD.RegisterComponentType("Round")
-	EXTENSION.HUD.RegisterComponent("Round", "Unlimited", {
+	nzu.RegisterHUDComponentType("Round")
+	nzu.RegisterHUDComponent("Round", "Unlimited", {
 		Paint = function()
 			local r = ROUND:GetRound()
 			surface.SetFont(font)

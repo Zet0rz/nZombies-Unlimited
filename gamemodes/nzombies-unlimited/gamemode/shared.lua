@@ -24,17 +24,16 @@ NZU_SANDBOX = false
 NZU_NZOMBIES = true
 
 --[[-------------------------------------------------------------------------
-Core gamemode code
+Extension Manager
 ---------------------------------------------------------------------------]]
-loadfile("player.lua")
+loadfile("nzombies-unlimited/core/extensions/extension_manager.lua")
+loadfile_c("nzombies-unlimited/core/extensions/extension_panels.lua")
+loadfile_c("nzombies-unlimited/core/hudmanagement.lua") -- Needed for the settings panel
 
 --[[-------------------------------------------------------------------------
 Core Modules shared with Sandbox
 ---------------------------------------------------------------------------]]
 loadfile_c("nzombies-unlimited/core/cl_nzombies_skin.lua")
-
-loadfile("nzombies-unlimited/core/extensions/extension_manager.lua")
-loadfile_c("nzombies-unlimited/core/extensions/extension_panels.lua")
 
 loadfile("nzombies-unlimited/core/configs.lua")
 loadfile_s("nzombies-unlimited/core/sv_saveload.lua")
@@ -42,5 +41,12 @@ loadfile_s("nzombies-unlimited/core/sv_saveload.lua")
 --[[-------------------------------------------------------------------------
 Gamemode-specific files
 ---------------------------------------------------------------------------]]
+loadfile("player.lua")
+
 loadfile("menu/menu.lua")
 loadfile_c("menu/menu_customizeplayer.lua")
+
+loadfile("round.lua")
+loadfile("points.lua")
+loadfile("targeting.lua")
+loadfile("weapons.lua")

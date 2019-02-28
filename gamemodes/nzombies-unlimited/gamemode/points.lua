@@ -111,7 +111,6 @@ end
 HUD Component
 ---------------------------------------------------------------------------]]
 if CLIENT then
-	local EXTENSION = nzu.Extension()
 
 	--local mat = Material("models/combine_dropship/combine_fenceglow")
 	--local mat = Material("models/props_combine/tpballglow")
@@ -146,8 +145,8 @@ if CLIENT then
 		antialias = true,
 	})
 
-	EXTENSION.HUD.RegisterComponentType("Points")
-	EXTENSION.HUD.RegisterComponent("Points", "Unlimited", {
+	nzu.RegisterHUDComponentType("Points")
+	nzu.RegisterHUDComponent("Points", "Unlimited", {
 		Create = function()
 			local pnl = vgui.Create("DPanel")
 			pnl:ParentToHUD()
