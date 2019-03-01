@@ -22,7 +22,7 @@ end
 local round = nzu.Round
 function nzu.GetAllTargetablePlayers()
 	local t = {}
-	for k,v in pairs(round.GetPlayers()) do
+	for k,v in pairs(round:GetPlayers()) do
 		if v:Alive() and v:IsTargetable() then
 			table.insert(t,v)
 		end

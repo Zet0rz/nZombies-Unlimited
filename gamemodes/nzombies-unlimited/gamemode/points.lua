@@ -29,14 +29,42 @@ if SERVER then
 		notifyplayers(self, -n)
 	end
 
+	local knifetypes = {
+		[DMG_CRUSH] = true,
+		[DMG_SLASH] = true,
+		[DMG_CLUB] = true
+	}
+	local hitboxes = {
+		[HITGROUP_HEAD] = 100,
+		[HITGROUP_CHEST] = 60,
+	}
+	local function dopoints(ent, dmg)
+		if ent.nzu_ShouldGivePoints then
+			local ply = dmg:GetAttacker()
+			if IsValid(ply) and ply:IsPlayer() then
+				if dmg:GetDamage() >= ent:Health() then
+					if knifetypes[dmg:GetDamageType()] then
+						ply:GivePoints(130)
+					else
+						ply:GivePoints(hitboxes[util.QuickTrace(dmg:GetDamagePosition(), dmg:GetDamagePosition()).HitGroup] or 50)
+					end
+				else
+					ply:GivePoints(10)
+				end
+			end
+		end
+	end
+
 	local ENTITY = FindMetaTable("Entity")
 	function ENTITY:ShouldGivePoints(b)
-		if b then
+		--[[if b then
 			if not self.nzu_ShouldGivePoints then
+				print("Applying points to zombie")
 				self.nzu_OriginalOnTakeDamage = self.OnTakeDamage
 
-				function self:OnTakeDamage(dmg) -- This isn't called on non-SENTs D:
-					--print("C")
+				 -- This isn't called on non-SENTs D:
+				self.OnTakeDamage = function(self, dmg)
+					print("C")
 					self:nzu_OriginalOnTakeDamage(dmg)
 
 					local p = dmg:GetPoints()
@@ -48,7 +76,7 @@ if SERVER then
 		elseif self.nzu_ShouldGivePoints then
 			self.OnTakeDamage = self.nzu_OriginalOnTakeDamage
 			self.nzu_OriginalOnTakeDamage = nil
-		end
+		end]]
 
 		self.nzu_ShouldGivePoints = b
 	end
@@ -57,7 +85,7 @@ if SERVER then
 	-- It uses a weak table to annotate the damageinfom  but without preventing it front being garbage collected
 	-- See "Weak Tables" in Lua
 
-	local dmg_points = setmetatable({}, {__mode = "k"})
+	--[[local dmg_points = setmetatable({}, {__mode = "k"})
 
 	local CTAKEDAMAGEINFO = FindMetaTable("CTakeDamageInfo")
 	function CTAKEDAMAGEINFO:SetPoints(n)
@@ -66,37 +94,9 @@ if SERVER then
 
 	function CTAKEDAMAGEINFO:GetPoints()
 		return dmg_points[self]
-	end
+	end]]
 
-	local knifetypes = {
-		[DMG_CRUSH] = true,
-		[DMG_SLASH] = true,
-		[DMG_CLUB] = true
-	}
-	local hitboxes = {
-		[HITGROUP_HEAD] = 100,
-		[HITGROUP_CHEST] = 60,
-	}
-	hook.Add("ScaleNPCDamage", "nzu_GenerateDefaultPoints", function(ent, hitgroup, dmginfo)
-		if ent.nzu_ShouldGivePoints and not dmginfo:GetPoints() then
-			--print("A")
-			if knifetypes[dmginfo:GetDamageType()] then
-				dmginfo:SetPoints(130)
-			else
-				dmginfo:SetPoints(hitboxes[hitgroup] or 50)
-			end
-		end
-	end)
-
-	hook.Add("EntityTakeDamage", "nzu_Test", function(ent, dmg)
-		if ent.nzu_ShouldGivePoints then
-			--print("B")
-		end
-	end)
-
-	nzu.AddPlayerNetworkVarNotify("Points", function(ply, name, old, new)
-		ply:ChatPrint(old .. " -> " ..new)
-	end)
+	hook.Add("EntityTakeDamage", "nzu_Test", dopoints)
 end
 
 if CLIENT then
@@ -232,24 +232,27 @@ if CLIENT then
 						function p.PaintOver(s,w,h)
 							local ct = CurTime()
 							
-							local n = #s.PointNotifies
-							for i = 1,n do
+							local num = #s.PointNotifies
+							local i = 1
+							while i <= num do
+								print(i,num)
 								local v = s.PointNotifies[i]
 								local pct = (ct - v[3])/totaltime
-								local n = v[1]
+								local points = v[1]
 
-								surface.SetTextColor(255,n > 0 and 255 or 0,0,255 - pct*255)
+								surface.SetTextColor(255,points > 0 and 255 or 0,0,255 - pct*255)
 								surface.SetTextPos(x + pct*50, y + pct*v[2])
 								surface.SetFont("Trebuchet24")
 								surface.DisableClipping(true)
-								surface.DrawText(n)
+								surface.DrawText(points)
 								surface.DisableClipping(false)
 
 								if pct >= 1 then
-									s.PointNotifies[i] = s.PointNotifies[n]
-									s.PointNotifies[n] = nil
-									n = n - 1
-									i = i - 1
+									s.PointNotifies[i] = s.PointNotifies[num]
+									table.remove(s.PointNotifies)
+									num = num - 1
+								else
+									i = i + 1
 								end
 							end
 						end

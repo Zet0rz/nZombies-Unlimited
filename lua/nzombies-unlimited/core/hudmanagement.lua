@@ -103,6 +103,10 @@ else
 		end
 	end
 
+	-- Debug
+	queue.Round = "Unlimited"
+	queue.Points = "Unlimited"
+
 	hook.Add("HUDPaint", "nzu_HUDComponents", function()
 		for k,v in pairs(draws) do
 			v()

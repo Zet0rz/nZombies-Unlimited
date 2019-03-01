@@ -51,12 +51,13 @@ if SERVER then
 
 	local function dozombiespawn(z)
 		z:SetPos(Vector(0,0,0))
-		z:SetHealth(self:GetZombieHealth())
+		--z:SetHealth(ROUND:GetZombieHealth())
+		z:SetHealth(100)
 
 		z:Spawn()
 	end
 	function ROUND:SpawnZombie()
-		local z = ents.Create("nzu_zombie_base")
+		local z = ents.Create("nzu_zombie")
 		--z:SetModel("models/props_junk/wood_crate001a.mdl")
 		z:ShouldGivePoints(true)
 
