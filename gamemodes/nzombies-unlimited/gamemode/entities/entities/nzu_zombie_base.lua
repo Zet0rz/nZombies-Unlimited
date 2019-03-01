@@ -134,17 +134,69 @@ Attacking
 
 ------- Callables -------
 
-function ENT:AttackTarget(target) -- Deal damage to its target if within range
-	if IsValid(target) and self:GetRangeTo(target) <= self.AttackRange then
-		local dmg = DamageInfo()
-		dmg:SetAttacker(self)
-		dmg:SetDamage(self.Damage)
-		dmg:SetDamageType(DMG_SLASH)
-		--dmg:SetDamageForce()
+-- Perform an attack
+-- It selects an attack animation and plays it, dealing damage during its moments of impact
+-- A damage info can be passed, otherwise a default is created
+function ENT:AttackTarget(target, dmg)
+	if IsValid(target) then
+		local dmg = dmg
+		if not dmg then
+			dmg = DamageInfo()
+			dmg:SetDamage(self.Damage)
+			dmg:SetDamageType(DMG_SLASH)
+			dmg:SetAttacker(self)
+			--dmg:SetDamageForce()
+		end
 
-		target:TakeDamageInfo(dmg)
+		-- Perform the attack with the function of hurting the target!
+		self:DoAttackFunction(target, function(self, target)
+			if self:GetRangeTo(target) <= self.AttackRange then target:TakeDamageInfo(dmg) end
+		end, true)
 	end
 end
+
+-- Plays an attack animation and at the moment of impact, executes the function
+-- This should only be called in an event handler (or otherwise in the bot's coroutine)
+function ENT:DoAttackFunction(target, func, multihit)
+	local attack = self:SelectAttack(target)
+	self.loco:FaceTowards(target)
+
+	self:ResetSequence(attack.Sequence)
+	local seqdur = self:SequenceDuration(self:LookupSequence(attack.Sequence))
+
+	if multihit then
+		-- Support using multiple hit times
+		local lasttime = 0
+		for i = 1,#attack.Impacts do
+			local delay = seqdur*attack.Impacts[i]
+			coroutine.wait(delay - lasttime)
+			func(self, target) -- Call the function
+			lasttime = delay
+		end
+	else
+		-- Only execute with the first hit
+		coroutine.wait(seqdur*attack.Impacts[1])		
+		func(self, target)
+	end
+end
+
+------- Overridables -------
+
+-- Select which attack sequence table to use for an upcoming attack
+-- This can be dependant on the target, but could also be anything
+-- We just pick a random in the AttackSequences table here
+function ENT:SelectAttack(target)
+	return self.AttackSequences[math.random(#self.AttackSequences)]
+end
+
+-- List of different attack sequences, and the cycle at which they impact
+-- Impacts are in cycle (0-1), the percentage through the sequence
+-- It may contain multiple entries, at which point the Zombie will hit multiple times
+-- They must be sequential.
+-- These are also used for ENT:DoAttackFunction(), only first if 'multihit' is not true
+ENT.AttackSequences = {
+	{Sequence = "swing", Impacts = {0.5}}
+}
 
 --[[-------------------------------------------------------------------------
 Events
@@ -155,18 +207,52 @@ function ENT:GetCurrentEvent() return self.ActiveEvent end -- Returns the string
 
 ------- Overridables -------
 ENT.Events = {} -- A table of events that this zombie supports
-ENT.Events.Spawn = {
-	Sequence = "nz_spawn_climbout_fast"
-}
 
-ENT.Events.Attack = {
-	{
-		Sequence = "nz_attack_walk_ad_1",
-		Events = {
-			{Cycle = 0.2, Function = function(self, target) self:AttackTarget(target) end}
-		}
-	}
-}
+-- Play a basic spawn animation before moving on
+ENT.Events.Spawn = function(self)
+	if self.SpawnSequence then
+		self:PlaySequenceAndWait(self.SpawnSequence)
+	end
+end
+
+-- Perform a basic attack on the given target
+ENT.Events.Attack = function(self, target)
+	self:AttackTarget(target or self.Target)
+end
+
+function ENT.Events.BarricadeTear = function(self, barricade)
+	if not barricade:HasAvailablePlanks() then
+		self:Timeout(2) -- Do nothing for 2 seconds
+	return end
+
+	local pos = barricade:GetAvailableTearPosition(self)
+	if not pos then
+		self:Timeout(2) -- Do nothing for 2 seconds
+	return end
+
+	-- We got a barricade position, move towards it
+	local result = self:MoveToPos(pos, {lookahead = 20, tolerance = 20, maxage = 3})
+	if result == "ok" then
+		-- We're in position
+		self.loco:FaceTowards(barricade:GetPos())
+		while barricade:HasAvailablePlanks() do
+			local attack = self:SelectAttack(barricade)
+			local impact = attack.Impacts[1]
+			local seqdur = self:SequenceDuration(self:LookupSequence(attack.Sequence))
+			local time = seqdur*impact
+
+			local plank = barricade:ReservePlank(self)
+			self:Timeout(barricade:GetTearTime(plank) - time) -- We wait as long so that the attack matches the tear time
+			self:ResetSequence(attack.Sequence)
+
+			coroutine.wait(time)
+			barricade:TearPlank(plank, self)
+			coroutine.wait(seqdur - time)
+		end
+	else
+		self:Timeout(2)
+	end
+end
 
 -- Gets the Event Table from an ID. This can be used to randomly pick
 -- or to parse values based on other factors such as movement speed
@@ -200,35 +286,10 @@ end
 function ENT:RunBehaviour()
 	while true do
 		if self.ActiveEvent then
-			if self.Event_Start then self:Event_Start(self.Event_Data) self.Event_Start = nil end
+			self:EventHandler(self.EventData) -- This handler should be holding the routine until it is done
 
-			local cycle = self:GetCycle()
-
-			local c = self.Event_Cycle
-			if c and cycle >= c then
-				self:Event_Function(self.Event_Data)
-
-				local i = self.Event_Index + 1
-				local nextup = self.Event_Events[i]
-				if nextup then
-					self.Event_Index = i
-					self.Event_Cycle = nextup.Cycle
-					self.Event_Function = nextup.Function
-				else
-					self.Event_Cycle = nil -- This stops the check
-					self.Event_Function = nil
-					self.Event_Events = nil
-					self.Event_Index = nil
-				end
-			end
-
-			if self.Event_Handle then self:Event_Handle(self.Event_Data) end
-
-			if cycle >= 1 then
-				if not self.Event_Loopback or self:Event_Loopback(self.Event_Data) then
-					self:EndEvent()
-				end
-			end
+			self.ActiveEvent = nil
+			self.EventData = nil
 		else
 			local ct = CurTime()
 			if ct >= self.NextRetarget then
@@ -265,53 +326,21 @@ end
 
 --[[-------------------------------------------------------------------------
 Events System
-Run specific sequences on specific events			(All fields are optional)
-Events are tables that may contain:
-	- Sequence: A string of the sequence to play (first)
-	- Start: A function that runs at the start of the event.
-		> This function is called with argument given in self:TriggerEvent after the id
-	- Events: A subtable containing tables of format:
-		- Cycle: The cycle at which the below function will trigger (0-1)
-		- Function: The function to trigger at this cycle key point
-	- Loopback: A function which is run at the end of each Event loop.
-		If this exists, the Event will not end by itself with the sequence
-		Rather, this function is required to return true to end the loop event
-		> This function is called with argument given in self:TriggerEvent after the id
-	- Handle: A function that is run at every behaviour tick
-		> This function is called with argument given in self:TriggerEvent after the id
+Attach custom handler functions to the Zombie's current behaviour
+Each Zombie class may override the handler given they have an event of the same ID
+Pass potential data as the third argument rather than directly in the handler
 ---------------------------------------------------------------------------]]
-function ENT:TriggerEvent(id, data, fallback)
+function ENT:TriggerEvent(id, handler, data)
+	if self.ActiveEvent then return end
+	
+	self.EventHandler = self.Events[id] or handler
+	self.EventData = data
+end
+ 
+function ENT:RequestTerminateEvent()
 	if self.ActiveEvent then
-		self:EndEvent()
-	end
-
-	local event = self:GetEvent(id) or fallback
-	if event then
-		self.ActiveEvent = id
-		if event.Sequence then self:ResetSequence(event.Sequence) end
-
-		if event.Events then
-			self.Event_Index = 1
-			self.Event_Events = event.Events
-			self.Event_Cycle = event.Events[1].Cycle
-			self.Event_Function = event.Events[1].Function
-		else
-			self.Event_Cycle = nil
-			self.Event_Function = nil
-			self.Event_Events = nil
-			self.Event_Index = nil
-		end
-
-		self.Event_Start = event.Start
-		self.Event_Loopback = event.Loopback
-		self.Event_Handle = event.Handle
-		self.Event_Data = data
+		self.Event_Terminate = true
 	end
 end
-
-function ENT:EndEvent()
-	self.ActiveEvent = nil
-	self.Event_Data = nil
-	self.EventEnded = true
-	-- The Zombie will automatically kill the animation next tick in its behavior
-end
+-- Build event handlers respecting this flag if possible
+function ENT:ShouldEventTerminate() return self.Event_Terminate end
