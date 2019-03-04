@@ -7,7 +7,57 @@ function nzu.IsAdmin(ply) return ply:IsAdmin() end -- Replace this later
 NZU_SANDBOX = true
 NZU_NZOMBIES = false
 
-if SERVER then
+local function loadfile(f)
+	if SERVER then AddCSLuaFile(f) end
+	include(f)
+end
+local function loadfile_c(f)
+	if SERVER then AddCSLuaFile(f) end
+	if CLIENT then include(f) end
+end
+local function loadfile_s(f)
+	if SERVER then include(f) end
+end
+
+--[[-------------------------------------------------------------------------
+Spawnmenu & Panels Preparation
+---------------------------------------------------------------------------]]
+loadfile_c("cl_nzombies_skin.lua")
+loadfile_c("cl_spawnmenu.lua")
+
+--[[-------------------------------------------------------------------------
+Configs & Saving
+---------------------------------------------------------------------------]]
+loadfile("configs.lua")
+loadfile_s("sv_saveload.lua")
+loadfile("extensions/extension_manager.lua")
+loadfile_c("extensions/extension_panels.lua")
+
+--[[-------------------------------------------------------------------------
+Components & Modules
+---------------------------------------------------------------------------]]
+loadfile_c("hudmanagement.lua")
+loadfile("logic/logic_manager.lua")
+
+--[[-------------------------------------------------------------------------
+Spawnmenu & Networking
+---------------------------------------------------------------------------]]
+loadfile_s("logic/sv_logicmap.lua")
+loadfile_c("logic/cl_logicmap.lua")
+loadfile_c("spawnmenu_saveload.lua")
+loadfile("spawnmenu_entities.lua")
+loadfile_c("spawnmenu_extensions.lua")
+loadfile("spawnmenu_tools.lua")
+
+--[[-------------------------------------------------------------------------
+Core item population
+---------------------------------------------------------------------------]]
+loadfile("logic/nzu_logic_testunit.lua")
+loadfile("spawnmenu_entities_test.lua")
+
+loadfile("entities_tools/spawnpoints/spawnpoint_zombie.lua")
+
+--[[if SERVER then
 	AddCSLuaFile("cl_nzombies_skin.lua")
 	AddCSLuaFile("cl_spawnmenu.lua")
 	AddCSLuaFile("entities.lua")
@@ -54,4 +104,4 @@ AddCSLuaFile("logic/nzu_logic_testunit.lua")
 include("logic/nzu_logic_testunit.lua")
 
 AddCSLuaFile("spawnmenu_entities_test.lua")
-include("spawnmenu_entities_test.lua")
+include("spawnmenu_entities_test.lua")]]

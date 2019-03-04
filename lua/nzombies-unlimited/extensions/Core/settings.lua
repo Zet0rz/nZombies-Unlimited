@@ -48,10 +48,9 @@ local settings = {
 				p.Comboboxes = {}
 				p.Choices = {}
 
-				local hud = ext.HUD
-				local types = hud.GetComponentTypes()
+				local types = nzu.GetHUDComponentTypes()
 				for k,v in pairs(types) do
-					local comps = hud.GetComponents(v)
+					local comps = nzu.GetHUDComponents(v)
 
 					local bar = l:Add("Panel")
 					bar:Dock(TOP)
@@ -73,9 +72,6 @@ local settings = {
 					end
 
 					p.Comboboxes[v] = combo
-
-					print(v)
-					PrintTable(comps)
 				end
 
 				local save = p:Add("DButton")
