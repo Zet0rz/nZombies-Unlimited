@@ -38,6 +38,7 @@ Components & Modules
 ---------------------------------------------------------------------------]]
 loadfile_c("hudmanagement.lua")
 loadfile("logic/logic_manager.lua")
+loadfile("mapflags.lua")
 
 --[[-------------------------------------------------------------------------
 Spawnmenu & Networking
@@ -55,7 +56,7 @@ Core item population
 loadfile("logic/nzu_logic_testunit.lua")
 loadfile("spawnmenu_entities_test.lua")
 
-loadfile("entities_tools/spawnpoints/spawnpoint_zombie.lua")
+loadfile("entities_tools/spawnpoints_sandbox.lua")
 
 --[[if SERVER then
 	AddCSLuaFile("cl_nzombies_skin.lua")

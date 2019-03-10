@@ -14,7 +14,7 @@ function nzu.RegisterTool(id, TOOL, nobuild)
 				table.Merge(o, TOOL)
 
 				o.Tab = "nzu"
-				local mode = "nzu_"..id
+				local mode = "nzu_tool_"..id
 				o.Mode = mode
 				o:CreateConVars()
 				stool.Tool[mode] = o

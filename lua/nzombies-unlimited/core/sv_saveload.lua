@@ -8,6 +8,7 @@ function nzu.AddSaveExtension(id, tbl)
 	-- Then Load receives the recreated entities in a table as second argument
 	
 	-- Can optionally contain PreSave and PreLoad functions which do the same (but without entity support)
+	-- Also PostSave and PostLoad
 end
 
 local loadedents
@@ -67,20 +68,28 @@ local function loadconfig(config)
 	end
 
 	timer.Simple(0.1, function()
+		-- Do preloads
+		for k,v in pairs(tab.SaveExtensions) do
+			if savefuncs[k] and savefuncs[k].PreLoad then
+				savefuncs[k].PreLoad(v.PreSave)
+			end
+		end
+
 		DisablePropCreateEffect = true
+
+		loadedents = {} -- Empty and prepare for new wave (should already be empty though)
 		
 		duplicator.RemoveMapCreatedEntities() -- Keep this? Maybe look for a way to reset map-created entities (like doors)
 		duplicator.Paste(nil, tab.Map.Entities, tab.Map.Constraints)
 		
-		loadedents = {} -- Empty and prepare for new wave (should already be empty though)
 		local postloads = {}
 		for k,v in pairs(tab.SaveExtensions) do
 			if savefuncs[k] then
-				local data = v.Data
+				local data = v.Save and v.Save.Data
 				local entities
-				if v.Entities then
+				if v.Save and v.Save.Entities then
 					entities = {}
-					for k,v in pairs(v.Entities) do
+					for k,v in pairs(v.Save.Entities) do
 						if loadedents[v] then -- Grab the pasted entities based on their index when they were saved
 							entities[k] = loadedents[v]
 						end
@@ -99,7 +108,7 @@ local function loadconfig(config)
 
 		-- Post load
 		for k,v in pairs(postloads) do
-			v()
+			v(tab.SaveExtensions[k].PostSave)
 		end
 	end)
 end
@@ -347,12 +356,31 @@ Sandbox saving of Configs
 ---------------------------------------------------------------------------]]
 
 if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
+	function nzu.IgnoreSaveEntity(ent)
+		ent.nzu_SaveIgnore = true
+	end
+
 	local function getmapjson()
-		local tbl = {}	
+		local tbl = {}
+		tbl.SaveExtensions = {}
+
+		for k,v in pairs(savefuncs) do
+			tbl.SaveExtensions[k] = {} -- Prepare Save Extension table. Even if it's empty, it tells the Config to attempt to load these functions on load.
+
+			if v.PreSave then
+				local data = v.PreSave()
+				if data then
+					tbl.SaveExtensions[k].PreSave = data
+				end
+			end
+		end
+
+
 		local Ents = ents.GetAll()
 		for k,v in pairs(Ents) do
-			if not gmsave.ShouldSaveEntity(v, v:GetSaveTable()) or v:IsConstraint() then
+			if v.nzu_SaveIgnore or not gmsave.ShouldSaveEntity(v, v:GetSaveTable()) or v:IsConstraint() then
 				Ents[k] = nil
+				v.nzu_SaveIgnore = nil
 			else
 				duplicator.StoreEntityModifier(v, "nzu_saveid", {id = k})
 			end
@@ -360,7 +388,6 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 		tbl.Map = duplicator.CopyEnts(Ents)
 		
 		local postsaves = {}
-		tbl.SaveExtensions = {}
 		for k,v in pairs(savefuncs) do
 			local data, entities = v.Save()
 			if data or entities then
@@ -371,7 +398,7 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 						table.insert(save.Entities, v2:EntIndex())
 					end
 				end
-				tbl.SaveExtensions[k] = save
+				tbl.SaveExtensions[k].Save = save
 			end
 
 			if v.PostSave then table.insert(postsaves, v.PostSave) end
@@ -379,7 +406,10 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 
 		-- Post save
 		for k,v in pairs(postsaves) do
-			v()
+			local data = v()
+			if data then
+				tbl.SaveExtensions[k].PostSave = data
+			end
 		end
 
 		return util.TableToJSON(tbl)
@@ -494,13 +524,6 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 			config.Codename = codename
 			config.Type = "Local"
 			config.Path = nzu.GetConfigDir("Local")..codename
-
-			-- If this is new, then load basic modules
-			if not nzu.CurrentConfig then
-				for k,v in pairs(coremodules) do
-					nzu.LoadExtension(k)
-				end
-			end
 
 			nzu.CurrentConfig = config
 			print("Changed config: ", config.Codename)

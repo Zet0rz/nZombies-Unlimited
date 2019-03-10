@@ -451,9 +451,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	-- Populate configs
 	local configpanels = {}
 	local function addconfig(_, config)
-		print("Then running here")
 		if not configpanels[config] then
-			print("Adding panel for", config.Codename, debug.traceback())
 			local pnl = vgui.Create("nzu_ConfigPanel", configlist)
 			--configlist:Add(pnl)
 			pnl:SetConfig(config)
@@ -476,7 +474,6 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 		end
 	end
 	local configs = nzu.GetConfigs()
-	print("Checking configs", configs)
 	if configs then
 		PrintTable(configs)
 		for k,v in pairs(configs) do
@@ -485,7 +482,6 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 			end
 		end
 	end
-	print("Adding hooks")
 	hook.Add("nzu_ConfigInfoSaved", configpanel, addconfig)
 	loadedcfg.DoClick = doconfigclick
 
