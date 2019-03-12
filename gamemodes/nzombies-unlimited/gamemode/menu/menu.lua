@@ -223,22 +223,22 @@ if CLIENT then
 		self.Character:DockMargin(5,5,15,5)
 		self.Character:Dock(LEFT)
 
-		local pnl = self:Add("DPanel")
-		pnl:DockPadding(10,10,10,10)
-		pnl:Dock(FILL)
-		pnl.Paint = barpaint
+		self.Panel = self:Add("DPanel")
+		self.Panel:DockPadding(10,10,10,10)
+		self.Panel:Dock(FILL)
+		self.Panel.Paint = barpaint
 
-		self.Avatar = pnl:Add("AvatarImage")
+		self.Avatar = self.Panel:Add("AvatarImage")
 		self.Avatar:SetWide(44)
 		self.Avatar:Dock(LEFT)
 
-		self.Ping = pnl:Add("DLabel")
+		self.Ping = self.Panel:Add("DLabel")
 		self.Ping:Dock(RIGHT)
 		self.Ping:SetFont("HudHintTextLarge")
 		self.Ping:SetContentAlignment(5)
 		--self.Ping:SetZPos(0)
 
-		self.Mute = pnl:Add("DImageButton")
+		self.Mute = self.Panel:Add("DImageButton")
 		self.Mute:SetSize(32, 32)
 		self.Mute:DockMargin(0,6,0,6)
 		self.Mute:Dock(RIGHT)
@@ -253,7 +253,7 @@ if CLIENT then
 		end
 		--self.Mute:SetZPos(1)
 
-		self.Name = pnl:Add("DLabel")
+		self.Name = self.Panel:Add("DLabel")
 		self.Name:SetText("")
 		self.Name:DockMargin(10,0,10,0)
 		self.Name:SetFont("DermaLarge")
@@ -291,10 +291,8 @@ if CLIENT then
 		end
 
 		if self.Unspawned == nil or self.Unspawned ~= self.Player:IsUnspawned() then
-			self.Unspawned == self.Player:IsUnspawned()
-			self:SetBackgroundColor(self.Unspawned and unspawnedcolor or spawnedcolor)
-
-			if self.Player == LocalPlayer() then self.Menu.ReadyButton:Update() end -- Refresh the menu button
+			self.Unspawned = self.Player:IsUnspawned()
+			self.Panel:SetBackgroundColor(self.Unspawned and unspawnedcolor or spawnedcolor)
 		end
 	end
 	vgui.Register("nzu_MenuPanel_PlayerLine", PLAYER_LINE, "Panel")
@@ -317,48 +315,52 @@ if CLIENT then
 	--function PANEL:AddNetworkedButton(text, )
 
 	-- Internal functions you don't really need to worry about
-	local topbuttonfuncs = {
-		Ready = function(s)
-			nzu.Ready()
-		end,
-		Unready = function(s)
-			nzu.Unready()
-		end,
-		Load = function(s)
-			if s.Menu.Config then
-				nzu.RequestLoadConfig(s.Menu.Config)
-			end
-		end,
-	}
-	local function updatereadybutton(self)
-		if self.Config then
-			if nzu.CurrentConfig and nzu.CurrentConfig.Codename == self.Config.Codename and nzu.CurrentConfig.Type == self.Config.Type then
+	local function readybuttonload(self)
+		if self.Menu.Config then
+			nzu.RequestLoadConfig(self.Menu.Config)
+		end
+	end
+	local function thinkreadybutton(self)
+		if self.Menu.Config then
+			if nzu.CurrentConfig and nzu.CurrentConfig.Codename == self.Menu.Config.Codename and nzu.CurrentConfig.Type == self.Menu.Config.Type then
 				-- Same config
 				local state = nzu.Round:GetState()
-				if state == ROUND_GAMEOVER then
-					self.ReadyButton:SetDisabled(true)
-					return
-				else
+				if state ~= ROUND_GAMEOVER then
 					if LocalPlayer():IsUnspawned() then
-						self.ReadyButton:SetText(state == ROUND_WAITING and "Ready" or "Spawn in")
-						self.ReadyButton.ClickFunction = topbuttonfuncs.Ready
+						local totext = state == ROUND_WAITING and "Ready" or "Spawn in"
+						if self:GetText() ~= totext then
+							self:SetText(totext)
+							self.ClickFunction = nzu.Ready
+
+							self.AdminOnly = false
+							self:SetDisabled(false)
+						end
 					else
-						self.ReadyButton:SetText(state == ROUND_WAITING and "Unready" or "Unspawn")
-						self.ReadyButton.ClickFunction = topbuttonfuncs.Unready
+						local totext = state == ROUND_WAITING and "Unready" or "Unspawn"
+						if self:GetText() ~= totext then
+							self:SetText(totext)
+							self.ClickFunction = nzu.Uneady
+
+							self.AdminOnly = false
+							self:SetDisabled(false)
+						end
 					end
+					return
 				end
-				self.ReadyButton.AdminOnly = false
 			else
-				-- Different config, only admins can trigger a load
-				self.ReadyButton:SetText("Load selected Config")
-				self.ReadyButton.ClickFunction = topbuttonfuncs.Load
-				self.ReadyButton.AdminOnly = true
+				if self:GetText() ~= "Load selected Config" then
+					-- Different config, only admins can trigger a load
+					self:SetText("Load selected Config")
+					self.ClickFunction = readybuttonload
+					self.AdminOnly = true
+					self:SetDisabled(false)
+				end
+				return
 			end
-			self.ReadyButton:SetDisabled(false)
-		else
-			self.ReadyButton:SetText("")
-			self.ReadyButton:SetDisabled(true)
 		end
+
+		self:SetText("")
+		self:SetDisabled(true)
 	end
 
 	function PANEL:SetConfig(config)
@@ -380,11 +382,9 @@ if CLIENT then
 			self.ConfigPanel.Authors:SetText("Use the Load Configs menu to select a Config to load.")
 			self.ConfigPanel.Authors:SizeToContents()
 		end
-		updatereadybutton(self)
 	end
 
 	function PANEL:Init()
-
 		self:ParentToHUD()
 		self:Dock(FILL)
 		self.OpenTime = 0
@@ -470,18 +470,7 @@ if CLIENT then
 
 		self.PlayerList = self.RightSide:Add("DScrollPanel")
 		self.PlayerList:Dock(FILL)
-		self.PlayerList.Think = function(s)
-			local plys = player.GetAll()
-			for id, pl in pairs(plys) do
-				if not IsValid(pl.MenuEntry) then
-					pl.MenuEntry = s:Add("nzu_MenuPanel_PlayerLine")
-					pl.MenuEntry:Setup(pl)
-					pl.MenuEntry:Dock(TOP)
-					pl.MenuEntry.Menu = self
-					s:AddItem(pl.MenuEntry)
-				end
-			end
-		end
+		
 
 		-- Add a middle panel for parenting special displays right in the center of the menu (depending on space)
 		self.MiddleCanvas = self:Add("DDragBase")
@@ -497,9 +486,21 @@ if CLIENT then
 		-- Now populate!
 		local canready = true
 		self.ReadyButton = self:AddButton("Ready", 1)
-		self.ReadyButton.Update = updatereadybutton
 		self.ReadyButton.Menu = self
-		hook.Add("nzu_RoundStateChanged", self.ReadyButton, self.ReadyButton.Update)
+		self.ReadyButton.Think = thinkreadybutton
+
+		self.PlayerList.Think = function(s)
+			local plys = player.GetAll()
+			for id, pl in pairs(plys) do
+				if not IsValid(pl.MenuEntry) then
+					pl.MenuEntry = s:Add("nzu_MenuPanel_PlayerLine")
+					pl.MenuEntry.Menu = self
+					pl.MenuEntry:Setup(pl)
+					pl.MenuEntry:Dock(TOP)
+					s:AddItem(pl.MenuEntry)
+				end
+			end
+		end
 
 		self:SetConfig(nzu.CurrentConfig) -- unloaded
 		self.MenuRoot:Show()

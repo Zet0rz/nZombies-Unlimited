@@ -92,7 +92,7 @@ function SPAWNER:CalculateWeight()
 	if self.LockedWeight then return self.LockedWeight end
 
 	local ct = CurTime()
-	if ct < self.NextWeightCalculation then
+	if self.NextWeightCalculation and ct < self.NextWeightCalculation then
 		return self.Weight
 	end
 
@@ -143,6 +143,13 @@ end
 
 local spawnpoints = {}
 local openspawns = {}
+local function doactivate(spawn)
+	if not spawn.Active then
+		table.insert(openspawns[spawn.Type], spawn)
+		spawn.Active = true
+	end
+end
+
 nzu.AddSaveExtension("Spawnpoints", {
 	-- Save and load aren't really needed here
 	Load = function() end,
@@ -151,20 +158,20 @@ nzu.AddSaveExtension("Spawnpoints", {
 			if not spawnpoints[v.Type] then spawnpoints[v.Type] = {} end
 			if not openspawns[v.Type] then openspawns[v.Type] = {} end
 
-			local spawner = NewSpawner(v.Type, v.Pos, v.Angles)
+			local spawner = NewSpawner(v.Type, v.Pos, v.Ang)
 
 			-- This is a cheeky way of enabling Entity-based Map Flag system on non-entities (but it works fine, since they just need to be indexable - aka tables)
-			ENTITY.SetMapFlags(spawner, v.MapFlags)
+			if v.MapFlags and table.Count(v.MapFlags) > 0 then
+				ENTITY.SetMapFlags(spawner, v.MapFlags)
+			else
+				doactivate(spawner)
+			end
 
 			table.insert(spawnpoints[v.Type], spawner)
 		end
 	end
 })
-
-nzu.AddMapFlagsHandler("Spawnpoints", function(spawn)
-	table.insert(openspawns[spawn.Type], spawn)
-	spawn.Active = true
-end)
+nzu.AddMapFlagsHandler("Spawnpoints", doactivate)
 
 --[[-------------------------------------------------------------------------
 Now getters and utility

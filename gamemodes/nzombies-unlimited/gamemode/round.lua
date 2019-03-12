@@ -133,7 +133,7 @@ if SERVER then
 			for k,v in pairs(distribution) do
 				if ROUND.ZombiesToSpawn <= 0 then break end
 
-				if ct >= k.NextSpawn then
+				if not k.NextSpawn or ct >= k.NextSpawn then
 					if not k:IsFrozen() and not k:HasQueue() and k:HasSpace() then
 						local z = ents.Create("nzu_zombie")
 						z:ShouldGivePoints(true)
@@ -233,7 +233,7 @@ Player Management
 We use Teams to network the players belonging to the round system or not
 ---------------------------------------------------------------------------]]
 -- The "Unspawned". A mysterious class of people that seemingly has no interaction with the world, yet await their place in it.
-team.SetUp(0, "Unspawned", Color(100,100,100))
+team.SetUp(TEAM_UNASSIGNED, "Unspawned", Color(100,100,100))
 
 function ROUND:SetUpTeam(...)
 	local i = 1
@@ -334,7 +334,7 @@ Readying and dropping in/out
 ---------------------------------------------------------------------------]]
 local PLAYER = FindMetaTable("Player")
 function PLAYER:IsUnspawned()
-	return self:Team() == 0
+	return self:Team() == TEAM_UNASSIGNED
 end
 
 if SERVER then
@@ -375,10 +375,21 @@ if SERVER then
 	-- This is basically dropping out and being on the main menu
 	-- You can spectate from here too (later)
 	function nzu.Unspawn(ply)
-		ply:SetTeam(0)
-		if ply:Alive() then ply:KillSilent() end
+		ply:SetTeam(TEAM_UNASSIGNED)
+		ply:KillSilent()
 	end
-	hook.Add("PlayerInitialSpawn", "nzu_Unspawn", nzu.Unspawn)
+	
+	function GM:PlayerInitialSpawn(ply)
+		-- Is this timer really necessary? :(
+		-- It doesn't seem to kill if not with the timer (probably cause it's before the spawn?)
+		timer.Simple(0, function()
+			if IsValid(ply) then
+				nzu.Unspawn(ply)
+				hook.Run("ShowHelp", ply) -- Open their F1 menu
+			end
+		end)
+	end
+	function GM:PlayerDeathThink() end
 end
 
 --[[-------------------------------------------------------------------------
