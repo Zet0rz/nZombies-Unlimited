@@ -1,7 +1,5 @@
 AddCSLuaFile()
 
-print("LOADING HERE TOO!")
-
 ENT.Base = "nzu_zombie_base"
 ENT.Type = "nextbot"
 ENT.Category = "nZombies Unlimited"

@@ -269,6 +269,8 @@ if CLIENT then
 		self:Think()
 	end
 
+	local spawnedcolor = Color(100,60,0)
+	local unspawnedcolor = Color(0,0,0)
 	function PLAYER_LINE:Think()
 		if not IsValid(self.Player) then self:Remove() end
 
@@ -286,6 +288,13 @@ if CLIENT then
 			self.Muted = self.Player:IsMuted()
 			self.Mute:SetImage(self.Muted and "icon32/muted.png" or "icon32/unmuted.png")
 			self.Mute.DoClick = function() self.Player:SetMuted(not self.Muted) end
+		end
+
+		if self.Unspawned == nil or self.Unspawned ~= self.Player:IsUnspawned() then
+			self.Unspawned == self.Player:IsUnspawned()
+			self:SetBackgroundColor(self.Unspawned and unspawnedcolor or spawnedcolor)
+
+			if self.Player == LocalPlayer() then self.Menu.ReadyButton:Update() end -- Refresh the menu button
 		end
 	end
 	vgui.Register("nzu_MenuPanel_PlayerLine", PLAYER_LINE, "Panel")
@@ -310,13 +319,10 @@ if CLIENT then
 	-- Internal functions you don't really need to worry about
 	local topbuttonfuncs = {
 		Ready = function(s)
-			print("Readying")
+			nzu.Ready()
 		end,
-		DropIn = function(s)
-
-		end,
-		DropOut = function(s)
-
+		Unready = function(s)
+			nzu.Unready()
 		end,
 		Load = function(s)
 			if s.Menu.Config then
@@ -328,12 +334,20 @@ if CLIENT then
 		if self.Config then
 			if nzu.CurrentConfig and nzu.CurrentConfig.Codename == self.Config.Codename and nzu.CurrentConfig.Type == self.Config.Type then
 				-- Same config
-				self.ReadyButton:SetText("Toggle Ready")
-				self.ReadyButton.ClickFunction = topbuttonfuncs.Ready
+				local state = nzu.Round:GetState()
+				if state == ROUND_GAMEOVER then
+					self.ReadyButton:SetDisabled(true)
+					return
+				else
+					if LocalPlayer():IsUnspawned() then
+						self.ReadyButton:SetText(state == ROUND_WAITING and "Ready" or "Spawn in")
+						self.ReadyButton.ClickFunction = topbuttonfuncs.Ready
+					else
+						self.ReadyButton:SetText(state == ROUND_WAITING and "Unready" or "Unspawn")
+						self.ReadyButton.ClickFunction = topbuttonfuncs.Unready
+					end
+				end
 				self.ReadyButton.AdminOnly = false
-
-				-- Just for good measure
-				self.Config = nzu.CurrentConfig
 			else
 				-- Different config, only admins can trigger a load
 				self.ReadyButton:SetText("Load selected Config")
@@ -463,6 +477,7 @@ if CLIENT then
 					pl.MenuEntry = s:Add("nzu_MenuPanel_PlayerLine")
 					pl.MenuEntry:Setup(pl)
 					pl.MenuEntry:Dock(TOP)
+					pl.MenuEntry.Menu = self
 					s:AddItem(pl.MenuEntry)
 				end
 			end
@@ -471,9 +486,7 @@ if CLIENT then
 		-- Add a middle panel for parenting special displays right in the center of the menu (depending on space)
 		self.MiddleCanvas = self:Add("DDragBase")
 		self.MiddleCanvas:Dock(FILL)
-		self.MiddleCanvas:DockMargin(0,100,0,100)
-
-		
+		self.MiddleCanvas:DockMargin(0,100,0,100)		
 
 		-- The menu list
 		self.MenuRoot = self.LeftSide:Add("nzu_MenuPanel_SubMenu")
@@ -483,8 +496,10 @@ if CLIENT then
 
 		-- Now populate!
 		local canready = true
-		self.ReadyButton = self:AddButton("Ready up", 1)
+		self.ReadyButton = self:AddButton("Ready", 1)
+		self.ReadyButton.Update = updatereadybutton
 		self.ReadyButton.Menu = self
+		hook.Add("nzu_RoundStateChanged", self.ReadyButton, self.ReadyButton.Update)
 
 		self:SetConfig(nzu.CurrentConfig) -- unloaded
 		self.MenuRoot:Show()
@@ -521,7 +536,7 @@ if CLIENT then
 	local menuhooks = {}
 	local function togglemenu()
 		local mainmenu = nzu.Menu
-		if mainmenu then mainmenu:Remove() mainmenu = nil end
+		--if mainmenu then mainmenu:Remove() mainmenu = nil end
 		if not mainmenu then
 			mainmenu = vgui.Create("nzu_MenuPanel")
 			mainmenu:SetSkin("nZombies Unlimited")

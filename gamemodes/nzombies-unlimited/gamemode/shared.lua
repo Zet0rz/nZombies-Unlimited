@@ -37,6 +37,7 @@ loadfile_c("nzombies-unlimited/core/cl_nzombies_skin.lua")
 
 loadfile("nzombies-unlimited/core/configs.lua")
 loadfile_s("nzombies-unlimited/core/sv_saveload.lua")
+loadfile_s("nzombies-unlimited/core/mapflags.lua") -- Only Server outside Sandbox
 
 --[[-------------------------------------------------------------------------
 Gamemode-specific files
@@ -50,3 +51,5 @@ loadfile("round.lua")
 loadfile("points.lua")
 loadfile("targeting.lua")
 loadfile("weapons.lua")
+
+loadfile_s("nzombies-unlimited/core/entities_tools/spawnpoints_nzu.lua")

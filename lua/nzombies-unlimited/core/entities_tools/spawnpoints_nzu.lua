@@ -13,11 +13,36 @@ function SPAWNER:GetQueue()
 	return self.Queue
 end
 
+function SPAWNER:IsValid()
+	return true -- Spawners are always valid, per-se
+end
+
+local queuetime = 2 -- How often to re-check for space to spawn a queued zombie
+local function queuefunc(self)
+	if CurTime() > self.NextQueue then
+		local e = self.Queue[1]
+		if self:HasSpace(e) then
+			e:SetPos(self:GetPos())
+			e:SetAngles(self:GetAngles()) -- Yes/no?
+			e:Spawn()
+
+			table.remove(self.Queue, 1)
+		end
+
+		if next(self.Queue) then
+			self.NextQueue = CurTime() + queuetime
+		else
+			self.NextQueue = nil
+			hook.Remove("Think", self)
+		end
+	end
+end
+
 -- Spawn a zombie. If it cannot spawn, it will be queued until there is space
 -- The queue is in order of zombies being added to the queue
 -- Pass noqueue to not add to the queue (only spawn if you can now)
-function SPAWNER:SpawnZombie(e, noqueue)
-	if not self.Frozen and self:HasSpace(e) then
+function SPAWNER:Spawn(e, noqueue)
+	if not self.Frozen and not self.NextQueue and self:HasSpace(e) then
 		e:SetPos(self:GetPos())
 		e:SetAngles(self:GetAngles()) -- Yes/no?
 		e:Spawn()
@@ -26,6 +51,10 @@ function SPAWNER:SpawnZombie(e, noqueue)
 
 	if not noqueue then
 		table.insert(self.Queue, e)
+		if not self.NextQueue then
+			self.NextQueue = CurTime() + queuetime
+			hook.Add("Think", self, queuefunc)
+		end
 	end
 	return false -- We couldn't spawn :/
 end
@@ -45,6 +74,10 @@ function SPAWNER:HasSpace(ent)
 	end
 	
 	return not result.Hit
+end
+
+function SPAWNER:HasQueue()
+	return self.NextQueue and true or false
 end
 
 function SPAWNER:SetLockedWeight(w)
@@ -85,6 +118,15 @@ end
 
 function SPAWNER:Freeze(b)
 	self.Frozen = b
+
+	if self.NextQueue then
+		if b then hook.Remove("Think", self) else hook.Add("Think", self, queuefunc) end -- Update queue hooks
+	end
+end
+function SPAWNER:IsFrozen() return self.Frozen end
+
+function SPAWNER.__tostring(spawner)
+	return "Spawner ["..spawner.Type.."]["..tostring(spawner.Pos).."]"
 end
 SPAWNER.__index = SPAWNER
 
@@ -140,14 +182,18 @@ end
 function nzu.PickWeightedRandomSpawner(type)
 	local spawns = openspawns[type]
 	local total = 0
+	local possible = {}
 	for k,v in pairs(spawns) do
-		local w = v:CalculateWeight()
-		total = total + w
+		if not v:IsFrozen() then
+			local w = v:CalculateWeight()
+			total = total + w
+			table.insert(possible, v)
+		end
 	end
 
 	local ran = math.Rand(0, total)
 	local cur = 0
-	for k,v in pairs(spawns) do
+	for k,v in pairs(possible) do
 		cur = cur + v.Weight -- The cached result from before
 		if cur >= ran then
 			return v
@@ -162,15 +208,19 @@ function nzu.CalculateSpawnerDistribution(type, num)
 	local total = 0
 	local max = 0
 	local top
+	local possible = {}
 
 	-- Get totals and the spawnpoint with highest weight
 	for k,v in pairs(spawns) do
-		local w = v:CalculateWeight()
-		if w > max then
-			max = w
-			top = v
+		if not v:IsFrozen() then
+			local w = v:CalculateWeight()
+			if w > max then
+				max = w
+				top = v
+			end
+			total = total + w
+			table.insert(possible, v)
 		end
-		total = total + w
 	end
 
 	if total <= 0 then
@@ -180,7 +230,7 @@ function nzu.CalculateSpawnerDistribution(type, num)
 	-- Distribute numbers over weight
 	local tbl = {}
 	local distributed = 0
-	for k,v in pairs(spawns) do
+	for k,v in pairs(possible) do
 		local distr = math.Round(num * v.Weight/total)
 		tbl[v] = distr
 		distributed = distributed + distr
