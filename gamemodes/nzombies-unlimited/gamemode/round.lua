@@ -251,7 +251,7 @@ if SERVER then
 	local function docountdownstart()
 		if not timer.Exists("nzu_RoundCountdown") then
 			timer.Create("nzu_RoundCountdown", countdowntime, 1, function() nzu.Round:Start() end)
-			hook.Run("nzu_RoundCountdownCancelled", countdowntime)
+			hook.Run("nzu_RoundCountdown", countdowntime)
 
 			net.Start("nzu_ready")
 				net.WriteBool(true)
@@ -351,8 +351,10 @@ else
 	-- Receiving countdown
 	net.Receive("nzu_ready", function()
 		if net.ReadBool() then
+			nzu.Round.GameStart = CurTime() + countdowntime
 			hook.Run("nzu_RoundCountdown", countdowntime)
 		else
+			nzu.Round.GameStart = nil
 			hook.Run("nzu_RoundCountdownCancelled")
 		end
 	end)

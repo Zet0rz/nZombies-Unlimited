@@ -359,7 +359,7 @@ if CLIENT then
 			end
 		end
 
-		self:SetText("")
+		self:SetText("[No valid action]")
 		self:SetDisabled(true)
 	end
 
@@ -384,6 +384,58 @@ if CLIENT then
 		end
 	end
 
+	local countdowntextstates = {
+		[ROUND_PREPARING] = "Prepare",
+		[ROUND_ONGOING] = "Ongoing",
+		[ROUND_GAMEOVER] = "GAME OVER"
+	}
+	local function countdownthink(s)
+		local state = nzu.Round:GetState()
+		if s.State ~= state then
+			if countdowntextstates[state] then
+				s:SetText("GAME ACTIVE - ["..countdowntextstates[state].."]")
+			end
+
+			local old = s.State
+			s.State = state
+			s.LastCountdown = nil
+			s:SetVisible(state ~= ROUND_WAITING)
+
+			if old == ROUND_WAITING and not LocalPlayer():IsUnspawned() then
+				s.Menu:Close() -- Close menu on game start
+			end
+		end
+
+		if s.State == ROUND_WAITING then
+			if nzu.Round.GameStart then
+				if not s:IsVisible() then s:Show() end
+				local diff = math.ceil(nzu.Round.GameStart - CurTime())
+				if diff >= 0 then
+					if diff ~= s.LastCountdown then
+						s:SetText("GAME STARTING - [Spawn in "..(diff > 0 and diff or 0).."...]")
+						s.LastCountdown = diff
+
+						-- Play UI sound
+						surface.PlaySound("buttons/button17.wav")
+					end
+					return
+				end
+			end
+			if s:IsVisible() then
+				s:Hide()
+			end
+		elseif s.State == ROUND_INVALID then
+			if not s.NextRandomize or s.NextRandomize < CurTime() then
+				local str = ""
+				for i = 1,10 do
+					str = str .. string.char(math.random(32,126))
+				end
+				s:SetText("GAME ACTIVE - ["..str.."]")
+				s.NextRandomize = CurTime() + 0.025
+			end
+		end
+	end
+
 	function PANEL:Init()
 		self:ParentToHUD()
 		self:Dock(FILL)
@@ -392,7 +444,7 @@ if CLIENT then
 		self.LeftSide = self:Add("DDragBase") -- So buttons are clickable
 		self.LeftSide:Dock(LEFT)
 		self.LeftSide:SetWide(600)
-		self.LeftSide:DockMargin(100,100,50,100)
+		self.LeftSide:DockMargin(100,100,50,50)
 
 		-- The loaded config icon
 		self.ConfigPanel = self.LeftSide:Add("DImage")
@@ -502,6 +554,43 @@ if CLIENT then
 			end
 		end
 
+		self.Countdown = self.LeftSide:Add("DPanel")
+		self.Countdown:Dock(BOTTOM)
+		self.Countdown:DockPadding(10,5,10,5)
+		self.Countdown:SetZPos(1)
+		self.Countdown:DockMargin(0,35,0,-33)
+		self.Countdown:SetTall(30)
+
+		self.CountdownText = self.Countdown:Add("DLabel")
+		self.CountdownText:SetText("")
+		self.CountdownText:Dock(FILL)
+		self.CountdownText:SetContentAlignment(4)
+		self.CountdownText:SetFont("ChatFont")
+		self.CountdownText:SetTextColor(color_black)
+
+		self.CountdownText.Menu = self
+		--self.CountdownText.Think = countdownthink
+		local s = self.CountdownText
+		self.Countdown.Think = function() countdownthink(s) end
+		self.Countdown.Paint = function(cd,w,h)
+			if s:IsVisible() then
+				surface.SetDrawColor(200,200,200,255)
+				surface.DrawRect(0,0,w,h)
+			end
+		end
+
+		--[[self.Promo = self.LeftSide:Add("DPanel")
+		self.Promo:Dock(BOTTOM)
+		self.Promo:SetTall(75)
+		self.Promo:SetZPos(-1)
+		self.Promo:DockMargin(0,5,0,0)
+
+		self.PromoText = self.Promo:Add("DLabel")
+		self.PromoText:SetText("Join the official nZombies Unlimited Discord Server")
+		self.PromoText:SetFont("Trebuchet24")
+		self.PromoText:SetContentAlignment(5)
+		self.PromoText:Dock(FILL)]]
+
 		self:SetConfig(nzu.CurrentConfig) -- unloaded
 		self.MenuRoot:Show()
 	end
@@ -530,7 +619,11 @@ if CLIENT then
 	--function PANEL:DoClick() print("hfiua") end
 
 	function PANEL:Toggle()
-		if self:IsVisible() then self:Close() else self:Open() end
+		if self:IsVisible() then
+			if nzu.Round:GetState() ~= ROUND_WAITING then self:Close() end -- Can't close in waiting state
+		else
+			self:Open()
+		end
 	end
 	vgui.Register("nzu_MenuPanel", PANEL, "Panel")
 
@@ -592,9 +685,7 @@ if CLIENT then
 		local sub = menu:AddPanel("Load Config ...", 3, scroll)
 
 		local function doconfigclick(p)
-			print(p.Config, p)
 			if p.Config then
-				PrintTable(p.Config)
 				net.Start("nzu_menu_loadconfigs")
 					net.WriteString(p.Config.Codename)
 					net.WriteString(p.Config.Type)
@@ -603,7 +694,6 @@ if CLIENT then
 		end
 		
 		local function addconfig(_, config)
-			print("Adding panel for", config.Codename)
 			local pnl = vgui.Create("nzu_ConfigPanel", clist)
 			clist:Add(pnl)
 			pnl:SetConfig(config)

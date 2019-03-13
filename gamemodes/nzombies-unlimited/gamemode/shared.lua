@@ -44,12 +44,12 @@ Gamemode-specific files
 ---------------------------------------------------------------------------]]
 loadfile("player.lua")
 
-loadfile("menu/menu.lua")
-loadfile_c("menu/menu_customizeplayer.lua")
-
 loadfile("round.lua")
 loadfile("points.lua")
 loadfile("targeting.lua")
 loadfile("weapons.lua")
+
+loadfile("menu/menu.lua")
+loadfile_c("menu/menu_customizeplayer.lua")
 
 loadfile_s("nzombies-unlimited/core/entities_tools/spawnpoints_nzu.lua")
