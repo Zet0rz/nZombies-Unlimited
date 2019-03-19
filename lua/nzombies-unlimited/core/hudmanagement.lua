@@ -6,6 +6,7 @@ Structure of a HUD Component:
 Component = {
 	Create = function, on component activate
 	Paint = function, every frame
+	Draw = function, called manually from nzu.DrawHUDComponent
 	Remove = function, remove/clean component
 }
 ^ All fields are optional
@@ -108,6 +109,8 @@ else
 	-- DEBUG
 	queue.Round = "Unlimited"
 	queue.Points = "Unlimited"
+	queue.ReviveProgress = "Unlimited"
+	queue.DownedIndicator = "Unlimited"
 
 	hook.Add("HUDPaint", "nzu_HUDComponentsPaint", function()
 		for k,v in pairs(draws) do

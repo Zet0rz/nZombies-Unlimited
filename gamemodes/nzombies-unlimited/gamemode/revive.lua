@@ -62,10 +62,10 @@ if CLIENT then
 		local ply = net.ReadEntity()
 		if net.ReadBool() then
 			ply.nzu_DownedTime = net.ReadFloat()
-			hook.Run("nzu_PlayerDowned", self)
+			hook.Run("nzu_PlayerDowned", ply)
 		else
 			ply.nzu_DownedTime = nil
-			hook.Run("nzu_PlayerRevived", self)
+			hook.Run("nzu_PlayerRevived", ply)
 		end
 	end)
 end
@@ -169,22 +169,34 @@ end
 if SERVER then
 	util.AddNetworkString("nzu_playerreviving") -- Server: Notify clients that a player is being revived by another
 
-	function PLAYER:StartReviving(target)
-		self.nzu_ReviveTime = CurTime() + time
-		self.nzu_ReviveTarget = ent
-		hook.Run("nzu_PlayerStartedRevive", self, target, time)
+	function PLAYER:StartReviving(target, time2)
+		if self.nzu_ReviveLocked then return end
 
-		net.Start("nzu_playerreviving")
-			net.WriteEntity(self)
-			net.WriteBool(true)
-			net.WriteFloat(self.nzu_ReviveTime)
-			net.WriteEntity(target)
-		net.Broadcast()
+		local time = time2 or self:GetReviveTime()
+		if time > 0 then
+			self.nzu_ReviveTime = CurTime() + time
+			self.nzu_ReviveTarget = target
+			self.nzu_ReviveStartTime = CurTime()
+			hook.Run("nzu_PlayerStartedRevive", self, target, time)
+
+			net.Start("nzu_playerreviving")
+				net.WriteEntity(self)
+				net.WriteBool(true)
+				net.WriteFloat(self.nzu_ReviveTime)
+				net.WriteEntity(target)
+			net.Broadcast()
+		else
+			target:RevivePlayer(self)
+		end
 	end
 
 	function PLAYER:StopReviving()
+		if self.nzu_ReviveLocked then return end
+
+		local target = self.nzu_ReviveTarget
 		self.nzu_ReviveTime = nil
 		self.nzu_ReviveTarget = nil
+		self.nzu_ReviveStartTime = nil
 
 		net.Start("nzu_playerreviving")
 			net.WriteEntity(self)
@@ -193,7 +205,18 @@ if SERVER then
 
 		self.nzu_ReviveBlock = CurTime() + 0.1
 
-		hook.Run("nzu_PlayerStoppedRevive", self)
+		hook.Run("nzu_PlayerStoppedRevive", self, target)
+	end
+
+	function PLAYER:StartForcedReviving(target, time)
+		self.nzu_ReviveLocked = false
+		self:StartReviving(target, time)
+		self.nzu_ReviveLocked = true
+	end
+
+	function PLAYER:StopForcedReviving()
+		self.nzu_ReviveLocked = nil
+		self:StopReviving()
 	end
 
 	-- Find players for use
@@ -201,15 +224,18 @@ if SERVER then
 	local quicktrace = util.QuickTrace
 	hook.Add("FindUseEntity", "nzu_Revive_UsePlayers", function(ply, ent)
 		-- Optimization. We already block downed players from using below, but we may as well save the trace too
-		if not ply:GetIsDowned() then
-			local tr = quicktrace(ply:EyePos(), ply:GetAimVector()*reviverange, ply)
-			local target = tr.Entity
+		if not ply.nzu_ReviveLocked then
+			if not ply:GetIsDowned() then
+				local tr = quicktrace(ply:EyePos(), ply:GetAimVector()*reviverange, ply)
+				local target = tr.Entity
 
-			if IsValid(target) and target:CanBeRevived() and target:GetIsDowned() then
-				return target
-			elseif ply.nzu_ReviveTarget then
+				if IsValid(target) and target:CanBeRevived() and target:GetIsDowned() then
+					return target
+				end
+			end
+			if ply.nzu_ReviveTarget then
 				ply:StopReviving()
-			end 
+			end
 		end
 	end)
 
@@ -217,29 +243,33 @@ if SERVER then
 	hook.Add("PlayerUse", "nzu_Revive_RevivePlayers", function(ply, ent)
 		if ply:GetIsDowned() then return false end
 
-		if IsValid(ent) and ent:CanBeRevived() and ent:GetIsDowned() and (not ply.nzu_ReviveBlock or ply.nzu_ReviveBlock < CurTime()) then
-			if ply.nzu_ReviveTarget ~= ent then
-				local time = ply:GetReviveTime()
-				if time > 0 then
+		if not ply.nzu_ReviveLocked then
+			if IsValid(ent) and ent:CanBeRevived() and ent:GetIsDowned() and (not ply.nzu_ReviveBlock or ply.nzu_ReviveBlock < CurTime()) then
+				if ply.nzu_ReviveTarget ~= ent then
 					ply:StartReviving(ent)
-				else
-					hook.Run("nzu_PlayerStartedRevive", ply, ent, time) -- Hack for instant rezzes, still call hook but save the networking
-					ent:RevivePlayer(ply)
+				--elseif CurTime() >= ply.nzu_ReviveTime then
+					--ent:RevivePlayer(ply)
+					--ply:StopReviving()
 				end
-				print("Started reviving", ply, ent, time)
-			elseif CurTime() >= ply.nzu_ReviveTime then
-				ent:RevivePlayer(ply)
+			elseif ply.nzu_ReviveTarget then
 				ply:StopReviving()
 			end
-		elseif ply.nzu_ReviveTarget then
-			ply:StopReviving()
 		end
 	end)
 
 	-- Also stop for E
 	hook.Add("KeyRelease", "nzu_Revive_StopHoldingE", function(ply, key)
-		if key == IN_USE and ply.nzu_ReviveTarget then
+		if key == IN_USE and ply.nzu_ReviveTarget and not ply.nzu_ReviveLocked then
 			ply:StopReviving()
+		end
+	end)
+
+	-- Keep an eye on players' revive times
+	hook.Add("PlayerPostThink", "nzu_Revive_Reviving", function(ply)
+		if ply.nzu_ReviveTime and ply.nzu_ReviveTime <= CurTime() then
+			if IsValid(ply.nzu_ReviveTarget) then ply.nzu_ReviveTarget:RevivePlayer(ply) end
+
+			ply:StopForcedReviving() -- Completing a revive also stops a forced one
 		end
 	end)
 end
@@ -250,12 +280,16 @@ if CLIENT then
 		if net.ReadBool() then
 			ply.nzu_ReviveTime = net.ReadFloat()
 			ply.nzu_ReviveTarget = net.ReadEntity()
+			ply.nzu_ReviveStartTime = CurTime()
 
 			hook.Run("nzu_PlayerStartedRevive", ply, ply.nzu_ReviveTarget, ply.nzu_ReviveTime - CurTime())
 		else
+			local target = ply.nzu_ReviveTarget
+
 			ply.nzu_ReviveTime = nil
 			ply.nzu_ReviveTarget = nil
-			hook.Run("nzu_PlayerStoppedRevive", ply)
+			ply.nzu_ReviveStartTime = nil
+			hook.Run("nzu_PlayerStoppedRevive", ply, target)
 		end
 	end)
 end
@@ -268,7 +302,7 @@ end
 --[[-------------------------------------------------------------------------
 Movement & Aiming for Downed Players
 ---------------------------------------------------------------------------]]
-local visionlowered = Vector(0,0,0)
+local visionlowered = Vector(0,0,-40)
 local crawlspeed = 30
 
 hook.Add("SetupMove", "nzu_Revive_DownedMovement", function(ply, mv, cmd)
@@ -345,7 +379,7 @@ hook.Add("CalcMainActivity", "nzu_Revive_DownedAnimation", function(ply, vel)
 	end
 end)
 
-local cyclex, cycley = 0.7,0.75
+local cyclex, cycley = 0.6,0.65
 local hullchange = Vector(0,0,25)
 hook.Add("UpdateAnimation", "nzu_Revive_DownedAnimation", function(ply, vel, seqspeed)
 	if ply:GetIsDowned() then
@@ -364,30 +398,205 @@ hook.Add("UpdateAnimation", "nzu_Revive_DownedAnimation", function(ply, vel, seq
 		ply:SetPoseParameter("move_x", -1)
 		ply:SetPlaybackRate(movement)
 
-		if not ply.nzu_DownedAnim then
-			local x,y = ply:GetHull()
-			ply:SetHull(x + hullchange, y + hullchange)
-			ply.nzu_DownedAnim = true
-		end
 		return true
-	elseif ply.nzu_DownedAnim then
-		ply:SetPos(ply:GetPos() + hullchange)
-		ply:ResetHull()
-		ply.nzu_DownedAnim = nil
 	end
 end)
 
 if CLIENT then
-	local loweredpos = Vector(0,0,0)
+	local loweredpos = Vector(20,0,-30)
+	local mat = Matrix()
+	mat:SetTranslation(loweredpos)
+	mat:Rotate(Angle(-30,0,0))
+
+	local mat2 = Matrix()
+
 	hook.Add("PrePlayerDraw", "nzu_Revive_DownedAnimation", function(ply)
 		if ply:GetIsDowned() then
-			ply:InvalidateBoneCache()
-			ply:SetNetworkOrigin(ply:GetPos() - loweredpos)
-			local ang = ply:GetAngles()
-			ply:SetRenderAngles(Angle(-30, ang[2], ang[3]))
+			if not ply.nzu_DownedAnim then
+				ply:EnableMatrix("RenderMultiply", mat)
+				ply.nzu_DownedAnim = true
+			end
+			--local ang = ply:GetAngles()
+			--ply:SetRenderAngles(Angle(-30, ang[2], ang[3]))
+			--ply:SetRenderOrigin(ply:GetPos() - loweredpos + ang:Forward()*20)
 			
-			local wep = ply:GetActiveWeapon()
-			if IsValid(wep) then wep:InvalidateBoneCache() end
+			--ply:InvalidateBoneCache()
+			
+			--local wep = ply:GetActiveWeapon()
+			--if IsValid(wep) then wep:InvalidateBoneCache() end
+		elseif ply.nzu_DownedAnim then
+			ply:DisableMatrix("RenderMultiply")
+			ply.nzu_DownedAnim = nil
 		end
 	end)
+end
+
+
+
+
+--[[-------------------------------------------------------------------------
+Clientside HUD Drawing
+---------------------------------------------------------------------------]]
+if CLIENT then
+	nzu.RegisterHUDComponentType("ReviveProgress")
+	nzu.RegisterHUDComponentType("DownedIndicator")
+
+	local localplayer
+	local isbeingrevived = false
+	local downedplayers = {}
+	hook.Add("nzu_PlayerDowned", "nzu_Revive_HUDDownedIndicator", function(ply)
+		if ply ~= LocalPlayer() then
+			downedplayers[ply] = NULL
+		end
+	end)
+
+	local function playernolongerdown(ply)
+		if ply ~= LocalPlayer() then
+			downedplayers[ply] = nil
+		end
+	end
+	hook.Add("nzu_PlayerRevived", "nzu_Revive_HUDDownedIndicator", playernolongerdown)
+	hook.Add("EntityRemoved", "nzu_Revive_HUDDownedIndicator", playernolongerdown)
+
+	-- When players start reviving a target, check to see if they're faster and update the revivor if so
+	hook.Add("nzu_PlayerStartedRevive", "nzu_Revive_HUDDownedIndicator", function(ply, target, time)
+		if target == LocalPlayer() then -- If LocalPlayer is the one being revived
+			if not isbeingrevived then -- If we were not previously being revived, immediately overwrite
+				localplayer = ply
+				isbeingrevived = true
+			elseif not IsValid(localplayer) or localplayer.nzu_ReviveTime > ply.nzu_ReviveTime then -- Else only if faster than previous revivor
+				localplayer = ply
+			end
+		elseif ply == LocalPlayer() and not isbeingrevived then -- If we're reviving, and we're also not being revived, change our target
+			localplayer = target
+		end
+
+		if downedplayers[target] then
+			if not IsValid(downedplayers[target]) or downedplayers[target].nzu_ReviveTime > ply.nzu_ReviveTime then
+				downedplayers[target] = ply
+			end
+		end
+	end)
+
+	-- When players stop reviving, loop through all to find the next fastest one to take over, if any
+	hook.Add("nzu_PlayerStoppedRevive", "nzu_Revive_HUDDownedIndicator", function(ply, target)
+		if ply == LocalPlayer() or target == LocalPlayer() then -- We're stopping being revived or stopping to revive ourselves
+			local min = math.huge
+			local revivor
+			for k,v in pairs(player.GetAll()) do
+				if v.nzu_ReviveTarget == LocalPlayer() then -- Loop through all. If any are reviving us, that takes priority (for fastest)
+					if v.nzu_ReviveTime < min then
+						min = v.nzu_ReviveTime
+						revivor = v
+					end
+				end
+			end
+
+			--print(revivor)
+
+			if IsValid(revivor) then -- Someone's reviving us
+				localplayer = revivor
+				isbeingrevived = true
+			elseif IsValid(LocalPlayer().nzu_ReviveTarget) then -- We're reviving someone else
+				localplayer = LocalPlayer().nzu_ReviveTarget
+				isbeingrevived = false
+			else
+				localplayer = nil
+				isbeingrevived = false -- Neither is true
+			end
+		end
+
+		-- For other players, loop through all and find the next fastest to take over
+		if downedplayers[target] then
+			local min = math.huge
+			local revivor
+			for k,v in pairs(player.GetAll()) do
+				if v.nzu_ReviveTarget == target then
+					if v.nzu_ReviveTime < min then
+						min = v.nzu_ReviveTime
+						revivor = v
+					end
+				end
+			end
+
+			if IsValid(revivor) then
+				downedplayers[target] = revivor
+			else
+				downedplayers[target] = NULL -- NULL, not NIL! That means it's true (for if statements), but no valid revivor
+			end
+		end
+	end)
+
+	local dopaint = nzu.DrawHUDComponent
+	-- Draw downed indicator on other players
+	hook.Add("HUDPaint", "nzu_Revive_DownedIndicator", function()
+		for k,v in pairs(downedplayers) do
+			dopaint("DownedIndicator", k, v)
+		end
+	end)
+
+	-- Draw revive progress for local player
+	hook.Add("HUDPaint", "nzu_Revive_ReviveProgress", function()
+		if IsValid(localplayer) then
+			dopaint("ReviveProgress", localplayer, isbeingrevived)
+		end
+	end)
+
+	--[[local getplys = team.GetPlayers
+	hook.Add("HUDPaint", "nzu_Revive_DownedIndicator", function()
+		local lp = LocalPlayer()
+
+		if not lp:IsUnspawned() then
+			local plys = getplys(lp:Team())
+
+			local torevive = {}
+			local maxprogress = {}
+			for k,v in pairs(plys) do
+				if v:GetIsDowned() then table.insert(torevive, v) end
+				if v.nzu_ReviveTarget then
+					local remain = v.nzu_ReviveTime
+				end
+			end
+		end
+	end)]]
+end
+
+
+
+--[[-------------------------------------------------------------------------
+HUD Components
+---------------------------------------------------------------------------]]
+if CLIENT then
+	nzu.RegisterHUDComponent("ReviveProgress", "Unlimited", {
+		Draw = function(ply, isbeingrevived)
+			local lp = LocalPlayer()
+			local w,h = ScrW()/2 ,ScrH()
+			local revivor = isbeingrevived and ply or LocalPlayer()
+
+			local diff = revivor.nzu_ReviveTime - revivor.nzu_ReviveStartTime
+			local pct = (CurTime() - revivor.nzu_ReviveStartTime)/diff
+			if pct > 1 then pct = 1 end
+
+			surface.SetDrawColor(0,0,0)
+			surface.DrawRect(w - 150, h - 300, 300, 20)
+
+			surface.SetDrawColor(255,255,255)
+			surface.DrawRect(w - 145, h - 295, 290*pct, 10)
+
+			if isbeingrevived then
+				draw.SimpleTextOutlined("Being revived by "..ply:Nick(), "DermaLarge", w, h - 310, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM, 2, color_black)
+			else
+				draw.SimpleTextOutlined("Reviving "..ply:Nick(), "DermaLarge", w, h - 310, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM, 2, color_black)
+			end
+		end
+	})
+
+	nzu.RegisterHUDComponent("DownedIndicator", "Unlimited", {
+		Draw = function(ply, revivor)
+			local pos = ply:GetPos():ToScreen()
+			if pos.visible then
+				draw.SimpleText(IsValid(revivor) and revivor:Nick() or "DOWNED", "DermaLarge", pos.x, pos.y, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
+			end
+		end
+	})
 end
