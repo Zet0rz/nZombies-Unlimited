@@ -53,7 +53,9 @@ else
 				value = new.Create()
 				t2.Value = value
 			end
-			if new.Paint then t2.DrawIndex = table.insert(draws, function() new.Paint(value) end) end
+
+			t2.Draw = new.Draw -- Function-triggered (context) drawing
+			if new.Paint then t2.DrawIndex = table.insert(draws, function() new.Paint(value) end) end -- Auto drawing (HUD)
 
 			enabled[type] = t2
 		end
@@ -103,15 +105,21 @@ else
 		end
 	end
 
-	-- Debug
+	-- DEBUG
 	queue.Round = "Unlimited"
 	queue.Points = "Unlimited"
 
-	hook.Add("HUDPaint", "nzu_HUDComponents", function()
+	hook.Add("HUDPaint", "nzu_HUDComponentsPaint", function()
 		for k,v in pairs(draws) do
 			v()
 		end
 	end)
+
+	-- Trigger drawing of context-based components
+	function nzu.DrawHUDComponent(type, a,b,c) -- We can change this to support more arguments later if needed
+		local comp = enabled[type]
+		if comp and comp.Draw then comp.Draw(a,b,c) end
+	end
 end
 
 -- Pre-register in Sandbox since the actual components are only registered in the gamemode

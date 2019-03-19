@@ -44,6 +44,7 @@ Gamemode-specific files
 ---------------------------------------------------------------------------]]
 loadfile("player.lua")
 
+loadfile("revive.lua")
 loadfile("round.lua")
 loadfile("points.lua")
 loadfile("targeting.lua")

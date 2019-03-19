@@ -386,8 +386,14 @@ if SERVER then
 		-- It doesn't seem to kill if not with the timer (probably cause it's before the spawn?)
 		timer.Simple(0, function()
 			if IsValid(ply) then
-				nzu.Unspawn(ply)
-				hook.Run("ShowHelp", ply) -- Open their F1 menu
+				--nzu.Unspawn(ply)
+				--hook.Run("ShowHelp", ply) -- Open their F1 menu
+				timer.Simple(1, function()
+					ply:Give("weapon_pistol")
+					ply:Give("weapon_ar2")
+					ply:GiveAmmo(999, "Pistol")
+					ply:GiveAmmo(999, "AR2")
+				end)
 			end
 		end)
 	end
