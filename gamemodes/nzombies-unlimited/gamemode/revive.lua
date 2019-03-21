@@ -533,6 +533,7 @@ if CLIENT then
 		for k,v in pairs(downedplayers) do
 			dopaint("DownedIndicator", k, v)
 		end
+		--dopaint("DownedIndicator", Entity(2))
 	end)
 
 	-- Draw revive progress for local player
@@ -567,6 +568,9 @@ end
 HUD Components
 ---------------------------------------------------------------------------]]
 if CLIENT then
+	local mat = Material("nzombies-unlimited/hud/points_shadow.png")
+	local mat2 = Material("nzombies-unlimited/hud/points_glow.vmt")
+
 	nzu.RegisterHUDComponent("ReviveProgress", "Unlimited", {
 		Draw = function(ply, isbeingrevived)
 			local lp = LocalPlayer()
@@ -591,11 +595,63 @@ if CLIENT then
 		end
 	})
 
+	local REVIVEfont = "nzu_HUD_ReviveFont"
+	surface.CreateFont(REVIVEfont, {
+		font = "Trebuchet MS",
+		size = 24,
+		weight = 500,
+		antialias = true,
+		outline = true,
+	})
+
+	local downedindicator = Vector(0,0,25)
+	local point = Material("gui/point.png")
+	local revivetext = "REVIVE"
+	local revivebarheight = 10
+	local outlines = 5
+	local waveheight = 40
+	local pointheight = 15
 	nzu.RegisterHUDComponent("DownedIndicator", "Unlimited", {
 		Draw = function(ply, revivor)
-			local pos = ply:GetPos():ToScreen()
+			local pos = (ply:GetPos() + downedindicator):ToScreen()
 			if pos.visible then
-				draw.SimpleText(IsValid(revivor) and revivor:Nick() or "DOWNED", "DermaLarge", pos.x, pos.y, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
+				local x,y = pos.x,pos.y
+				surface.SetFont(REVIVEfont)
+				local w,h = surface.GetTextSize(revivetext)
+
+				local w2 = w + outlines*2
+				local x2 = x - w/2 - outlines
+				local y2 = y - 6
+
+				surface.SetMaterial(mat)
+				surface.SetDrawColor(0,0,0,255)
+				surface.DrawTexturedRectRotated(x, y - h, waveheight, w2, 90)
+
+				surface.DrawRect(x2, y2, w2, revivebarheight)
+
+				surface.SetMaterial(point)
+				surface.DrawTexturedRect(x2, y2 + revivebarheight, w2, pointheight)
+				
+
+				if IsValid(revivor) then
+					local diff = revivor.nzu_ReviveTime - revivor.nzu_ReviveStartTime
+					local pct = (CurTime() - revivor.nzu_ReviveStartTime)/diff
+
+					surface.SetDrawColor(255,255,255)
+					surface.SetTextColor(255,255,255)
+					surface.DrawRect(x2 + 4, y2 + 3, (w2 - 8) * pct, revivebarheight - 6)
+				elseif ply.nzu_DownedTime then
+					local pct = (1 - (CurTime() - ply.nzu_DownedTime)/bleedouttime)*255
+					surface.SetDrawColor(255,pct,0)
+					surface.SetTextColor(255,pct,0)
+					surface.DrawRect(x2 + 4, y2 + 3, w2 - 8, revivebarheight - 6)
+				end
+				surface.DrawTexturedRect(x2 + 7, y2 + revivebarheight, w2 - 14, pointheight - 4)
+				surface.SetMaterial(mat2)
+				surface.DrawTexturedRectRotated(x, y - h, waveheight, w2, 90)
+				
+				surface.SetTextPos(pos.x - w/2, pos.y - h)
+				surface.DrawText(revivetext)
 			end
 		end
 	})

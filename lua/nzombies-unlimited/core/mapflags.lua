@@ -517,13 +517,13 @@ if NZU_SANDBOX then
 
 	properties.Add("nzu_MapFlags", {
 		MenuLabel = "[NZU] Edit Map Flags",
-		Order = 3000,
+		Order = 3100,
 		MenuIcon = "icon16/door_open.png",
-		PrependSpacer = true,
+		--PrependSpacer = true,
 
 		Filter = function(self, ent, ply) -- A function that determines whether an entity is valid for this property
 			if !IsValid(ent) then return false end
-			if !gamemode.Call("CanProperty", ply, "ignite", ent) then return false end
+			if !gamemode.Call("CanProperty", ply, "nzu_MapFlags", ent) then return false end
 
 			return ent.nzu_MapFlagsHandler
 		end,
