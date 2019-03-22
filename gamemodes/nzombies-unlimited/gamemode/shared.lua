@@ -23,6 +23,8 @@ function nzu.IsAdmin(ply) return ply:IsAdmin() end -- Replace this later
 NZU_SANDBOX = false
 NZU_NZOMBIES = true
 
+loadfile_c("fonts.lua")
+
 --[[-------------------------------------------------------------------------
 Extension Manager
 ---------------------------------------------------------------------------]]
@@ -43,6 +45,7 @@ loadfile_s("nzombies-unlimited/core/mapflags.lua") -- Only Server outside Sandbo
 Gamemode-specific files
 ---------------------------------------------------------------------------]]
 loadfile("player.lua")
+loadfile("playeruse.lua")
 
 loadfile("revive.lua")
 loadfile("round.lua")
@@ -51,6 +54,9 @@ loadfile("targeting.lua")
 loadfile("weapons.lua")
 
 loadfile("menu/menu.lua")
-loadfile_c("menu/menu_customizeplayer.lua")
 
+--[[-------------------------------------------------------------------------
+Gamemode modules
+---------------------------------------------------------------------------]]
+loadfile_c("menu/menu_customizeplayer.lua")
 loadfile_s("nzombies-unlimited/core/entities_tools/spawnpoints_nzu.lua")

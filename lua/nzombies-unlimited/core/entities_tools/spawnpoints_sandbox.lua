@@ -134,11 +134,12 @@ if CLIENT then
 		panel:Help("Spawnpoints only activate when the doors belonging to at least one of the selected flags are opened. If none are selected, the Spawnpoint is always activated.")
 
 		local listbox = vgui.Create("nzu_MapFlagsPanel", panel)
-		listbox:SetSelectedFlags(string.Explode(" ", GetConVar("nzu_tool_spawnpoint_flags"):GetString()))
+		--[[listbox:SetSelectedFlags(string.Explode(" ", GetConVar("nzu_tool_spawnpoint_flags"):GetString()))
 		listbox.OnSelectedFlagsChanged = function()
 			local flags = listbox:GetSelectedFlags()
 			GetConVar("nzu_tool_spawnpoint_flags"):SetString(table.concat(flags, " "))
-		end
+		end]]
+		listbox:SetConVar("nzu_tool_spawnpoint_flags")
 		panel:AddItem(listbox)
 		listbox:RefreshFlags()
 

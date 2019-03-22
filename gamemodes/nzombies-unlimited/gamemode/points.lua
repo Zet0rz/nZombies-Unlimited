@@ -120,31 +120,11 @@ if CLIENT then
 	local selfsize = 50
 	local othersize = 35
 
-	local namefont = "nzu_HUD_Points_LocalPlayerName"
-	surface.CreateFont(namefont, {
-		font = "Trebuchet MS",
-		size = 23,
-		weight = 1000,
-		antialias = true,
-	})
-	local othernamefont = "Default"
-
-	local pointsfont = "nzu_HUD_Points_PointsLarge"
-	surface.CreateFont(pointsfont, {
-		font = "Trebuchet MS",
-		size = 32,
-		weight = 600,
-		antialias = true,
-	})
-
-	local pointsfont2 = "nzu_HUD_Points_PointsSmall"
-	surface.CreateFont(pointsfont2, {
-		font = "Trebuchet MS",
-		size = 24,
-		weight = 500,
-		antialias = true,
-	})
-
+	local namefont = "nzu_Font_Points_NameLarge"
+	local othernamefont = "nzu_Font_Points_NameSmall"
+	local pointsfont = "nzu_Font_Points_PointsLarge"
+	local pointsfont2 = "nzu_Font_Points_PointsSmall"
+	
 	nzu.RegisterHUDComponentType("Points")
 	nzu.RegisterHUDComponent("Points", "Unlimited", {
 		Create = function()

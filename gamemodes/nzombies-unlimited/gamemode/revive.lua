@@ -595,15 +595,7 @@ if CLIENT then
 		end
 	})
 
-	local REVIVEfont = "nzu_HUD_ReviveFont"
-	surface.CreateFont(REVIVEfont, {
-		font = "Trebuchet MS",
-		size = 24,
-		weight = 500,
-		antialias = true,
-		outline = true,
-	})
-
+	local REVIVEfont = "nzu_Font_Revive"
 	local downedindicator = Vector(0,0,25)
 	local point = Material("gui/point.png")
 	local revivetext = "REVIVE"
@@ -611,6 +603,7 @@ if CLIENT then
 	local outlines = 5
 	local waveheight = 40
 	local pointheight = 15
+	
 	nzu.RegisterHUDComponent("DownedIndicator", "Unlimited", {
 		Draw = function(ply, revivor)
 			local pos = (ply:GetPos() + downedindicator):ToScreen()
