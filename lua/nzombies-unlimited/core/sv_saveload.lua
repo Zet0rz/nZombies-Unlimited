@@ -382,7 +382,7 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 				Ents[k] = nil
 				v.nzu_SaveIgnore = nil
 			else
-				duplicator.StoreEntityModifier(v, "nzu_saveid", {id = k})
+				duplicator.StoreEntityModifier(v, "nzu_saveid", {id = v:EntIndex()})
 			end
 		end
 		tbl.Map = duplicator.CopyEnts(Ents)

@@ -49,6 +49,7 @@ if SERVER then
 	function ENTITY:CreateDoor(data)
 		-- Sanity check
 		data.Price = data.Price or 0
+		if data.Group == "" then data.Group = nil end
 
 		self.nzu_DoorData = data
 		net.Start("nzu_doors")
@@ -350,7 +351,7 @@ properties.Add("nzu_DoorLock", {
 		local l = frame:Add("nzu_MapFlagsPanel")
 		l:Dock(FILL)
 		l:ShowRefreshButton(false)
-		l:SetSelectedFlags(data.Flags)
+		l:SetSelectedFlags(data and data.Flags)
 		l:RefreshFlags()
 
 		local bottom = frame:Add("Panel")

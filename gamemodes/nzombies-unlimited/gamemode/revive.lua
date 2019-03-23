@@ -203,8 +203,6 @@ if SERVER then
 			net.WriteBool(false)
 		net.Broadcast()
 
-		self.nzu_ReviveBlock = CurTime() + 0.1
-
 		hook.Run("nzu_PlayerStoppedRevive", self, target)
 	end
 
@@ -240,16 +238,11 @@ if SERVER then
 	end)
 
 	-- Downed players can't use anything
-	hook.Add("PlayerUse", "nzu_Revive_RevivePlayers", function(ply, ent)
-		if ply:GetIsDowned() then return false end
-
+	hook.Add("nzu_PlayerStartUse", "nzu_Revive_RevivePlayers", function(ply, ent)
 		if not ply.nzu_ReviveLocked then
-			if IsValid(ent) and ent:CanBeRevived() and ent:GetIsDowned() and (not ply.nzu_ReviveBlock or ply.nzu_ReviveBlock < CurTime()) then
+			if IsValid(ent) and ent:CanBeRevived() and ent:GetIsDowned() then
 				if ply.nzu_ReviveTarget ~= ent then
 					ply:StartReviving(ent)
-				--elseif CurTime() >= ply.nzu_ReviveTime then
-					--ent:RevivePlayer(ply)
-					--ply:StopReviving()
 				end
 			elseif ply.nzu_ReviveTarget then
 				ply:StopReviving()
@@ -257,9 +250,8 @@ if SERVER then
 		end
 	end)
 
-	-- Also stop for E
-	hook.Add("KeyRelease", "nzu_Revive_StopHoldingE", function(ply, key)
-		if key == IN_USE and ply.nzu_ReviveTarget and not ply.nzu_ReviveLocked then
+	hook.Add("nzu_PlayerStopUse", "nzu_Revive_StopReviving", function(ply, ent)
+		if not ply.nzu_ReviveLocked and ent == ply.nzu_ReviveTarget then
 			ply:StopReviving()
 		end
 	end)

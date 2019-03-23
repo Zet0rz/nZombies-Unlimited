@@ -60,3 +60,4 @@ Gamemode modules
 ---------------------------------------------------------------------------]]
 loadfile_c("menu/menu_customizeplayer.lua")
 loadfile_s("nzombies-unlimited/core/entities_tools/spawnpoints_nzu.lua")
+loadfile("nzombies-unlimited/core/entities_tools/doors_nzu.lua")

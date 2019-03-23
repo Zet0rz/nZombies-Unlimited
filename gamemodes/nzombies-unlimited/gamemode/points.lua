@@ -1,10 +1,13 @@
+local PLAYER = FindMetaTable("Player")
 
 -- Use these NetworkVars or use NW2Int?
 nzu.AddPlayerNetworkVar("Int", "Points")
 
-if SERVER then
-	local PLAYER = FindMetaTable("Player")
+function PLAYER:CanAfford(cost)
+	return cost <= self:GetPoints()
+end
 
+if SERVER then
 	util.AddNetworkString("nzu_PointsNotify")
 	local function notifyplayers(ply, n)
 		net.Start("nzu_PointsNotify")

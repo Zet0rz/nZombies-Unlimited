@@ -162,7 +162,7 @@ nzu.AddSaveExtension("Spawnpoints", {
 
 			-- This is a cheeky way of enabling Entity-based Map Flag system on non-entities (but it works fine, since they just need to be indexable - aka tables)
 			if v.MapFlags and table.Count(v.MapFlags) > 0 then
-				ENTITY.SetMapFlags(spawner, v.MapFlags)
+				spawner:SetMapFlags(v.MapFlags)
 			else
 				doactivate(spawner)
 			end
@@ -171,6 +171,14 @@ nzu.AddSaveExtension("Spawnpoints", {
 		end
 	end
 })
+
+-- To make the hack work, we just have to ensure it doesn't error due to a lack of functions
+function SPAWNER:AddMapFlag(v)
+	ENTITY.AddMapFlag(self, v)
+end
+function SPAWNER:SetMapFlags(tbl)
+	ENTITY.SetMapFlags(self, tbl)
+end
 nzu.AddMapFlagsHandler("Spawnpoints", doactivate)
 
 --[[-------------------------------------------------------------------------

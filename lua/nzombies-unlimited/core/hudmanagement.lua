@@ -111,6 +111,7 @@ else
 	queue.Points = "Unlimited"
 	queue.ReviveProgress = "Unlimited"
 	queue.DownedIndicator = "Unlimited"
+	queue.TargetID = "Unlimited"
 
 	hook.Add("HUDPaint", "nzu_HUDComponentsPaint", function()
 		for k,v in pairs(paints) do
@@ -164,7 +165,10 @@ local font = "nzu_Font_TargetID"
 local typeformats = {
 	[TARGETID_TYPE_USE] = function(a) return "Press E to "..a end,
 	[TARGETID_TYPE_BUY] = function(a,b) return "Press E to buy "..a.." for "..b end,
-	[TARGETID_TYPE_USECOST] = function(a,b) return "Press E to "..a.." for "..b end,
+	[TARGETID_TYPE_USECOST] = function(a,b)
+		-- Do something with electricity?
+		return "Press E to "..a.." for "..b
+	end,
 	[TARGETID_TYPE_PLAYER] = function(a) return a:Nick() end,
 }
 local color = color_white
