@@ -339,7 +339,7 @@ if CLIENT then
 						local totext = state == ROUND_WAITING and "Unready" or "Unspawn"
 						if self:GetText() ~= totext then
 							self:SetText(totext)
-							self.ClickFunction = nzu.Uneady
+							self.ClickFunction = nzu.Unready
 
 							self.AdminOnly = false
 							self:SetDisabled(false)

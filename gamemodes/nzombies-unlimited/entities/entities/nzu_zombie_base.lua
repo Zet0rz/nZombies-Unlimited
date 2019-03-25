@@ -68,6 +68,13 @@ function ENT:SelectMovementSpeed(speed)
 	return 100
 end
 
+-- Called by the round when the Zombie should have its health set
+-- It is given the curve-based health from Round as an argument
+-- You can return a result to override the zombie's health
+function ENT:SelectHealth(health)
+	
+end
+
 -- Called as the zombie spawns before it starts its Spawning event
 -- Also called on respawns, so it's not always on initial creation!
 function ENT:OnSpawn() end

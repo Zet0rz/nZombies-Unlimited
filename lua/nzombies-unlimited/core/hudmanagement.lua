@@ -145,11 +145,12 @@ Target ID Component
 ---------------------------------------------------------------------------]]
 nzu.RegisterHUDComponentType("TargetID")
 
-TARGETID_TYPE_GENERIC = 0
-TARGETID_TYPE_USE = 1
-TARGETID_TYPE_BUY = 2
-TARGETID_TYPE_USECOST = 3
-TARGETID_TYPE_PLAYER = 4
+TARGETID_TYPE_GENERIC = 1
+TARGETID_TYPE_USE = 2
+TARGETID_TYPE_BUY = 3
+TARGETID_TYPE_USECOST = 4
+TARGETID_TYPE_PLAYER = 5
+TARGETID_TYPE_ELECTRICITY = 6
 
 if NZU_SANDBOX then
 	surface.CreateFont("nzu_Font_TargetID", {
@@ -163,19 +164,19 @@ end
 local font = "nzu_Font_TargetID"
 
 local typeformats = {
-	[TARGETID_TYPE_USE] = function(a) return "Press E to "..a end,
-	[TARGETID_TYPE_BUY] = function(a,b) return "Press E to buy "..a.." for "..b end,
-	[TARGETID_TYPE_USECOST] = function(a,b)
-		-- Do something with electricity?
-		return "Press E to "..a.." for "..b
+	[TARGETID_TYPE_USE] = function(text, data, ent) return "Press E to"..text end,
+	[TARGETID_TYPE_BUY] = function(text, data, ent) return "Press E to buy"..text.."for "..data end,
+	[TARGETID_TYPE_USECOST] = function(text, data, ent)
+		return "Press E to"..text.."for "..data
 	end,
-	[TARGETID_TYPE_PLAYER] = function(a) return a:Nick() end,
+	[TARGETID_TYPE_PLAYER] = function(text, data, ent) return ent:Nick() end,
+	[TARGETID_TYPE_ELECTRICITY] = function() return "Requires Electricity" end,
 }
 local color = color_white
 
-local function basiccomponent(typ, text, data)
+local function basiccomponent(typ, text, data, ent)
 	local x,y = ScrW()/2, ScrH()/2 + 100
-	local str = typeformats[typ] and typeformats[typ](text, data) or text
+	local str = typeformats[typ] and typeformats[typ](text, data, ent) or text
 
 	if str then
 		draw.SimpleText(str, font, x, y, color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
@@ -189,8 +190,8 @@ if NZU_NZOMBIES then
 		Draw = basiccomponent,
 	})
 else
-	dopaint = function(_, typ, text, data)
-		basiccomponent(typ, text, data)
+	dopaint = function(_, typ, text, data, ent)
+		basiccomponent(typ, text, data, ent)
 	end
 	nzu.RegisterHUDComponent("TargetID", "Unlimited")
 end
@@ -220,13 +221,20 @@ local function determinetargetstr()
 		typ = TARGETID_TYPE_GENERIC
 	else
 		-- The order goes: Special hook, ENT-defined, Normal hook
-		text, typ, data = hook.Run("nzu_GetTargetIDTextSpecial", ent) or (ent.GetTargetIDText and ent:GetTargetIDText()) or hook.Run("nzu_GetTargetIDText", ent)
-		--print(text, typ, data)
+		text, typ, data = hook.Run("nzu_GetTargetIDTextSpecial", ent)
+		if not text then
+			if ent.GetTargetIDText then
+				text, typ, data = ent:GetTargetIDText()
+			end
+		end
+		if not text then
+			text, typ, data = hook.Run("nzu_GetTargetIDText", ent)
+		end
 	end
 
 	if text then
 		if not typ then typ = TARGETID_TYPE_GENERIC end
-		dopaint("TargetID", typ, text, data)
+		dopaint("TargetID", typ, text, data, ent)
 		return true
 	end
 end
@@ -239,6 +247,6 @@ else
 
 	local PLAYER = FindMetaTable("Player")
 	function PLAYER:GetTargetIDText()
-		return self, TARGETID_TYPE_PLAYER
+		return nil, TARGETID_TYPE_PLAYER
 	end
 end

@@ -218,7 +218,6 @@ if CLIENT then
 							local num = #s.PointNotifies
 							local i = 1
 							while i <= num do
-								print(i,num)
 								local v = s.PointNotifies[i]
 								local pct = (ct - v[3])/totaltime
 								local points = v[1]

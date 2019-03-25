@@ -1,8 +1,9 @@
 local ENTITY = FindMetaTable("Entity")
 
-function ENTITY:GetDoorData()
-	return self.nzu_DoorData
-end
+--function ENTITY:GetDoorData()
+	--return self.nzu_DoorData
+--end
+ENTITY.GetDoorData = ENTITY.GetBuyFunction -- Since Door Data is just stored in the BuyFunction of the entity
 
 if SERVER then
 	local nzu = nzu
@@ -93,7 +94,21 @@ if SERVER then
 		end
 	})
 
+	local function opendoorfunc(ply, ent)
+		local data = ent:GetDoorData()
+		if data then
+			if data.Group then
+				nzu.OpenDoorGroup(data.Group, ply)
+			else
+				nzu.OpenDoor(ent, ply)
+			end
+		end
+	end
+
 	function ENTITY:CreateDoor(data)
+		print("Creating door", self)
+		print(self.nzu_DoorData)
+		PrintTable(data)
 		-- Sanity check
 		data.Price = data.Price or 0
 
@@ -140,7 +155,9 @@ if SERVER then
 			nongroups[self] = true
 		end
 
-		self.nzu_DoorData = data
+		-- Apply stuff for the buy function
+		data.Function = opendoorfunc
+		self:SetBuyFunction(data, true) -- Don't network it, we do it ourselves
 
 		if not nonetwork then
 			net.Start("nzu_doors")
@@ -152,15 +169,14 @@ if SERVER then
 	end
 
 	function ENTITY:RemoveDoor()
-		local group = self.nzu_DoorData and self.nzu_DoorData.Group
+		local group = self.nzu_BuyFunction and self.nzu_BuyFunction.Group
 		if group then
 			doorgroups[self] = nil
 		else
 			nongroups[self] = nil
 		end
 
-		self.nzu_DoorData = nil
-
+		self:SetBuyFunction(nil, true)
 		if not nonetwork then
 			net.Start("nzu_doors")
 				net.WriteEntity(self)
@@ -200,6 +216,7 @@ if SERVER then
 			for k,v in pairs(doors) do
 				nzu.OpenDoor(k, ply)
 			end
+			doorgroups[id] = nil
 			hook.Run("nzu_DoorGroupOpened", id, ply)
 		end
 	end
@@ -216,22 +233,25 @@ if SERVER then
 			end)
 		end
 	end
+
+	function nzu.IsDoorGroupOpen(id)
+		return not doorgroups[id]
+	end
 end
 
 if CLIENT then
 	local queue = {}
 	local function doapplydoordata(index, data)
 		local ent = Entity(index)
-		PrintTable(data)
 		if IsValid(ent) then
-			ent.nzu_DoorData = data
+			ent:SetBuyFunction(data)
 		else
 			queue[index] = data
 		end
 	end
 	hook.Add("OnEntityCreated", "nzu_Doors_DoorDataQueue", function(ent)
 		if queue[ent:EntIndex()] then
-			ent.nzu_DoorData = queue[ent:EntIndex()]
+			ent:SetBuyFunction(queue[ent:EntIndex()])
 			queue[ent:EntIndex()] = nil
 		end
 	end)
@@ -244,6 +264,9 @@ if CLIENT then
 			if net.ReadBool() then
 				tbl.Electricity = true
 			end
+
+			tbl.TargetIDType = TARGETID_TYPE_USECOST
+			tbl.Text = " clear debris "
 
 			doapplydoordata(ent, tbl)
 			hook.Run("nzu_DoorLockCreated", ent, tbl)
@@ -260,20 +283,14 @@ if CLIENT then
 			tbl.Electricity = true
 		end
 
+		tbl.TargetIDType = TARGETID_TYPE_USECOST
+		tbl.Text = " clear debris "
+
 		local num = net.ReadUInt(32)
 		for i = 1, num do
 			local ent = net.ReadUInt(16)
 			doapplydoordata(ent, tbl)
 			hook.Run("nzu_DoorLockCreated", ent, tbl)
-		end
-	end)
-
-	-- Draw door to text
-	hook.Add("nzu_GetTargetIDText", "nzu_Doors_TargetID", function(ent)
-		local data = ent:GetDoorData()
-		if data then
-
-			return "clear debris", TARGETID_TYPE_USECOST, data.Price
 		end
 	end)
 end

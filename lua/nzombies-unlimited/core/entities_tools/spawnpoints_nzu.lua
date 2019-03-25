@@ -60,6 +60,9 @@ function SPAWNER:Spawn(e, noqueue)
 end
 
 function SPAWNER:HasSpace(ent)
+	-- Optimization: No need to check trace in the same tick as another earlier check
+	if self.LastSuccessfulCheck == engine.TickCount() then return true end
+
 	local trace = {
 		start = self:GetPos(),
 		endpos = self:GetPos(),
@@ -73,7 +76,11 @@ function SPAWNER:HasSpace(ent)
 		result = util.TraceHull(trace)
 	end
 	
-	return not result.Hit
+	if not result.Hit then
+		self.LastSuccessfulCheck = engine.TickCount()
+		return true
+	end
+	return false
 end
 
 function SPAWNER:HasQueue()

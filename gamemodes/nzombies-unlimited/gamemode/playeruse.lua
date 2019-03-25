@@ -5,9 +5,9 @@ local ENTITY = FindMetaTable("Entity")
 Applying Buy functions - Run when the player attempts to use the entity
 ---------------------------------------------------------------------------]]
 
-local nw_price = "nzu_UseCost"
-local nw_text = "nzu_UseText"
-local nw_elec = "nzu_UseElec"
+--local nw_price = "nzu_UseCost"
+--local nw_text = "nzu_UseText"
+--local nw_elec = "nzu_UseElec"
 
 --[[
 	Structure of a Buy Function:
@@ -57,11 +57,129 @@ else
 	end)
 end]]
 
+function ENTITY:GetBuyFunction()
+	return self.nzu_BuyFunction
+end
+
+if SERVER then
+	util.AddNetworkString("nzu_buyfunctions") -- Server: Broadcast an entity's buy function
+
+	local networkedents = {}
+	local function writebuyfunc(ent, data)
+		net.WriteEntity(ent)
+		net.WriteBool(true)
+		net.WriteUInt(data.Price, 32)
+		net.WriteBool(data.Electricity)
+		net.WriteBool(data.Rebuyable)
+		net.WriteUInt(data.TargetIDType or TARGETID_TYPE_USECOST, 4)
+		net.WriteString(data.Text or "")
+	end
+	function ENTITY:SetBuyFunction(data, nonetwork)
+		self.nzu_BuyFunction = data
+		if not nonetwork then
+			if data then -- Send data
+				net.Start("nzu_buyfunctions")
+					writebuyfunc(ent, data)
+				net.Broadcast()
+				networkedents[self] = true
+
+			elseif networkedents[self] then -- Send removal only if previously networked
+				net.Start("nzu_buyfunctions")
+					net.WriteEntity(self)
+					net.WriteBool(false)
+				net.Broadcast()
+				networkedents[self] = nil
+			end
+		else
+			networkedents[self] = nil
+		end
+	end
+
+	hook.Add("PlayerInitialSpawn", "nzu_PlayerUse_BuyFunctionSync", function(ply)
+		for k,v in pairs(networkedents) do
+			net.Start("nzu_buyfunctions")
+				writebuyfunc(k, k.nzu_BuyFunction)
+			net.Send(ply)
+		end
+	end)
+else
+	-- Clientside mirror, allows for shared creation (such as in Initialize) to save networking
+	-- Or you can call this in your own client receiving if you can optimize networking (Door system does this)
+	function ENTITY:SetBuyFunction(data)
+		self.nzu_BuyFunction = data
+	end
+
+	local queue = {}
+	local function applybuyfunc(index, data)
+		local ent = Entity(index)
+		if IsValid(ent) then
+			ent.nzu_BuyFunction = data
+		else
+			queue[index] = data
+		end
+	end
+	hook.Add("OnEntityCreated", "nzu_PlayerUse_BuyFunctionQueue", function(ent)
+		if queue[ent:EntIndex()] then
+			ent.nzu_BuyFunction = queue[ent:EntIndex()]
+			queue[ent:EntIndex()] = nil
+		end
+	end)
+
+	net.Receive("nzu_buyfunctions", function()
+		local ent = net.ReadUInt(16)
+		if net.ReadBool() then
+			local tbl = {}
+			tbl.Price = net.ReadUInt(32)
+
+			if net.ReadBool() then
+				tbl.Electricity = true
+			end
+
+			if net.ReadBool() then
+				tbl.Rebuyable = true
+			end
+
+
+			tbl.TargetIDType = net.ReadUInt(4)
+			tbl.Text = net.ReadString()
+
+			if tbl.TargetIDType == 0 then
+				tbl.TargetIDType = nil
+				tbl.Text = nil
+			end
+
+			applybuyfunc(ent, tbl)
+			hook.Run("nzu_BuyFunctionSet", ent, tbl)
+		else
+			applybuyfunc(ent, nil)
+			hook.Run("nzu_BuyFunctionRemoved", ent)
+		end
+	end)
+
+	-- Draw text for the buy function
+	hook.Add("nzu_GetTargetIDText", "nzu_Doors_TargetID", function(ent)
+		local data = ent:GetBuyFunction()
+		if data and data.TargetIDType then
+			if data.Electricity then -- and not ent:HasPower() then
+				return nil, TARGETID_TYPE_ELECTRICITY
+			end
+			
+			return data.Text, data.TargetIDType, data.Price
+		end
+	end)
+end
+
+
+
 
 --[[-------------------------------------------------------------------------
 Player Use handling
 ---------------------------------------------------------------------------]]
 if SERVER then
+	function ENTITY:UseCooldown(num)
+		self.nzu_UseCooldown = CurTime() + num
+	end
+
 	local usecooldown = 0.1
 
 	-- We prevent using here. Another hook can easily block this though, but we do this to optimize saving a trace
@@ -90,7 +208,16 @@ if SERVER then
 				hook.Run("nzu_PlayerStopUse", ply, ent2)
 			end
 
-			if IsValid(ent) then
+			if IsValid(ent) and (not ent.nzu_UseCooldown or ent.nzu_UseCooldown < CurTime()) then
+				local data = ent:GetBuyFunction()
+				if data then
+					if not ply:CanAfford(data.Price) then return false end -- Can't use entities with a buy function that we can't afford!
+
+					ply:Buy(data.Price, data.Function, ent)
+					if not data.Rebuyable then
+						ent:SetBuyFunction(nil) -- Remove buy function from non-rebuyables
+					end
+				end
 				hook.Run("nzu_PlayerStartUse", ply, ent)
 			end
 		else
@@ -113,10 +240,10 @@ end
 --[[-------------------------------------------------------------------------
 Player Buy shortcut function
 ---------------------------------------------------------------------------]]
-function PLAYER:Buy(cost, func)
+function PLAYER:Buy(cost, func, args)
 	if self:CanAfford(cost) then
 		self:TakePoints(cost)
-		return true, func(self)
+		return true, func and func(self, args)
 	end
 	return false
 end

@@ -52,25 +52,26 @@ if SERVER then
 	function ROUND:GetRemainingZombies() return self.NumberZombies + self.ZombiesToSpawn end
 
 	local function dozombiespawn(z, spawner)
-		--z:SetPos(Vector(0,0,0))
-		--z:SetHealth(ROUND:GetZombieHealth())
-		z:SetHealth(100)
-
-		spawner:SpawnZombie(z, true)
-		--z:Spawn()
-	end
-	function ROUND:SpawnZombie(spawner)
-		local z = ents.Create("nzu_zombie")
-		--z:SetModel("models/props_junk/wood_crate001a.mdl")
 		z:ShouldGivePoints(true)
 
-		self.NumberZombies = self.NumberZombies + 1
-		self.ZombiesToSpawn = self.ZombiesToSpawn - 1
-		self.Zombies[z] = true
+		local health = ROUND:CalculateZombieHealth()
+		health = z.SelectHealth and z:SelectHealth(health) or health
+		z:SetMaxHealth(health)
+		z:SetHealth(health)
 
-		dozombiespawn(z, spawner)
-		return z
+		local speed = ROUND:CalculateZombieSpeed()
+		speed = z.SelectMovementSpeed and z:SelectMovementSpeed(speed) or speed
+		z:SetDesiredSpeed(speed)
+
+		spawner:Spawn(z)
 	end
+
+	local function dozombieadd(z)
+		ROUND.NumberZombies = ROUND.NumberZombies + 1
+		ROUND.ZombiesToSpawn = ROUND.ZombiesToSpawn - 1
+		ROUND.Zombies[z] = true
+	end
+
 	local function dozombiedeath(z)
 		if ROUND.Zombies[z] then
 			if z.nzu_RefundOnDeath then
@@ -136,13 +137,8 @@ if SERVER then
 				if not k.NextSpawn or ct >= k.NextSpawn then
 					if not k:IsFrozen() and not k:HasQueue() and k:HasSpace() then
 						local z = ents.Create("nzu_zombie")
-						z:ShouldGivePoints(true)
-
-						ROUND.NumberZombies = ROUND.NumberZombies + 1
-						ROUND.ZombiesToSpawn = ROUND.ZombiesToSpawn - 1
-						ROUND.Zombies[z] = true
-
-						k:Spawn(z) -- Spawn this zombie on the spawner
+						dozombieadd(z)
+						dozombiespawn(z, k)
 					end
 					k.NextSpawn = ct + v
 				end
@@ -168,6 +164,8 @@ if SERVER then
 	end
 
 	function ROUND:Prepare()
+		hook.Remove("Think", "nzu_Round_Spawning")
+
 		self.State = ROUND_PREPARING
 		donetwork()
 
@@ -186,8 +184,6 @@ if SERVER then
 
 	function ROUND:SetRound(num)
 		--timer.Stop("nzu_Round_Spawning")
-		hook.Remove("nzu_Round_Spawning")
-
 		self.Round = num
 		PrintMessage(HUD_PRINTTALK, "Round is now: "..num)
 		self:SpawnPlayers()
@@ -204,7 +200,8 @@ if SERVER then
 
 	function ROUND:CalculateZombieHealth()
 		-- 950 for round 10, multiply 1.1 for each round after
-		return self.Round < 10 and 50 + 100*self.Round or 950*(math.pow(1.1, self.Round-10))
+		local val = self.Round < 10 and 50 + 100*self.Round or 950*(math.pow(1.1, self.Round-10))
+		return val * 0.5 -- Scale down to gmod levels (for now)
 	end
 
 	function ROUND:CalculateZombieAmount()
@@ -212,7 +209,8 @@ if SERVER then
 	end
 
 	function ROUND:GetZombieHealth() return self.ZombieHealth end
-	function ROUND:GetZombieSpeed()
+
+	function ROUND:CalculateZombieSpeed()
 		return 100
 	end
 end
@@ -298,33 +296,36 @@ if SERVER then
 		if nzu.Round:GetState() == ROUND_WAITING then doreadycheck() end
 	end
 
-	function ROUND:SpawnPlayer(ply)
-		local spawnpoints = nzu.GetSpawners("player")
-		local num = #spawnpoints
-		local k = ply:EntIndex()
-
-		local spawner = spawnpoints[(k-1)%num + 1]
-		ply:SetPos(spawner:GetPos())
-		ply:Spawn()
-		ply:Give(SETTINGS.StartWeapon)
-		ply:GiveAmmo(999, "Pistol")
-		hook.Run("nzu_PlayerRespawned", ply)
-	end
-
 	function ROUND:SpawnPlayers()
 		local spawnpoints = nzu.GetSpawners("player")
 		local num = #spawnpoints
 		for k,v in pairs(self:GetPlayers()) do
 			if not v:Alive() then
-				local spawner = spawnpoints[(k-1)%num + 1]
-				v:SetPos(spawner:GetPos())
 				v:Spawn()
-				v:Give(SETTINGS.StartWeapon)
-				v:GiveAmmo(999, "Pistol")
-				hook.Run("nzu_PlayerRespawned", v)
+				if not v:CanAfford(SETTINGS.StartPoints) then
+					v:SetPoints(SETTINGS.StartPoints)
+				end
 			end
 		end
 	end
+
+	hook.Add("PlayerSpawn", "nzu_Round_PlayerSpawn", function(ply)
+		if not ply:IsUnspawned() then
+			local spawnpoints = nzu.GetSpawners("player")
+			if not spawnpoints then return end
+
+			local num = #spawnpoints
+			if num == 0 then return end
+
+			local k = ply:EntIndex()
+
+			local spawner = spawnpoints[(k-1)%num + 1]
+			ply:SetPos(spawner:GetPos())
+			ply:Give(SETTINGS.StartWeapon)
+			ply:GiveAmmo(999, "Pistol")
+			hook.Run("nzu_PlayerRespawned", ply)
+		end
+	end)
 end
 ROUND:SetUpTeam("Survivors", Color(100,255,150))
 
