@@ -170,7 +170,7 @@ local typeformats = {
 		return "Press E to"..text.."for "..data
 	end,
 	[TARGETID_TYPE_PLAYER] = function(text, data, ent) return ent:Nick() end,
-	[TARGETID_TYPE_ELECTRICITY] = function() return "Requires Electricity" end,
+	[TARGETID_TYPE_ELECTRICITY] = function(text) return text end,
 }
 local color = color_white
 

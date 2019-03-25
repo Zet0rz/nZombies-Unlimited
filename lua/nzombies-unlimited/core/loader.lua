@@ -58,6 +58,8 @@ loadfile("spawnmenu_entities_test.lua")
 
 loadfile("entities_tools/spawnpoints_sandbox.lua")
 loadfile("entities_tools/doors_sandbox.lua")
+loadfile("entities_tools/electricityswitch.lua")
+loadfile("entities_tools/wallbuys.lua")
 
 --[[if SERVER then
 	AddCSLuaFile("cl_nzombies_skin.lua")

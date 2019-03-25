@@ -43,8 +43,11 @@ function TOOL:LeftClick(trace)
 	if SERVER then
 		local spawntype = self:GetClientInfo("type")
 		if spawnpointtypes[spawntype] then
+			local ply = self:GetOwner()
+
 			local e = ents.Create("nzu_spawnpoint")
 			e:SetPos(trace.HitPos)
+			e:SetAngles(Angle(0,(ply:GetPos() - trace.HitPos):Angle()[2],0))
 			e:SetColor(spawnpointtypes[spawntype][2])
 			e.SpawnpointType = spawntype
 			e:Spawn()
@@ -53,7 +56,6 @@ function TOOL:LeftClick(trace)
 			local tbl = flags == "" and {} or string.Explode(" ", flags)
 			e:SetMapFlags(tbl)
 
-			local ply = self:GetWeapon().Owner
 			if IsValid(ply) then
 				undo.Create(spawnpointtypes[spawntype][1])
 					undo.SetPlayer(ply)

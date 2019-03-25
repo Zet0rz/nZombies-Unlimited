@@ -47,6 +47,7 @@ Gamemode-specific files
 loadfile("player.lua")
 loadfile("playeruse.lua")
 
+loadfile("electricity.lua")
 loadfile("revive.lua")
 loadfile("round.lua")
 loadfile("points.lua")
@@ -61,3 +62,4 @@ Gamemode modules
 loadfile_c("menu/menu_customizeplayer.lua")
 loadfile_s("nzombies-unlimited/core/entities_tools/spawnpoints_nzu.lua")
 loadfile("nzombies-unlimited/core/entities_tools/doors_nzu.lua")
+loadfile("nzombies-unlimited/core/entities_tools/electricityswitch.lua")

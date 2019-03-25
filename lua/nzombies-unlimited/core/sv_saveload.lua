@@ -20,6 +20,7 @@ duplicator.RegisterEntityModifier("nzu_saveid", function(ply, ent, data)
 end)
 
 local function loadconfig(config)
+	hook.Run("nzu_PreLoadConfig")
 
 	-- 1) Load Extensions
 	if file.Exists(config.Path.."/settings.txt", "GAME") then
@@ -111,6 +112,8 @@ local function loadconfig(config)
 			v(tab.SaveExtensions[k].PostSave)
 		end
 	end)
+
+	hook.Run("nzu_PostLoadConfig")
 end
 
 

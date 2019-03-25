@@ -106,9 +106,6 @@ if SERVER then
 	end
 
 	function ENTITY:CreateDoor(data)
-		print("Creating door", self)
-		print(self.nzu_DoorData)
-		PrintTable(data)
 		-- Sanity check
 		data.Price = data.Price or 0
 
@@ -195,8 +192,35 @@ if SERVER then
 	--[[-------------------------------------------------------------------------
 	Opening doors
 	---------------------------------------------------------------------------]]
-	local function dooropeneffect(ent)
+	local effectdelay = 2
+	local function openprops(ent)
+		local e = EffectData()
+		e:SetEntity(ent)
+		e:SetScale(effectdelay)
+		util.Effect("nzu_Effect_ClearDebris", e, nil, true)
+		SafeRemoveEntityDelayed(ent, effectdelay)
+	end
+
+	-- Change this later to Open -> Lock, but support double doors
+	local function opendoors(ent)
 		ent:Remove()
+	end
+
+	local doortypes = {
+		["func_door"] = opendoors,
+		["func_door_rotating"] = opendoors,
+		["prop_door_rotating"] = opendoors,
+		["prop_dynamic"] = openprops,
+		["prop_physics"] = openprops,
+		["prop_physics_multiplayer"] = openprops,
+		["prop_physics_override"] = openprops,
+		["prop_dynamic_override"] = openprops,
+	}
+	local function dooropeneffect(ent)
+		if ent.OpenDoor then ent:OpenDoor() return end -- Call their own door effect
+
+		local func = doortypes[ent:GetClass()]
+		if func then func(ent) else ent:Remove() end
 	end
 
 	function nzu.OpenDoor(ent, ply)
@@ -237,6 +261,34 @@ if SERVER then
 	function nzu.IsDoorGroupOpen(id)
 		return not doorgroups[id]
 	end
+
+	-- Hook for when electricity is on, open all doors with 0 cost and electricity requirement
+	hook.Add("nzu_OnElectricityOn", "nzu_Doors_OpenElectricityDoors", function()
+		for k,v in pairs(doorgroups) do
+			for k2,v2 in pairs(v) do
+				local data = k2:GetDoorData()
+				if data and data.Price == 0 and data.Electricity then
+					nzu.OpenDoor(k2)
+				end
+			end
+		end
+		for k,v in pairs(nongroups) do
+			local data = k:GetDoorData()
+			if data and data.Price == 0 and data.Electricity then
+				nzu.OpenDoor(k)
+			end
+		end
+	end)
+
+	-- Also open doors with power overrides
+	hook.Add("nzu_OnEntityElectricityOn", "nzu_Doors_OpenElectricityDoors", function(ent)
+		local data = ent:GetDoorData()
+		if data and (data.Group and doorgroups[data.Group][ent] or nongroups[ent]) then -- Verify it is a door in our system!
+			if data.Price == 0 and data.Electricity then
+				nzu.OpenDoor(ent)
+			end
+		end
+	end)
 end
 
 if CLIENT then

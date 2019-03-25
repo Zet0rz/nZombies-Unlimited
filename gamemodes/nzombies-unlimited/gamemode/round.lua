@@ -195,7 +195,10 @@ if SERVER then
 	end
 
 	function ROUND:Start()
-		if self.State == ROUND_WAITING then self:SetRound(1) end
+		if self.State == ROUND_WAITING then
+			self:SetRound(1)
+			hook.Run("nzu_GameStarted")
+		end
 	end
 
 	function ROUND:CalculateZombieHealth()

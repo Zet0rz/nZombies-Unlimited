@@ -102,6 +102,11 @@ if SERVER then
 			net.Send(ply)
 		end
 	end)
+
+	-- Allow blocking the entity
+	function ENTITY:BlockUse(b)
+		if b then self.nzu_UseBlocked = true else self.nzu_UseBlocked = nil end
+	end
 else
 	-- Clientside mirror, allows for shared creation (such as in Initialize) to save networking
 	-- Or you can call this in your own client receiving if you can optimize networking (Door system does this)
@@ -157,19 +162,17 @@ else
 	end)
 
 	-- Draw text for the buy function
-	hook.Add("nzu_GetTargetIDText", "nzu_Doors_TargetID", function(ent)
+	hook.Add("nzu_GetTargetIDText", "nzu_PlayerUse_TargetID", function(ent)
 		local data = ent:GetBuyFunction()
 		if data and data.TargetIDType then
-			if data.Electricity then -- and not ent:HasPower() then
-				return nil, TARGETID_TYPE_ELECTRICITY
+			if data.Electricity and not ent:HasElectricity() then
+				return "Requires Electricity", TARGETID_TYPE_ELECTRICITY
 			end
 			
 			return data.Text, data.TargetIDType, data.Price
 		end
 	end)
 end
-
-
 
 
 --[[-------------------------------------------------------------------------
@@ -199,6 +202,7 @@ if SERVER then
 			return false -- Even if another hook should return another entity, prevent use
 		end
 		if ply.nzu_UseCooldown and ply.nzu_UseCooldown > CurTime() then return false end
+		if ent.nzu_UseBlocked then return false end
 
 		local ent2 = ply.nzu_UseTarget
 		if ent2 ~= ent then
@@ -212,6 +216,7 @@ if SERVER then
 				local data = ent:GetBuyFunction()
 				if data then
 					if not ply:CanAfford(data.Price) then return false end -- Can't use entities with a buy function that we can't afford!
+					if data.Electricity and not ent:HasElectricity() then return false end -- Can't use entities that require electricity it doesn't have!
 
 					ply:Buy(data.Price, data.Function, ent)
 					if not data.Rebuyable then
