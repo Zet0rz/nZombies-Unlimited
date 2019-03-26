@@ -63,9 +63,10 @@ function SPAWNER:HasSpace(ent)
 	-- Optimization: No need to check trace in the same tick as another earlier check
 	if self.LastSuccessfulCheck == engine.TickCount() then return true end
 
+	local pos = self:GetPos() + Vector(0,0,1) -- TODO: Find a better solution than this :(
 	local trace = {
-		start = self:GetPos(),
-		endpos = self:GetPos(),
+		start = pos,
+		endpos = pos,
 		filter = ent,
 		mask = MASK_NPCSOLID,
 	}
@@ -150,10 +151,17 @@ end
 
 local spawnpoints = {}
 local openspawns = {}
-local function doactivate(spawn)
-	if not spawn.Active then
-		table.insert(openspawns[spawn.Type], spawn)
-		spawn.Active = true
+function SPAWNER:Activate()
+	if not self.Active then
+		openspawns[self.Type][self] = true
+		self.Active = true
+	end
+end
+
+function SPAWNER:Deactivate()
+	if self.Active then
+		openspawns[self.Type][self] = nil
+		self.Active = false
 	end
 end
 
@@ -166,12 +174,10 @@ nzu.AddSaveExtension("Spawnpoints", {
 			if not openspawns[v.Type] then openspawns[v.Type] = {} end
 
 			local spawner = NewSpawner(v.Type, v.Pos, v.Ang)
-
-			-- This is a cheeky way of enabling Entity-based Map Flag system on non-entities (but it works fine, since they just need to be indexable - aka tables)
 			if v.MapFlags and table.Count(v.MapFlags) > 0 then
 				spawner:SetMapFlags(v.MapFlags)
 			else
-				doactivate(spawner)
+				spawner:Activate()
 			end
 
 			table.insert(spawnpoints[v.Type], spawner)
@@ -179,6 +185,7 @@ nzu.AddSaveExtension("Spawnpoints", {
 	end
 })
 
+-- This is a cheeky way of enabling Entity-based Map Flag system on non-entities (but it works fine, since they just need to be indexable - aka tables)
 -- To make the hack work, we just have to ensure it doesn't error due to a lack of functions
 function SPAWNER:AddMapFlag(v)
 	ENTITY.AddMapFlag(self, v)
@@ -186,7 +193,7 @@ end
 function SPAWNER:SetMapFlags(tbl)
 	ENTITY.SetMapFlags(self, tbl)
 end
-nzu.AddMapFlagsHandler("Spawnpoints", doactivate)
+nzu.AddMapFlagsHandler("Spawnpoints", function(spawner) spawner:Activate() end)
 
 --[[-------------------------------------------------------------------------
 Now getters and utility
@@ -196,7 +203,7 @@ function nzu.GetSpawners(type)
 end
 
 function nzu.GetActiveSpawners(type)
-	return openspawns[type]
+	return table.GetKeys(openspawns[type])
 end
 
 -- Utility for single-spawning at a random spawnpoint, chance based on its weight (calculated)

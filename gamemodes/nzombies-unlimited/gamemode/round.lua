@@ -91,7 +91,8 @@ if SERVER then
 	local ENTITY = FindMetaTable("Entity")
 	function ENTITY:Respawn() -- This respawns the specific zombie by simply restoring health and position
 		if ROUND.Zombies[self] then
-			dozombiespawn(self)
+			ROUND:RefundZombie(self) -- ... eeeexcept it doesn't right now. TODO: How to make it just respawn? Spawners might be blocked
+			self:TakeDamage(self:Health(), self, self)
 		end
 	end
 	

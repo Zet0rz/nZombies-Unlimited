@@ -39,12 +39,14 @@ if SERVER then
 		if doorgroups then
 			local groups = {}
 			for k,v in pairs(doorgroups) do
-				local data = k:GetDoorData()
-				if data then
-					if groups[data] then -- If this data is equal to an existing dataset. We know they're equal since direct referencing is done in ENTITY:CreateDoor()
-						table.insert(groups[data], k)
-					else
-						groups[data] = {k}
+				for k2,v2 in pairs(v) do
+					local data = k2:GetDoorData()
+					if data then
+						if groups[data] then -- If this data is equal to an existing dataset. We know they're equal since direct referencing is done in ENTITY:CreateDoor()
+							table.insert(groups[data], k2)
+						else
+							groups[data] = {k2}
+						end
 					end
 				end
 			end

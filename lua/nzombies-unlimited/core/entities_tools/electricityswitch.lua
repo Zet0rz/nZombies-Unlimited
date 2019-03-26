@@ -100,50 +100,52 @@ scripted_ents.Register(ENT, "nzu_electricityswitch")
 --[[-------------------------------------------------------------------------
 Tool for creating switch
 ---------------------------------------------------------------------------]]
-local TOOL = {}
-TOOL.Category = "Basic"
-TOOL.Name = "#tool.nzu_tool_electricityswitch.name"
+if NZU_SANDBOX then
+	local TOOL = {}
+	TOOL.Category = "Basic"
+	TOOL.Name = "#tool.nzu_tool_electricityswitch.name"
 
-function TOOL:LeftClick(trace)
-	if SERVER then
-		local ply = self:GetOwner()
-		local e = ents.Create("nzu_electricityswitch")
-		e:SetPos(trace.HitPos)
-		e:SetAngles(Angle(0,(ply:GetPos() - trace.HitPos):Angle()[2],0))
-		e:Spawn()
-		
-		if IsValid(ply) then
-			undo.Create("Electricity Switch")
-				undo.SetPlayer(ply)
-				undo.AddEntity(e)
-			undo.Finish()
+	function TOOL:LeftClick(trace)
+		if SERVER then
+			local ply = self:GetOwner()
+			local e = ents.Create("nzu_electricityswitch")
+			e:SetPos(trace.HitPos)
+			e:SetAngles(Angle(0,(ply:GetPos() - trace.HitPos):Angle()[2],0))
+			e:Spawn()
+			
+			if IsValid(ply) then
+				undo.Create("Electricity Switch")
+					undo.SetPlayer(ply)
+					undo.AddEntity(e)
+				undo.Finish()
+			end
+			return true
 		end
-		return true
 	end
-end
 
-function TOOL:RightClick(trace)
-	if IsValid(trace.Entity) and trace.Entity:GetClass() == "nzu_electricityswitch" then
-		trace.Entity:Remove()
-		return true
+	function TOOL:RightClick(trace)
+		if IsValid(trace.Entity) and trace.Entity:GetClass() == "nzu_electricityswitch" then
+			trace.Entity:Remove()
+			return true
+		end
 	end
-end
 
-if CLIENT then
-	TOOL.Information = {
-		{name = "left"},
-		{name = "right"},
-	}
+	if CLIENT then
+		TOOL.Information = {
+			{name = "left"},
+			{name = "right"},
+		}
 
-	language.Add("tool.nzu_tool_electricityswitch.name", "Electricity Switch")
-	language.Add("tool.nzu_tool_electricityswitch.desc", "Creates an Electricity Switch that will turn on global electricity when used.")
+		language.Add("tool.nzu_tool_electricityswitch.name", "Electricity Switch")
+		language.Add("tool.nzu_tool_electricityswitch.desc", "Creates an Electricity Switch that will turn on global electricity when used.")
 
-	language.Add("tool.nzu_tool_electricityswitch.left", "Create Electricity Switch")
-	language.Add("tool.nzu_tool_electricityswitch.right", "Remove Electricity Switch")
+		language.Add("tool.nzu_tool_electricityswitch.left", "Create Electricity Switch")
+		language.Add("tool.nzu_tool_electricityswitch.right", "Remove Electricity Switch")
 
-	function TOOL.BuildCPanel(panel)
-		panel:Help("Spawn an Electricity Switch that will turn on the global electricity state when used in-game.")
+		function TOOL.BuildCPanel(panel)
+			panel:Help("Spawn an Electricity Switch that will turn on the global electricity state when used in-game.")
+		end
 	end
-end
 
-nzu.RegisterTool("electricityswitch", TOOL)
+	nzu.RegisterTool("electricityswitch", TOOL)
+end
