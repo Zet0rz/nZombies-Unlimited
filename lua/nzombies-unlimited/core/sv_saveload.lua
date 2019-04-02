@@ -141,6 +141,7 @@ Networking of Configs
 util.AddNetworkString("nzu_saveconfig") -- SERVER: Update clients' config cache || CLIENT: Request a config save
 util.AddNetworkString("nzu_configsnetworked") -- SERVER: Tell client request received || CLIENT: Request full list of configs for cache
 util.AddNetworkString("nzu_deleteconfig") -- SERVER: Remove from clients' config cache || CLIENT: Request config deletion
+util.AddNetworkString("nzu_saveconfig_settings") -- CLIENT: Request a save of the config's settings
 
 local function networkconfig(config, ply, loaded)
 	net.Start("nzu_saveconfig")
@@ -565,6 +566,11 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 			dontnetwork = false
 			hook.Run("nzu_ConfigLoaded", config)
 		end
+	end)
+
+	net.Receive("nzu_saveconfig_settings", function(len, ply)
+		if not nzu.IsAdmin(ply) then return end
+		nzu.SaveConfigSettings()
 	end)
 
 

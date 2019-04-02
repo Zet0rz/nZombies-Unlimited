@@ -54,6 +54,12 @@ local writetypes = {
 	[TYPE_COLOR]		= function ( v )	net.WriteColor( v )			end,
 }
 
+-- Adding our own custom TYPEs
+local customtypes = {}
+function nzu.AddCustomExtensionSettingType(type, tbl)
+	customtypes[type] = tbl
+end
+
 local function netwritesetting(tbl,set,val)
 	net.WriteString(set)
 	if tbl.NetSend then
@@ -71,8 +77,6 @@ local function netreadsetting(tbl)
 	end
 	return val
 end
-
-
 
 
 
@@ -103,6 +107,22 @@ local function loadextensionprepare(name)
 		settings, panelfunc = include(filename)
 
 		if settings then
+			-- Inherit from custom types
+			for k,v in pairs(settings) do
+				if v.Type and customtypes[v.Type] then
+					-- Inherit all data from the table that Settings didn't define itself
+					for k2,v2 in pairs(customtypes[v.Type]) do
+						if v[k2] == nil then v[k2] = v2 end
+					end
+				end
+
+				if SERVER or NZU_SANDBOX or v.Client then
+					if v.Create then v.Create(loadingextension, k) end
+				else
+					settings[k] = nil
+				end
+			end
+
 			if SERVER then
 				local t = {}
 				if NZU_SANDBOX then
@@ -112,7 +132,7 @@ local function loadextensionprepare(name)
 						local s = settings[k]
 						if s.Parse then v = s.Parse(v) end
 						tbl[k] = v -- Actually set the value of course
-						if s.ServerNotify then loadingextension[s.ServerNotify](v) end -- Call the notify if it exists
+						if s.ServerNotify then loadingextension[s.ServerNotify](v,k) end -- Call the notify if it exists
 
 						net.Start("nzu_extension_setting")
 							net.WriteString(loadingextension.ID)
@@ -127,7 +147,7 @@ local function loadextensionprepare(name)
 						local s = settings[k]
 						if s.Parse then v = s.Parse(v) end
 						tbl[k] = v
-						if s.ServerNotify then loadingextension[s.ServerNotify](v) end -- Call the notify if it exists
+						if s.ServerNotify then loadingextension[s.ServerNotify](v,k) end -- Call the notify if it exists
 
 						if s.Client then
 							net.Start("nzu_extension_setting")
@@ -143,12 +163,6 @@ local function loadextensionprepare(name)
 				loadingextension.Settings = t
 			else
 				loadingextension.Settings = {} -- Empty for clients by default; we wait expected networking here
-			end
-		end
-
-		if CLIENT and not NZU_SANDBOX then
-			for k,v in pairs(settings) do
-				if not v.Client then settings[k] = nil end -- Remove all non-networked from the table
 			end
 		end
 	end
@@ -184,7 +198,9 @@ local function loadextension(loadingextension, st)
 		elseif CLIENT and st then -- On Client and not in Sandbox: Only read settings in the 'st' table
 			for k,v in pairs(st) do
 				t[k] = st[k]
-				if v.ClientNotify then notifies[k] = {v.ClientNotify, t[k]} end
+
+				local notify = loadingextension.GetSettingsMeta()[k].ClientNotify
+				if notify then notifies[k] = {notify, t[k]} end
 			end
 		end
 	end
@@ -209,7 +225,7 @@ local function loadextension(loadingextension, st)
 
 	if notifies then
 		for k,v in pairs(notifies) do
-			loadingextension[v[1]](v[2])
+			loadingextension[v[1]](v[2],k)
 		end
 	end
 
@@ -256,7 +272,7 @@ if SERVER then
 	-- This lets us ensure prerequisite loading properly by remembering load order - since clients can only load them in order of prerequisites
 	local load_order
 	if NZU_SANDBOX then
-		load_order = {}
+		load_order = {[1] = "Core"}
 		function nzu.GetLoadedExtensionOrder() return load_order end
 	end
 
@@ -295,6 +311,7 @@ if SERVER then
 		if ext and ext.Settings then
 			for k,v in pairs(settings) do
 				ext.Settings[k] = v
+				hook.Run("nzu_ExtensionSettingChanged", name, k, v)
 			end
 
 			net.Start("nzu_extension_load")
@@ -358,6 +375,7 @@ else
 			else
 				for k,v in pairs(settings) do
 					ext.Settings[k] = v
+					hook.Run("nzu_ExtensionSettingChanged", name, k, v)
 				end
 			end
 		elseif loaded_extensions[name] then
@@ -401,7 +419,7 @@ else
 			local v = netreadsetting(s)
 			ext.Settings[k] = v
 
-			if s.ClientNotify then ext[s.ClientNotify](v) end
+			if s.ClientNotify then ext[s.ClientNotify](v,k) end
 
 			hook.Run("nzu_ExtensionSettingChanged", ext.ID, k, v)
 		end
@@ -478,6 +496,8 @@ if SERVER then
 	end
 end
 
+
+
 --[[-------------------------------------------------------------------------
 Load Core extension at this point - this happens no matter what, and before any
 other Extension.
@@ -485,4 +505,7 @@ other Extension.
 The Core extension doesn't actually contain any code, instead just proxies
 settings used by the main gamemode.
 ---------------------------------------------------------------------------]]
+-- DEBUG
+if SERVER then AddCSLuaFile("../resources.lua") end
+include("../resources.lua")
 loadextension(loadextensionprepare("Core"))

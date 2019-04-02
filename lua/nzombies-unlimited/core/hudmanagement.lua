@@ -112,6 +112,7 @@ else
 	queue.ReviveProgress = "Unlimited"
 	queue.DownedIndicator = "Unlimited"
 	queue.TargetID = "Unlimited"
+	queue.DamageOverlay = "Unlimited"
 
 	hook.Add("HUDPaint", "nzu_HUDComponentsPaint", function()
 		for k,v in pairs(paints) do
@@ -137,6 +138,9 @@ if NZU_SANDBOX then
 
 	nzu.RegisterHUDComponentType("Weapons")
 	nzu.RegisterHUDComponent("Weapons", "Unlimited")
+
+	nzu.RegisterHUDComponentType("DamageOverlay")
+	nzu.RegisterHUDComponent("DamageOverlay", "Unlimited")
 end
 
 

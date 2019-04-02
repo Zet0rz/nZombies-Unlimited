@@ -339,6 +339,12 @@ if CLIENT then
 			PrintTable(config)
 		end
 
+		function nzu.RequestSaveConfigSettings()
+			if not nzu.IsAdmin(LocalPlayer()) then return end
+			net.Start("nzu_saveconfig_settings")
+			net.SendToServer()
+		end
+
 		function nzu.RequestDeleteConfig(config)
 			if not nzu.IsAdmin(LocalPlayer()) then return end
 			net.Start("nzu_deleteconfig")

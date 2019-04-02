@@ -104,7 +104,13 @@ local settings = {
 			end
 		},
 		ClientNotify = "OnHUDComponentsChanged" -- Call the callback
-	}
+	},
+
+	["ResourceTest"] = {
+		Type = "ResourceSet",
+		Default = "1",
+		Client = true,
+	},
 }
 
 if CLIENT then
@@ -148,6 +154,10 @@ if CLIENT then
 		huds:Dock(TOP)
 		huds:SetTall(100)
 		huds:DockMargin(5,5,5,5)
+
+		local resources = SettingPanel("ResourceTest", p)
+		resources:SetTall(25)
+		resources:Dock(TOP)
 
 		return p
 	end

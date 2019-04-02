@@ -36,6 +36,7 @@ loadfile_c("extensions/extension_panels.lua")
 --[[-------------------------------------------------------------------------
 Components & Modules
 ---------------------------------------------------------------------------]]
+--loadfile("resources.lua")
 loadfile_c("hudmanagement.lua")
 loadfile("logic/logic_manager.lua")
 loadfile("mapflags.lua")

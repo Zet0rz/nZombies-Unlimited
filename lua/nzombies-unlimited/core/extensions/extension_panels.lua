@@ -142,7 +142,7 @@ local function nwpanel(id, parent)
 	if setting then
 		local build = setting.CustomPanel or paneltypes[setting.Type]
 		if build then
-			local p = build.Create(parent, bext)
+			local p = build.Create(parent, bext, id)
 			p._SetValue = build.Set
 			p._GetValue = build.Get
 

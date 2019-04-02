@@ -53,6 +53,7 @@ loadfile("round.lua")
 loadfile("points.lua")
 loadfile("targeting.lua")
 loadfile("weapons.lua")
+loadfile("health.lua")
 
 loadfile("menu/menu.lua")
 

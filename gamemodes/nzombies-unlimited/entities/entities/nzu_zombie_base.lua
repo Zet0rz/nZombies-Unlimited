@@ -51,7 +51,7 @@ if SERVER then
 	-- Lets you determine what class of model this zombie is, along with a default
 	-- if it cannot be chosen by the gamemode's Model Packs settings
 	function ENT:SelectModel()
-		return "zombie", "models/nzu/nzombie_honorguard.mdl"
+		return "ZombieModels", "models/nzu/nzombie_honorguard.mdl"
 	end
 
 	-- Called after each event to determine its base movement animation
