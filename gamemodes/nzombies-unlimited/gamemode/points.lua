@@ -128,8 +128,8 @@ if CLIENT then
 	local pointsfont = "nzu_Font_Points_PointsLarge"
 	local pointsfont2 = "nzu_Font_Points_PointsSmall"
 	
-	nzu.RegisterHUDComponentType("Points")
-	nzu.RegisterHUDComponent("Points", "Unlimited", {
+	--nzu.RegisterHUDComponentType("HUD_Points")
+	nzu.RegisterHUDComponent("HUD_Points", "Unlimited", {
 		Create = function()
 			local pnl = vgui.Create("DPanel")
 			pnl:ParentToHUD()

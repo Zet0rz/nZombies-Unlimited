@@ -430,8 +430,8 @@ end
 Clientside HUD Drawing
 ---------------------------------------------------------------------------]]
 if CLIENT then
-	nzu.RegisterHUDComponentType("ReviveProgress")
-	nzu.RegisterHUDComponentType("DownedIndicator")
+	nzu.RegisterHUDComponentType("HUD_ReviveProgress")
+	nzu.RegisterHUDComponentType("HUD_DownedIndicator")
 
 	local localplayer
 	local isbeingrevived = false
@@ -523,15 +523,15 @@ if CLIENT then
 	-- Draw downed indicator on other players
 	hook.Add("HUDPaint", "nzu_Revive_DownedIndicator", function()
 		for k,v in pairs(downedplayers) do
-			dopaint("DownedIndicator", k, v)
+			dopaint("HUD_DownedIndicator", k, v)
 		end
-		--dopaint("DownedIndicator", Entity(2))
+		--dopaint("HUD_DownedIndicator", Entity(2))
 	end)
 
 	-- Draw revive progress for local player
 	hook.Add("HUDPaint", "nzu_Revive_ReviveProgress", function()
 		if IsValid(localplayer) then
-			dopaint("ReviveProgress", localplayer, isbeingrevived)
+			dopaint("HUD_ReviveProgress", localplayer, isbeingrevived)
 		end
 	end)
 
@@ -563,7 +563,7 @@ if CLIENT then
 	local mat = Material("nzombies-unlimited/hud/points_shadow.png")
 	local mat2 = Material("nzombies-unlimited/hud/points_glow.vmt")
 
-	nzu.RegisterHUDComponent("ReviveProgress", "Unlimited", {
+	nzu.RegisterHUDComponent("HUD_ReviveProgress", "Unlimited", {
 		Draw = function(ply, isbeingrevived)
 			local lp = LocalPlayer()
 			local w,h = ScrW()/2 ,ScrH()
@@ -596,7 +596,7 @@ if CLIENT then
 	local waveheight = 40
 	local pointheight = 15
 	
-	nzu.RegisterHUDComponent("DownedIndicator", "Unlimited", {
+	nzu.RegisterHUDComponent("HUD_DownedIndicator", "Unlimited", {
 		Draw = function(ply, revivor)
 			local pos = (ply:GetPos() + downedindicator):ToScreen()
 			if pos.visible then

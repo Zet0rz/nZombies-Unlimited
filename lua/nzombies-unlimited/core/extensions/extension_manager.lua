@@ -57,6 +57,7 @@ local writetypes = {
 -- Adding our own custom TYPEs
 local customtypes = {}
 function nzu.AddCustomExtensionSettingType(type, tbl)
+	tbl.__index = tbl
 	customtypes[type] = tbl
 end
 
@@ -111,9 +112,10 @@ local function loadextensionprepare(name)
 			for k,v in pairs(settings) do
 				if v.Type and customtypes[v.Type] then
 					-- Inherit all data from the table that Settings didn't define itself
-					for k2,v2 in pairs(customtypes[v.Type]) do
-						if v[k2] == nil then v[k2] = v2 end
-					end
+					setmetatable(v, customtypes[v.Type])
+					--for k2,v2 in pairs(customtypes[v.Type]) do
+						--if v[k2] == nil then v[k2] = v2 end
+					--end
 				end
 
 				if SERVER or NZU_SANDBOX or v.Client then
@@ -260,7 +262,7 @@ if SERVER then
 		if ext.Settings then
 			local sm = ext.GetSettingsMeta()
 			for k,v in pairs(ext.Settings) do
-				if NZU_SANDBOX or sm[k].Client then
+				if sm[k] and (NZU_SANDBOX or sm[k].Client) then
 					net.WriteBool(true)
 					netwritesetting(sm[k],k,v)
 				end
@@ -505,7 +507,13 @@ other Extension.
 The Core extension doesn't actually contain any code, instead just proxies
 settings used by the main gamemode.
 ---------------------------------------------------------------------------]]
--- DEBUG
-if SERVER then AddCSLuaFile("../resources.lua") end
+-- This is needed here cause Core uses some of these for its settings
+if SERVER then
+	AddCSLuaFile("../hudmanagement.lua")
+	AddCSLuaFile("../resources.lua")
+end
 include("../resources.lua")
+include("../hudmanagement.lua")
+
+
 loadextension(loadextensionprepare("Core"))

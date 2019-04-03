@@ -168,6 +168,7 @@ end
 local extpanels = {}
 function PANEL:Rebuild()
 	local ext = self.Extension
+	self:Clear()
 
 	local pf = ext.GetPanelFunction()
 	if not pf then

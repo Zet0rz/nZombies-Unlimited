@@ -424,8 +424,8 @@ if CLIENT then
 	local transitioncomplete
 	local transitiontime = 3
 
-	nzu.RegisterHUDComponentType("Round")
-	nzu.RegisterHUDComponent("Round", "Unlimited", {
+	nzu.RegisterHUDComponentType("HUD_Round")
+	nzu.RegisterHUDComponent("HUD_Round", "Unlimited", {
 		Paint = function()
 			local r = ROUND:GetRound()
 			surface.SetFont(font)

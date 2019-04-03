@@ -1,4 +1,15 @@
--- This file is CLIENT only
+local customtype = {
+	NetSend = function(v) net.WriteString(v) end,
+	NetRead = function() return net.ReadString() end,
+	Client = true, -- Always network these
+}
+
+if SERVER then
+	nzu.AddCustomExtensionSettingType("HUDComponent", customtype)
+	return
+end
+
+-- This file is now CLIENT only
 
 --[[-------------------------------------------------------------------------
 Structure of a HUD Component:
@@ -14,7 +25,6 @@ Component = {
 Registration happens by pointing at an existing type, then giving the component a name and the component table
 Types have to be registered or it will error (this is purely to cause errors if a category is mistyped)
 ---------------------------------------------------------------------------]]
-local CORE = nzu.GetExtension("Core")
 
 local components = {}
 function nzu.GetHUDComponentTypes()
@@ -23,25 +33,33 @@ end
 
 function nzu.RegisterHUDComponentType(type)
 	components[type] = components[type] or {}
-	CORE:RebuildPanels() -- Cause a rebuild so that the panel will now display this new type
+end
+
+function nzu.GetHUDComponents(type)
+	return table.GetKeys(components[type])
 end
 
 if NZU_SANDBOX then
 	-- In Sandbox, we only need to register possible types and option names
 	-- We can discard the actual component information
 
+	local exts = {}
 	function nzu.RegisterHUDComponent(type, name, component)
 		assert(components[type], "Attempted to register HUD component to non-existing category '"..type.."'")
 
-		table.insert(components[type], name)
-		CORE:RebuildPanels() -- Cause an update so panels will show this component under this type
-	end
-	
-	function nzu.GetHUDComponents(type)
-		return components[type]
+		components[type][name] = true
+
+		-- Cause an update so panels will show this component under this type
+		print("Added", type, name)
+		if CLIENT and exts[type] then
+			exts[type]:RebuildPanels()
+		end
 	end
 
-	function CORE.OnHUDComponentsChanged(t) end -- Leave this empty just so it doesn't error but also does nothing
+	customtype.Create = function(ext, setting)
+		nzu.RegisterHUDComponentType(setting)
+		exts[setting] = ext
+	end
 else
 	local enabled = {}
 	local paints = {}
@@ -56,6 +74,7 @@ else
 			end
 
 			t2.Draw = new.Draw -- Function-triggered (context) drawing
+			t2.Remove = new.Remove
 			if new.Paint then t2.PaintIndex = table.insert(paints, function() new.Paint(value) end) end -- Auto drawing (HUD)
 
 			enabled[type] = t2
@@ -67,7 +86,6 @@ else
 		assert(components[type], "Attempted to register HUD component to non-existing category '"..type.."'")
 
 		components[type][name] = component
-		CORE:RebuildPanels() -- Cause an update so panels will show this component under this type
 
 		if queue[type] == name then
 			enable(type, name)
@@ -82,37 +100,40 @@ else
 		end
 	end
 
-	function nzu.GetHUDComponents(type)
-		return table.GetKeys(components[type])
+	local function doenable(k,v)
+		if enabled[k] then
+			local t = enabled[k]
+			if t.ID == k then return end
+			
+			if t.Remove then t.Remove(t.Value) end
+			if t.PaintIndex then table.remove(paints, t.PaintIndex) end
+			enabled[k] = nil
+		end
+		enable(k,v)
 	end
 
-	function CORE.OnHUDComponentsChanged(t)
-		print("It's changed!")
-		PrintTable(t)
-		for k,v in pairs(enabled) do
-			-- If the already enabled component is not equal to the newly selected one
-			if v.ID ~= t[k] then
-				if v.Remove then v.Remove(v.Value) end
-				if v.PaintIndex then table.remove(paints, v.PaintIndex) end
+	local hookedsets = {}
+	customtype.Create = function(ext, setting)
+		nzu.RegisterHUDComponentType(setting)
+		hookedsets[ext.ID] = true
+	end
 
-				-- Now add the new one
-				enable(k, t[k])
+	hook.Add("nzu_ExtensionSettingChanged", "nzu_HUD_AutoSettingChangeSet", function(id, k, v)
+		if hookedsets[id] and nzu.GetExtension(id).GetSettingsMeta()[k].Type == "HUDComponent" then
+			doenable(k,v)
+		end
+	end)
+
+	hook.Add("nzu_ExtensionLoaded", "nzu_HUD_AutoSettingLoad", function(name)
+		if hookedsets[name] then
+			local ext = nzu.GetExtension(name)
+			for k,v in pairs(ext.GetSettingsMeta()) do
+				if v.Type == "HUDComponent" then
+					doenable(k,ext.Settings[k])
+				end
 			end
 		end
-
-		-- Enable all the ones that were previously not enabled
-		for k,v in pairs(t) do
-			if not enabled[k] then enable(k, t[k]) end
-		end
-	end
-
-	-- DEBUG
-	queue.Round = "Unlimited"
-	queue.Points = "Unlimited"
-	queue.ReviveProgress = "Unlimited"
-	queue.DownedIndicator = "Unlimited"
-	queue.TargetID = "Unlimited"
-	queue.DamageOverlay = "Unlimited"
+	end)
 
 	hook.Add("HUDPaint", "nzu_HUDComponentsPaint", function()
 		for k,v in pairs(paints) do
@@ -127,27 +148,37 @@ else
 	end
 end
 
--- Pre-register in Sandbox since the actual components are only registered in the gamemode
--- This enables them appearing in the dropdown menues in Sandbox under settings
-if NZU_SANDBOX then
-	nzu.RegisterHUDComponentType("Round")
-	nzu.RegisterHUDComponent("Round", "Unlimited")
+customtype.CustomPanel = {
+	Create = function(parent, ext, setting)
+		local p = vgui.Create("DComboBox", parent)
+		function p:OnSelect(index, value)
+			self:Send()
+		end
 
-	nzu.RegisterHUDComponentType("Points")
-	nzu.RegisterHUDComponent("Points", "Unlimited")
+		p:AddChoice("None")
+		if components[setting] then
+			for k,v in pairs(nzu.GetHUDComponents(setting)) do
+				print("Building", setting, v)
+				p:AddChoice(v)
+			end
+		end
+		PrintTable(p.Choices)
 
-	nzu.RegisterHUDComponentType("Weapons")
-	nzu.RegisterHUDComponent("Weapons", "Unlimited")
-
-	nzu.RegisterHUDComponentType("DamageOverlay")
-	nzu.RegisterHUDComponent("DamageOverlay", "Unlimited")
-end
-
+		return p
+	end,
+	Set = function(p,v)
+		p:SetValue(v)
+	end,
+	Get = function(p)
+		return p:GetSelected()
+	end,
+}
+nzu.AddCustomExtensionSettingType("HUDComponent", customtype)
 
 --[[-------------------------------------------------------------------------
 Target ID Component
 ---------------------------------------------------------------------------]]
-nzu.RegisterHUDComponentType("TargetID")
+nzu.RegisterHUDComponentType("HUD_TargetID")
 
 TARGETID_TYPE_GENERIC = 1
 TARGETID_TYPE_USE = 2
@@ -190,14 +221,14 @@ end
 local dopaint
 if NZU_NZOMBIES then
 	dopaint = nzu.DrawHUDComponent
-	nzu.RegisterHUDComponent("TargetID", "Unlimited", {
+	nzu.RegisterHUDComponent("HUD_TargetID", "Unlimited", {
 		Draw = basiccomponent,
 	})
 else
 	dopaint = function(_, typ, text, data, ent)
 		basiccomponent(typ, text, data, ent)
 	end
-	nzu.RegisterHUDComponent("TargetID", "Unlimited")
+	nzu.RegisterHUDComponent("HUD_TargetID", "Unlimited")
 end
 
 local targetidrange = 100
@@ -238,7 +269,7 @@ local function determinetargetstr()
 
 	if text then
 		if not typ then typ = TARGETID_TYPE_GENERIC end
-		dopaint("TargetID", typ, text, data, ent)
+		dopaint("HUD_TargetID", typ, text, data, ent)
 		return true
 	end
 end

@@ -30,7 +30,7 @@ Extension Manager
 ---------------------------------------------------------------------------]]
 loadfile("nzombies-unlimited/core/extensions/extension_manager.lua")
 loadfile_c("nzombies-unlimited/core/extensions/extension_panels.lua")
-loadfile_c("nzombies-unlimited/core/hudmanagement.lua") -- Needed for the settings panel
+--loadfile_c("nzombies-unlimited/core/hudmanagement.lua") -- Needed for the settings panel
 
 --[[-------------------------------------------------------------------------
 Core Modules shared with Sandbox
