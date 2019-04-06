@@ -179,7 +179,7 @@ if SERVER then
 		self.Zombies = {}
 
 		if not timer.Start("nzu_Round_Prepare") then
-			timer.Create("nzu_Round_Prepare", 5, 1, startongoing)
+			timer.Create("nzu_Round_Prepare", 10, 1, startongoing)
 		end
 	end
 
@@ -199,6 +199,40 @@ if SERVER then
 		if self.State == ROUND_WAITING then
 			self:SetRound(1)
 			hook.Run("nzu_GameStarted")
+		end
+	end
+
+	local function doreset()
+		for k,v in pairs(ROUND:GetPlayers()) do
+			nzu.Unspawn(v)
+		end
+
+		local tbl = ROUND:GetZombies()
+		ROUND.Zombies = {}
+		ROUND.NumberZombies = 0
+		ROUND.ZombiesToSpawn = 0
+
+		for k,v in pairs(tbl) do
+			v:Remove()
+		end
+
+		ROUND.State = ROUND_WAITING
+		ROUND.Round = 0
+		
+		donetwork()
+
+		-- TODO: Reload config? Respawn props and such. A map reload is not needed to replay the same config
+	end
+	function ROUND:GameOver()
+		hook.Remove("Think", "nzu_Round_Spawning")
+		self.State = ROUND_GAMEOVER
+
+		PrintMessage(HUD_PRINTTALK, "GAME OVER! You survived "..self.Round.." rounds.")
+
+		donetwork()
+
+		if not timer.Start("nzu_Round_GameOver") then
+			timer.Create("nzu_Round_GameOver", 10, 1, doreset)
 		end
 	end
 
@@ -228,6 +262,66 @@ if CLIENT then
 	end)
 end
 
+--[[-------------------------------------------------------------------------
+Player Downed registration
+---------------------------------------------------------------------------]]
+if SERVER then
+	local function dogameovercheck()
+		if ROUND.State == ROUND_WAITING or ROUND.State == ROUND_GAMEOVER then return end
+
+		for k,v in pairs(ROUND:GetPlayers()) do
+			if not v:GetCountsDowned() then
+				return
+			end
+		end
+		ROUND:GameOver()
+	end
+
+	hook.Add("nzu_PlayerDowned", "nzu_Round_PlayerDowned", function(ply)
+		print("Player downed", ply)
+		timer.Simple(1, dogameovercheck) -- Delay a bit so other code can potentially set promised revives
+	end)
+	hook.Add("PostPlayerDeath", "nzu_Round_PlayerDeath", dogameovercheck)
+end
+
+--[[-------------------------------------------------------------------------
+Round Sounds using ResourceSet setting in Core extension
+---------------------------------------------------------------------------]]
+if SERVER then
+	-- Sounds!
+	local sounds = nzu.GetResources("RoundSounds")
+	hook.Add("nzu_RoundStateChanged", "nzu_Round_RoundSounds", function(round, state)
+		if round == 1 and (state == ROUND_PREPARING or state == ROUND_ONGOING) and sounds.Start then return end -- Don't play any sounds in round 1 if we have custom start sounds
+
+		if sounds[state] then
+			local s = sounds[state][math.random(#sounds[state])]
+			nzu.PlayClientSound(s)
+		end
+	end)
+
+	hook.Add("nzu_GameStarted", "nzu_Round_RoundSounds", function()
+		if sounds.Start then
+			local s = sounds.Start[math.random(#sounds.Start)]
+			nzu.PlayClientSound(s)
+		end
+	end)
+
+	nzu.AddResourceSet("RoundSounds", "Classic", {
+		[ROUND_PREPARING] = {
+			"nzu/round/round_end.mp3"
+		},
+		[ROUND_ONGOING] = {
+			"nzu/round/round_start.mp3"
+		},
+		[ROUND_GAMEOVER] = {
+			"nzu/round/game_over_derriese.mp3"
+		},
+		-- DEBUG
+		["Start"] = {
+			"nzu/round/game_over_5.mp3"
+		}
+	})
+end
 
 
 --[[-------------------------------------------------------------------------
@@ -244,6 +338,7 @@ function ROUND:SetUpTeam(...)
 end
 function ROUND:GetPlayers() return team.GetPlayers(self.Team) end
 function ROUND:GetPlayerCount() return team.NumPlayers(self.Team) end
+function ROUND:HasPlayer(ply) return ply:Team() == self.Team end
 
 --
 local countdowntime = 5
@@ -294,10 +389,13 @@ if SERVER then
 		elseif state == ROUND_WAITING then
 			doreadycheck()
 		end
+
+		hook.Run("nzu_PlayerReady", ply)
 	end
 	function ROUND:RemovePlayer(ply)
 		nzu.Unspawn(ply)
 		if nzu.Round:GetState() == ROUND_WAITING then doreadycheck() end
+		hook.Run("nzu_PlayerUnready", ply)
 	end
 
 	function ROUND:SpawnPlayers()
@@ -384,6 +482,7 @@ if SERVER then
 	function nzu.Unspawn(ply)
 		ply:SetTeam(TEAM_UNASSIGNED)
 		ply:KillSilent()
+		hook.Run("nzu_PlayerUnspawned", ply)
 	end
 	
 	function GM:PlayerInitialSpawn(ply)
@@ -403,6 +502,10 @@ if SERVER then
 		end)
 	end
 	function GM:PlayerDeathThink() end
+
+	function GM:PlayerDisconnected(ply)
+		if ROUND:HasPlayer(ply) then ROUND:RemovePlayer(ply) end
+	end
 end
 
 --[[-------------------------------------------------------------------------

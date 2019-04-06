@@ -631,17 +631,35 @@ if CLIENT then
 	local function togglemenu()
 		local mainmenu = nzu.Menu
 		--if mainmenu then mainmenu:Remove() mainmenu = nil end
-		if not mainmenu then
-			mainmenu = vgui.Create("nzu_MenuPanel")
-			mainmenu:SetSkin("nZombies Unlimited")
-			nzu.Menu = mainmenu
-			for k,v in pairs(menuhooks) do
-				v(mainmenu)
+
+		if net.ReadBool() then
+			if net.ReadBool() then
+				if not mainmenu then
+					mainmenu = vgui.Create("nzu_MenuPanel")
+					mainmenu:SetSkin("nZombies Unlimited")
+					nzu.Menu = mainmenu
+					for k,v in pairs(menuhooks) do
+						v(mainmenu)
+					end
+					mainmenu:Open()
+				end
+			elseif mainmenu then
+				mainmenu:Close()
 			end
-			mainmenu:Open()
 		else
-			mainmenu:Toggle()
+			if not mainmenu then
+				mainmenu = vgui.Create("nzu_MenuPanel")
+				mainmenu:SetSkin("nZombies Unlimited")
+				nzu.Menu = mainmenu
+				for k,v in pairs(menuhooks) do
+					v(mainmenu)
+				end
+				mainmenu:Open()
+			else
+				mainmenu:Toggle()
+			end
 		end
+		
 	end
 	net.Receive("nzu_OpenMenu", togglemenu)
 
@@ -659,6 +677,14 @@ else
 	util.AddNetworkString("nzu_OpenMenu")
 	hook.Add("ShowHelp", "nzu_OpenMenu", function(ply)
 		net.Start("nzu_OpenMenu")
+			net.WriteBool(false)
+		net.Send(ply)
+	end)
+
+	hook.Add("nzu_PlayerUnspawned", "nzu_OpenMenu", function(ply)
+		net.Start("nzu_OpenMenu")
+			net.WriteBool(true)
+			net.WriteBool(true)
 		net.Send(ply)
 	end)
 

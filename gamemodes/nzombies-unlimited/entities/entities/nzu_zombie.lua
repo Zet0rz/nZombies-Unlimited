@@ -234,11 +234,8 @@ ENT.AnimTables = {
 	}
 }
 
-function ENT:OnSpawn()
-	self.AnimTableIndex = math.random(#self.AnimTables)
-end
-
 function ENT:SelectMovementSpeed(speed)
+	if not self.AnimTableIndex then self.AnimTableIndex = math.random(#self.AnimTables) end
 	local tbl = self.AnimTables[self.AnimTableIndex]
 
 	local n = #tbl

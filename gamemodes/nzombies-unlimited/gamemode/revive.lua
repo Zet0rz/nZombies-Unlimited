@@ -31,11 +31,20 @@ if SERVER then
 		end
 	end
 
+	-- Promised Revive: A downed player is promised to be revived - therefore, do not count them as out
+	function PLAYER:SetPromisedRevive(t)
+		self.nzu_PromisedRevive = t
+		hook.Run("nzu_PlayerPromisedRevive", self, t)
+	end
+	function PLAYER:GetPromisedRevive() return self.nzu_PromisedRevive end
+	function PLAYER:GetCountsDowned() return self:GetIsDowned() and not self:GetPromisedRevive() end -- Downed and not promised to be revived
+
 	function PLAYER:RevivePlayer(savior)
 		if self:GetIsDowned() then
 			self:SetHealth(100)
 			self:SetIsDowned(false)
 			self.nzu_DownedTime = nil
+			self.nzu_PromisedRevive = nil
 
 			net.Start("nzu_playerdowned")
 				net.WriteEntity(self)

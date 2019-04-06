@@ -149,10 +149,9 @@ local settings = {
 		Client = true,
 	},
 
-	["ResourceTest"] = {
+	["RoundSounds"] = {
 		Type = "ResourceSet",
-		Default = "1",
-		Client = true,
+		Default = "Classic",
 	},
 }
 
@@ -227,9 +226,12 @@ if CLIENT then
 			hud:Dock(FILL)
 		end
 
-		local resources = SettingPanel("ResourceTest", p)
-		resources:SetTall(25)
-		resources:Dock(TOP)
+		local lbl_rsounds = p:Add("DLabel")
+		lbl_rsounds:SetText("Round Sounds")
+		lbl_rsounds:Dock(TOP)
+		local roundsounds = SettingPanel("RoundSounds", p)
+		roundsounds:SetTall(25)
+		roundsounds:Dock(TOP)
 
 		return p
 	end

@@ -76,9 +76,15 @@ if SERVER then
 	end
 end
 
--- Called as the zombie spawns before it starts its Spawning event
+-- Called as the zombie is about to spawn right before it does
+-- This is where you can set custom stats and other initialization parts
+function ENT:Init() end
+
+-- Called as the zombie spawns
 -- Also called on respawns, so it's not always on initial creation!
-function ENT:OnSpawn() end
+function ENT:OnSpawn()
+	if SERVER then self:TriggerEvent("Spawn") end
+end
 
 --[[-------------------------------------------------------------------------
 Targeting
@@ -127,6 +133,13 @@ if SERVER then
 	-- This is called after the path is computed; NOT after retarget
 	function ENT:CalculateNextRetarget(target, dist)
 		return 5
+	end
+
+	-- Called from RunBehaviour when there is no valid target
+	-- This lets you do your own custom logic
+	-- Remember that retargeting is automatic if the next retarget cycle is past
+	function ENT:OnNoTarget()
+		self:Timeout(2)
 	end
 end
 
@@ -403,6 +416,7 @@ if SERVER then
 	-- When a path ends. Either when the goal is reached, or when no path could be found
 	-- This is where you should trigger your attack event or idle
 	function ENT:OnPathEnd()
+		print(self, self.Target, self.PreventAttack)
 		if IsValid(self.Target) and not self.PreventAttack then
 			self:TriggerEvent("Attack", self.Target)
 		else
@@ -462,16 +476,10 @@ function ENT:Initialize()
 
 		self:SetNextRepath(0)
 		self:SetNextRetarget(0)
-
-		self:OnSpawn()
-
-		-- DEBUG
-		self:SetDesiredSpeed(100)
-
-		self:TriggerEvent("Spawn")
-	else
-		self:OnSpawn()
 	end
+
+	self:Init()
+	self:OnSpawn()
 end
 
 if SERVER then
@@ -508,14 +516,18 @@ if SERVER then
 			end
 
 			if not IsValid(self.Target) then
-				self:Timeout(2)
+				self:OnNoTarget()
 			else
-				if not IsValid(self.Path) then self:InitializePath() end
 				local path = self.Path
-				
-				if not IsValid(path) then -- We reached the goal, or path terminated for another reason
+				if not path then
+					self:InitializePath()
+				elseif not IsValid(path) then -- We reached the goal, or path terminated for another reason
 					self:OnPathEnd()
 					self.Path = nil
+
+					if not IsValid(self.Target) or not self:AcceptTarget(self.Target) then
+						self:SetNextRetarget(0) -- Always retarget at the end of a path if the current target no longer exists or is not acceptable anymore (such as downed)
+					end
 				else
 					-- DEBUG
 					path:Draw()
@@ -523,6 +535,7 @@ if SERVER then
 					if path:GetAge() >= self.NextRepath then
 						if not IsValid(self.Target) then
 							self:SetNextRetarget(0) -- Retarget next cycle
+							coroutine.yield()
 							continue
 						end
 						path:Compute(self, self:GetTargetPosition(), self.ComputePath)

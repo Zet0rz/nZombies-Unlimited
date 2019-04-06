@@ -68,6 +68,9 @@ if NZU_NZOMBIES then
 	local queue = {}
 	function nzu.AddResourceSet(set, id, tbl)
 		resources[set][id] = tbl
+		if queue[set] == id then
+			nzu.SelectResourceSet(set, id)
+		end
 	end
 
 	function nzu.SelectResourceSet(set, id)
@@ -83,6 +86,9 @@ if NZU_NZOMBIES then
 			for k,v in pairs(resources[set][id]) do
 				tbl[k] = v
 			end
+			queue[set] = nil
+		else
+			queue[set] = id
 		end
 	end
 
@@ -131,12 +137,3 @@ else
 		surface.PlaySound(net.ReadString())
 	end)
 end
-
--- DEBUG
-hook.Add("nzu_ExtensionLoaded", "Test", function(name)
-	if name == "Core" then
-		nzu.AddResourceSet("ResourceTest", "A", {"a"})
-		nzu.AddResourceSet("ResourceTest", "B", {"b"})
-		nzu.AddResourceSet("ResourceTest", "C", {"c", "c"})
-	end
-end)
