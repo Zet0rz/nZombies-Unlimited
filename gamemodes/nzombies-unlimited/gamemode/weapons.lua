@@ -144,7 +144,12 @@ local function doweaponslot(ply, wep, slot)
 
 	if specialslots[wslot.ID] then
 		wep.OldDeploy = wep.Deploy
-		wep.Deploy = wep["nzu_SpecialDeploy"..wslot.ID] or specialslots[wslot.ID]
+		wep.Deploy = wep["SpecialDeploy"..wslot.ID] or specialslots[wslot.ID]
+	end
+
+	-- If the slot can be numerically accessed, auto-switch to it
+	if wslot.Number and IsValid(wep) then
+		ply:SelectWeaponPredicted(wep)
 	end
 end
 
@@ -220,18 +225,29 @@ if SERVER then
 	hook.Add("WeaponEquip", "nzu_WeaponPickedUp", function(wep, ply)
 		timer.Simple(0, function()
 			if IsValid(wep) and IsValid(ply) and not wep.nzu_WeaponSlot then
-				print(wep)
-				local slot = ply:GetReplaceWeaponSlot()
+				local slot = wep.nzu_DefaultWeaponSlot or ply:GetReplaceWeaponSlot()
 				doweaponslotnetwork(ply, wep, slot)
-				ply:SelectWeapon(wep:GetClass()) -- This a dumb idea with prediction?
+				--ply:SelectWeapon(wep:GetClass()) -- This a dumb idea with prediction?
 			end
 		end)
 	end)
 else
 	net.Receive("nzu_weaponslot", function()
-		local wep = net.ReadEntity()
+		local i = net.ReadUInt(16) -- Same as net.ReadEntity()
+		local wep = Entity(i)
 		local slot = net.ReadString()
+
 		doweaponslot(LocalPlayer(), wep, slot)
+
+		-- If we get networking before the entity is valid, keep an eye out for when it should be ready
+		if not IsValid(wep) then
+			hook.Add("HUDWeaponPickedUp", "nzu_WeaponSlot"..slot, function(wep)
+				if wep:EntIndex() == i then
+					doweaponslot(LocalPlayer(), wep, slot)
+					hook.Remove("HUDWeaponPickedUp", "nzu_WeaponSlot"..slot)
+				end
+			end)
+		end
 	end)
 
 	net.Receive("nzu_weaponslot_access", function()
@@ -252,6 +268,11 @@ function nzu.AddKeybindToWeaponSlot(slot, key)
 end
 
 local maxswitchtime = 3
+function PLAYER:SelectWeaponPredicted(wep)
+	self.nzu_DoSelectWeapon = wep
+	self.nzu_DoSelectWeaponTime = CurTime() + maxswitchtime
+end
+
 hook.Add("PlayerButtonDown", "nzu_WeaponSwitching_Keybinds", function(ply, but)
 	-- Buttons 1-10 are keys 0-9
 	local slot = but < 11 and but - 1 or keybinds[but]
@@ -280,11 +301,19 @@ hook.Add("PlayerButtonDown", "nzu_WeaponSwitching_Keybinds", function(ply, but)
 	elseif slot then
 		local wep = ply:GetWeaponInSlot(slot)
 		if IsValid(wep) then
-			ply.nzu_DoSelectWeapon = wep
-			ply.nzu_DoSelectWeaponTime = CurTime() + maxswitchtime
+			ply:SelectWeaponPredicted(wep)
+			ply.nzu_SpecialKeyDown = but
 		end
 	end
 end)
+
+hook.Add("PlayerButtonUp", "nzu_WeaponSwitching_Keybinds", function(ply, but)
+	if ply.nzu_SpecialKeyDown == but then ply.nzu_SpecialKeyDown = nil end
+end)
+
+function WEAPON:IsSpecialSlotKeyStillDown()
+	return self.Owner.nzu_SpecialKeyDown and keybinds[self.Owner.nzu_SpecialKeyDown] == self:GetWeaponSlot()
+end
 
 hook.Add("StartCommand", "nzu_WeaponSwitching", function(ply, cmd)
 	-- if PlayerButtonDown won't work, we gotta do it here :(
@@ -300,8 +329,7 @@ hook.Add("StartCommand", "nzu_WeaponSwitching", function(ply, cmd)
 
 				local wep2 = ply:GetWeaponInSlot(slot)
 				if IsValid(wep2) then
-					ply.nzu_DoSelectWeapon = wep2
-					ply.nzu_DoSelectWeaponTime = CurTime() + maxswitchtime
+					ply:SelectWeaponPredicted(wep2)
 				end
 			end
 		end
@@ -371,14 +399,6 @@ if SERVER then
 		if IsValid(new) then
 			if new.nzu_PrimaryAmmo then ply:SetAmmo(new.nzu_PrimaryAmmo, new:GetPrimaryAmmoType()) end
 			if new.nzu_SecondaryAmmo then ply:SetAmmo(new.nzu_SecondaryAmmo, new:GetSecondaryAmmoType()) end
-
-			-- Now handled with the SWEP's onboard Deploy function (making it predicted)
-			--[[local slot = new:GetWeaponSlot()
-			if slot and specialslots[slot] then
-				ply:SetWeaponLocked(true)
-				local func = new["nzu_SpecialSlot"..slot] or specialslots[slot]
-				func(new)
-			end]]
 		end
 	end
 else
@@ -392,16 +412,6 @@ else
 				ply.nzu_PreviousWeapon = old
 			end
 		end
-
-		if IsValid(new) then
-			-- Now handled with the SWEP's onboard Deploy function (making it predicted)
-			--[[local slot = new:GetWeaponSlot()
-			if slot and specialslots[slot] then
-				ply:SetWeaponLocked(true)
-				local func = new["nzu_SpecialSlot"..slot] or specialslots[slot]
-				func(new)
-			end]]
-		end
 	end
 end
 
@@ -413,6 +423,7 @@ Populate base weapon slots
 nzu.AddKeybindToWeaponSlot("Knife", KEY_V)
 if true then
 	nzu.SpecialWeaponSlot("Knife", function(self)
+		self.Owner:SetWeaponLocked(true)
 		self:SetNextPrimaryFire(0)
 		self:PrimaryFire()
 		timer.Simple(0.5, function()
@@ -435,6 +446,7 @@ end
 nzu.AddKeybindToWeaponSlot("Grenade", KEY_G)
 if true then
 	nzu.SpecialWeaponSlot("Grenade", function(self)
+		self.Owner:SetWeaponLocked(true)
 		self:SetNextPrimaryFire(0)
 		self:PrimaryFire()
 		timer.Simple(0.5, function()
@@ -457,6 +469,7 @@ end
 nzu.AddKeybindToWeaponSlot("SpecialGrenade", KEY_B)
 if true then
 	nzu.SpecialWeaponSlot("SpecialGrenade", function(self)
+		self.Owner:SetWeaponLocked(true)
 		self:SetNextPrimaryFire(0)
 		self:PrimaryFire()
 		timer.Simple(0.5, function()

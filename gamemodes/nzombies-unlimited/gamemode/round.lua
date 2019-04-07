@@ -492,6 +492,7 @@ if SERVER then
 			if IsValid(ply) then
 				--nzu.Unspawn(ply)
 				--hook.Run("ShowHelp", ply) -- Open their F1 menu
+				-- DEBUG
 				timer.Simple(1, function()
 					ply:Give("weapon_pistol")
 					ply:Give("weapon_ar2")
