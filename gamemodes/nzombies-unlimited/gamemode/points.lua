@@ -19,17 +19,23 @@ if SERVER then
 	end
 
 	function PLAYER:GivePoints(n)
-		n = hook.Run("nzu_PlayerGivePoints", self, n) or n
-		self:SetPoints(self:GetPoints() + n)
-
-		notifyplayers(self, n)
+		local tbl = {Points = n}
+		hook.Run("nzu_PlayerGivePoints", self, tbl)
+		local n = tbl.Points
+		if n ~= 0 then
+			self:SetPoints(self:GetPoints() + n)
+			notifyplayers(self, n)
+		end
 	end
 
 	function PLAYER:TakePoints(n)
-		n = hook.Run("nzu_PlayerTakePoints", self, n) or n
-		self:SetPoints(self:GetPoints() - n)
-
-		notifyplayers(self, -n)
+		local tbl = {Points = n}
+		hook.Run("nzu_PlayerTakePoints", self, tbl)
+		local n = tbl.Points
+		if n ~= 0 then
+			self:SetPoints(self:GetPoints() - n)
+			notifyplayers(self, -n)
+		end
 	end
 
 	local knifetypes = {

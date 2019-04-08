@@ -1,6 +1,6 @@
 local customtype = {
-	NetSend = function(v) net.WriteString(v) end,
-	NetRead = function() return net.ReadString() end,
+	NetSend = net.WriteString,
+	NetRead = net.ReadString,
 	Client = true, -- Always network these
 }
 
@@ -50,7 +50,6 @@ if NZU_SANDBOX then
 		components[type][name] = true
 
 		-- Cause an update so panels will show this component under this type
-		print("Added", type, name)
 		if CLIENT and exts[type] then
 			exts[type]:RebuildPanels()
 		end
@@ -162,7 +161,6 @@ customtype.CustomPanel = {
 				p:AddChoice(v)
 			end
 		end
-		PrintTable(p.Choices)
 
 		return p
 	end,

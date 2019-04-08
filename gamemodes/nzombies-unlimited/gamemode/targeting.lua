@@ -5,7 +5,7 @@ local next = next
 
 function PLAYER:IsTargetable()
 	-- Has an untargetability table and it's non-empty
-	return not (self.nzu_Untargetability and next(self.nzu_Untargetability))
+	return not self.nzu_Untargetability
 end
 
 function PLAYER:AddUntargetability(id)
@@ -16,8 +16,12 @@ end
 function PLAYER:RemoveUntargetability(id)
 	if self.nzu_Untargetability then
 		self.nzu_Untargetability[id] = nil
+
+		if next(self.nzu_Untargetability) == nil then self.nzu_Untargetability = nil end
 	end
 end
+
+hook.Add("PostPlayerDeath", "nzu_Targeting_PlayerResetTargetability", function(ply) ply.nzu_Untargetability = nil end)
 
 local round = nzu.Round
 function nzu.GetAllTargetablePlayers()

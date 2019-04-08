@@ -152,6 +152,7 @@ if CLIENT then
 			end
 		end
 
+		-- DEBUG
 		print("Running here")
 		hook.Run("nzu_ConfigInfoSaved", config, new) -- Call the same hook
 

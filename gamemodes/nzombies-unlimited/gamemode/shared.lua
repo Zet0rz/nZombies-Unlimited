@@ -47,11 +47,13 @@ Gamemode-specific files
 loadfile("player.lua")
 loadfile("playeruse.lua")
 
+loadfile_c("menu/scoreboard.lua")
+
 loadfile("electricity.lua")
 loadfile("revive.lua")
 loadfile("round.lua")
 loadfile("points.lua")
-loadfile("targeting.lua")
+loadfile_s("targeting.lua")
 loadfile("weapons.lua")
 loadfile("health.lua")
 

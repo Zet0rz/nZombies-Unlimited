@@ -33,8 +33,8 @@ local customtype = {
 			return p:GetSelected()
 		end,
 	},
-	NetSend = function(v) net.WriteString(v) end,
-	NetRead = function() return net.ReadString() end,
+	NetSend = net.WriteString,
+	NetRead = net.ReadString,
 }
 
 if NZU_SANDBOX then

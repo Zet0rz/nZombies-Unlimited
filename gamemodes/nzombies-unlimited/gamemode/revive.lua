@@ -49,6 +49,12 @@ if SERVER then
 			net.Start("nzu_playerdowned")
 				net.WriteEntity(self)
 				net.WriteBool(false)
+				if IsValid(savior) then
+					net.WriteBool(true)
+					net.WriteEntity(savior)
+				else
+					net.WriteBool(false)
+				end
 			net.Broadcast()
 
 			hook.Run("nzu_PlayerRevived", self, savior)
@@ -64,6 +70,10 @@ if SERVER then
 	function PLAYER:CanBeRevived()
 		return true
 	end
+
+	hook.Add("nzu_PlayerGivePoints", "nzu_Revive_DownedPlayersNoPoints", function(ply, tbl)
+		if ply:GetIsDowned() then tbl.Points = 0 return end -- DO NOT return normally! We only return because we set to 0 anyway, no other modifiers can do anything!
+	end)
 end
 
 if CLIENT then
@@ -74,7 +84,9 @@ if CLIENT then
 			hook.Run("nzu_PlayerDowned", ply)
 		else
 			ply.nzu_DownedTime = nil
-			hook.Run("nzu_PlayerRevived", ply)
+			local savior
+			if net.ReadBool() then savior = net.ReadEntity() end
+			hook.Run("nzu_PlayerRevived", ply, savior)
 		end
 	end)
 end
@@ -564,6 +576,28 @@ if CLIENT then
 end
 
 
+--[[-------------------------------------------------------------------------
+Stat Registers
+---------------------------------------------------------------------------]]
+nzu.AddPlayerNetworkVar("Int", "NumRevives")
+nzu.AddPlayerNetworkVar("Int", "NumDowns")
+
+if SERVER then
+	hook.Add("nzu_PlayerRevived", "nzu_Revive_ReviveStat", function(ply, savior)
+		if IsValid(savior) then savior:SetNumRevives(savior:GetNumRevives() + 1) end
+	end)
+
+	hook.Add("nzu_PlayerDowned", "nzu_Revive_DownStat", function(ply)
+		ply:SetNumDowns(ply:GetNumDowns() + 1)
+	end)
+
+	hook.Add("nzu_GameStarted", "nzu_Revive_StatReset", function()
+		for k,v in pairs(player.GetAll()) do
+			v:SetNumRevives(0)
+			v:SetNumDowns(0)
+		end
+	end)
+end
 
 --[[-------------------------------------------------------------------------
 HUD Components

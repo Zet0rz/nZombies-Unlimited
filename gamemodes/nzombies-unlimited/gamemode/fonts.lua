@@ -42,3 +42,24 @@ surface.CreateFont("nzu_Font_TargetID", {
 	antialias = true,
 	outline = true,
 })
+
+surface.CreateFont("nzu_Font_Bloody_Large", {
+	font = "DK Umbilical Noose",
+	size = 48,
+	weight = 500,
+	antialias = true,
+})
+
+surface.CreateFont("nzu_Font_Bloody_Medium", {
+	font = "DK Umbilical Noose",
+	size = 36,
+	weight = 500,
+	antialias = true,
+})
+
+surface.CreateFont("nzu_Font_Bloody_Small", {
+	font = "DK Umbilical Noose",
+	size = 24,
+	weight = 500,
+	antialias = true,
+})
