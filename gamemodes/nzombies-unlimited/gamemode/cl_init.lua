@@ -3,8 +3,8 @@ include( "shared.lua" )
 local hidden = {
 	CHudHealth = true,
 	CHudBattery = true,
-	--CHudAmmo = true,
-	--CHudSecondaryAmmo = true,
+	CHudAmmo = true,
+	CHudSecondaryAmmo = true,
 	CHudWeaponSelection = true,
 }
 function GM:HUDShouldDraw(name)

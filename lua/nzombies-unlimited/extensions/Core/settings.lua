@@ -149,6 +149,12 @@ local settings = {
 		Client = true,
 	},
 
+	["HUD_Weapons"] = {
+		Type = "HUDComponent",
+		Default = "Unlimited",
+		Client = true,
+	},
+
 	["RoundSounds"] = {
 		Type = "ResourceSet",
 		Default = "Classic",
@@ -165,7 +171,8 @@ if CLIENT then
 		["HUD_DamageOverlay"] = "Damage Overlay",
 		["HUD_DownedIndicator"] = "Revive Indicator",
 		["HUD_ReviveProgress"] = "Revive Progress Bar",
-		["HUD_TargetID"] = "Target ID"
+		["HUD_TargetID"] = "Target ID",
+		["HUD_Weapons"] = "Weapons",
 	}
 
 	if NZU_SANDBOX then

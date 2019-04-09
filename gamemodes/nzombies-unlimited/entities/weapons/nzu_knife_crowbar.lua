@@ -40,6 +40,8 @@ SWEP.Primary.Damage = 150
 SWEP.Primary.DamageType = DMG_CLUB
 SWEP.Primary.DamageForce = 10
 
+if CLIENT then SWEP.HUDIcon = Material("nzombies-unlimited/hud/CrowbarIcon.png", "unlitgeneric smooth") end -- CONTENT + change this to crowbar png!
+
 --[[-------------------------------------------------------------------------
 Force the weapon to always be loaded into the Knife slot (unless otherwise specified)
 ---------------------------------------------------------------------------]]
@@ -98,6 +100,19 @@ if SERVER then
 		self.Owner:TraceHullAttack(startpos, endpos, self.HullAttackMins, self.HullAttackMaxs, self.Primary.Damage, self.Primary.DamageType, self.Primary.DamageForce, self.DamageAllNPCs)
 	end
 end
+
+if CLIENT then
+	function SWEP:DrawHUDIcon(x,y,h)
+		surface.SetMaterial(self.HUDIcon)
+		surface.SetDrawColor(255,255,255,255)
+		surface.DrawTexturedRect(x-h,y,h,h)
+		return h
+	end
+end
+
+--[[-------------------------------------------------------------------------
+Internals
+---------------------------------------------------------------------------]]
 
 function SWEP:Think()
 	if self.IsKnifing and CurTime() >= self:GetNextPrimaryFire() then

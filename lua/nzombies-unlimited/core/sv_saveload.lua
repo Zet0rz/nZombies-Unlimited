@@ -364,6 +364,11 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 		ent.nzu_SaveIgnore = true
 	end
 
+	local ignoredfields = {}
+	function nzu.IgnoreSaveField(key)
+		ignoredfields[key] = true
+	end
+
 	local function getmapjson()
 		local tbl = {}
 		tbl.SaveExtensions = {}
@@ -381,15 +386,27 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 
 
 		local Ents = ents.GetAll()
+		local map = {Entities = {}, Constraints = {}}
 		for k,v in pairs(Ents) do
 			if v.nzu_SaveIgnore or not gmsave.ShouldSaveEntity(v, v:GetSaveTable()) or v:IsConstraint() then
-				Ents[k] = nil
 				v.nzu_SaveIgnore = nil
 			else
 				duplicator.StoreEntityModifier(v, "nzu_saveid", {id = v:EntIndex()})
+
+				local temp = {}
+				for k2,v2 in pairs(ignoredfields) do
+					if v[k2] then
+						temp[k2] = v[k2]
+						v[k2] = nil
+					end
+				end
+				map = duplicator.Copy(v, map)
+				for k2,v2 in pairs(temp) do
+					v[k2] = v2
+				end
 			end
 		end
-		tbl.Map = duplicator.CopyEnts(Ents)
+		tbl.Map = map
 		
 		local postsaves = {}
 		for k,v in pairs(savefuncs) do

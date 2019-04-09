@@ -68,3 +68,9 @@ loadfile("nzombies-unlimited/core/entities_tools/doors_nzu.lua")
 loadfile("nzombies-unlimited/core/entities_tools/electricityswitch.lua")
 loadfile_s("nzombies-unlimited/core/entities_tools/navlocker_nzu.lua")
 loadfile("nzombies-unlimited/core/entities_tools/barricades.lua")
+
+--[[-------------------------------------------------------------------------
+Misc GM hooks
+---------------------------------------------------------------------------]]
+-- No noclipping!
+function GM:PlayerNoClip(ply,on) return false end

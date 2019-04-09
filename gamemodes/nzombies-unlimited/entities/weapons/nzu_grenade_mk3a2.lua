@@ -3,6 +3,8 @@ SWEP.PrintName = "MK3A2 Grenade"
 SWEP.ViewModel = "models/weapons/c_grenade.mdl"
 SWEP.WorldModel = "models/weapons/w_grenade.mdl"
 
+SWEP.Base = "weapon_base"
+
 if CLIENT then
 	SWEP.Author = "Zet0r"
 	SWEP.Purpose = "Grenade for nZombies Unlimited"
@@ -22,7 +24,7 @@ SWEP.Primary.ClipSize = -1
 SWEP.Primary.DefaultClip = -1
 SWEP.Primary.Automatic = false
 SWEP.Primary.Delay = 1
-SWEP.Primary.Ammo = "none"
+SWEP.Primary.Ammo = "Grenade"
 
 SWEP.Secondary.ClipSize = -1
 SWEP.Secondary.DefaultClip = -1
@@ -38,6 +40,8 @@ SWEP.GrenadeCanCook = true
 SWEP.GrenadeTime = 3
 SWEP.GrenadeDamage = 150
 SWEP.GrenadeDamageRadius = 250
+
+if CLIENT then SWEP.HUDIcon = Material("nzombies-unlimited/hud/MK3A2Icon.png", "unlitgeneric smooth") end -- CONTENT
 
 --[[-------------------------------------------------------------------------
 Force the weapon to always be loaded into the Grenade slot (unless otherwise specified)
@@ -69,6 +73,40 @@ function SWEP:ThrowAnimation()
 	self.Owner:SetAnimation(PLAYER_ATTACK1)
 end
 
+-- Block deploying if we have no ammo
+function SWEP:PreventDeploy()
+	return self:Ammo1() < 1
+end
+
+if CLIENT then
+	function SWEP:DrawHUDIcon(x,y,h)
+		local ammo = self:Ammo1()
+
+		surface.SetMaterial(self.HUDIcon)
+		local drawammo = false
+		local x1 = -5
+		if ammo <= 0 then
+			surface.SetDrawColor(100,100,100,255)
+			ammo = 1
+			drawammo = true
+		else
+			surface.SetDrawColor(255,255,255,255)
+		end
+			
+		for i = 1,ammo do
+			x1 = x1 + 5
+			surface.DrawTexturedRect(x - x1 - h,y,h,h)
+			if i >= 4 then
+				drawammo = true
+				break
+			end
+		end
+		
+
+		return h + x1, true
+	end
+end
+
 if SERVER then
 	function SWEP:ThrowGrenade()
 		local aim = self.Owner:GetAimVector()
@@ -90,6 +128,12 @@ if SERVER then
 				util.BlastDamage(nade, self.Owner, nade:GetPos(), self.GrenadeDamageRadius, 1)
 			end
 		end)
+
+		self:TakePrimaryAmmo(1)
+	end
+
+	function SWEP:CalculateMaxAmmo()
+		return 4,nil
 	end
 end
 
@@ -115,6 +159,10 @@ function SWEP:Finish()
 	self.IsThrowing = nil
 	self:OnThrowFinished()
 end
+
+--[[-------------------------------------------------------------------------
+Internals
+---------------------------------------------------------------------------]]
 
 function SWEP:Think()
 	if self.IsThrowing and CurTime() >= self.ThrowTime then

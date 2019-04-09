@@ -70,6 +70,7 @@ if SERVER then
 		doors[self] = nil
 		hook.Run("nzu_DoorLockRemoved", self)
 	end
+	nzu.IgnoreSaveField("nzu_DoorData") -- Make this field not save; We handle our own save data
 
 	hook.Add("PlayerInitialSpawn", "nzu_Doors_InitSync", function(ply)
 		for k,v in pairs(doors) do

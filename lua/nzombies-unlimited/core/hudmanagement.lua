@@ -86,7 +86,7 @@ else
 
 		components[type][name] = component
 
-		if queue[type] == name then
+		if queue[type] == name or name == "Unlimited" then -- DEBUG
 			enable(type, name)
 			queue[type] = nil
 		else

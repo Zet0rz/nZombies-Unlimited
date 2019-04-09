@@ -515,9 +515,9 @@ Add HUD Component. Since this file only runs in nZombies, this component has bee
 if CLIENT then
 	local font = "nzu_RoundNumber"
 	surface.CreateFont(font, {
-		font = "DK Umbilical Noose",
+		font = "Edo SZ",
 		size = 128,
-		weight = 300,
+		weight = 500,
 		antialias = true,
 	})
 
@@ -528,42 +528,92 @@ if CLIENT then
 	local transitioncomplete
 	local transitiontime = 3
 
+	local tallysize = 150
+	local tallymats = {
+		Material("nzombies-unlimited/hud/tally_1.png", "unlitgeneric smooth"),
+		Material("nzombies-unlimited/hud/tally_2.png", "unlitgeneric smooth"),
+		Material("nzombies-unlimited/hud/tally_3.png", "unlitgeneric smooth"),
+		Material("nzombies-unlimited/hud/tally_4.png", "unlitgeneric smooth"),
+		Material("nzombies-unlimited/hud/tally_5.png", "unlitgeneric smooth")
+	}
+
 	nzu.RegisterHUDComponentType("HUD_Round")
 	nzu.RegisterHUDComponent("HUD_Round", "Unlimited", {
 		Paint = function()
 			local r = ROUND:GetRound()
-			surface.SetFont(font)
-			surface.SetTextPos(50, ScrH() - 150)
 
 			if r ~= lastdrawnround then
 				if not transitioncomplete then
 					transitioncomplete = CurTime() + transitiontime
 				end
-
 				local pct = (transitioncomplete - CurTime())/transitiontime
-				surface.SetTextColor(255,0,0,255*pct)
-				surface.DrawText(lastdrawnround)
+				local pct2 = math.Clamp(transitioncomplete - 2 - CurTime(), 0, 1)
 
-				render.ClearStencil()
-				render.SetStencilEnable(true)
-				render.ClearStencilBufferRectangle(50, ScrH() - 150, 200, ScrH() - 150*pct, 1)
+				if r <= 5 and r >= 0 then
+					if lastdrawnround > r then
+						lastdrawnround = 0
+					elseif lastdrawnround <= 5 then
+						surface.SetDrawColor(255,0,0)
+						for i = 1, lastdrawnround do
+							surface.SetMaterial(tallymats[i])
+							surface.DrawTexturedRect(75, ScrH() - 175, tallysize, tallysize)
+						end
+					end
 
-				render.SetStencilReferenceValue(1)
-				render.SetStencilCompareFunction(STENCIL_EQUAL)
+					-- Transition with tally marks
+					surface.SetDrawColor(255,pct*200,pct*100)
 
-				surface.SetTextColor(255,pct*200,pct*100,255)
-				surface.SetTextPos(50, ScrH() - 150)
-				surface.DrawText(r)
+					for i = lastdrawnround + 1, r do
+						surface.SetMaterial(tallymats[i])
+						surface.DrawTexturedRectUV(75, ScrH() - 175, tallysize, tallysize - pct2*tallysize, 0,0,1, 1 - pct2)
+					end
+				else
+					surface.SetFont(font)
 
-				render.SetStencilEnable(false)
+					-- Transition with number
+					if lastdrawnround <= 5 then
+						surface.SetDrawColor(255,0,0,255*pct2)
+						for i = 1, lastdrawnround do
+							surface.SetMaterial(tallymats[i])
+							surface.DrawTexturedRect(75, ScrH() - 175, tallysize, tallysize)
+						end
+					else
+						surface.SetTextPos(100, ScrH() - 165)
+						surface.SetTextColor(150,0,0,255*pct2)
+						surface.DrawText(lastdrawnround)
+					end
+
+					render.ClearStencil()
+					render.SetStencilEnable(true)
+					render.ClearStencilBufferRectangle(0, ScrH() - 165, 400, ScrH() - 150*pct2, 1)
+
+					render.SetStencilReferenceValue(1)
+					render.SetStencilCompareFunction(STENCIL_EQUAL)
+
+					surface.SetTextColor(150 + pct*100,pct*250,pct*150,255)
+					surface.SetTextPos(100, ScrH() - 165)
+					surface.DrawText(r)
+
+					render.SetStencilEnable(false)
+				end
 
 				if pct <= 0 then
 					lastdrawnround = r
 					transitioncomplete = nil
 				end
 			else
-				surface.SetTextColor(255,0,0)
-				surface.DrawText(r)
+				if r > 5 then
+					surface.SetFont(font)
+					surface.SetTextPos(100, ScrH() - 165)
+					surface.SetTextColor(150,0,0)
+					surface.DrawText(r)
+				else
+					surface.SetDrawColor(255,0,0)
+					for i = 1, r do
+						surface.SetMaterial(tallymats[i])
+						surface.DrawTexturedRect(75, ScrH() - 175, tallysize, tallysize)
+					end
+				end
 			end
 		end
 	})

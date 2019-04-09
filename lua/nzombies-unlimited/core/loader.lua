@@ -63,6 +63,7 @@ loadfile("entities_tools/electricityswitch.lua")
 loadfile("entities_tools/wallbuys.lua")
 loadfile("entities_tools/navlocker_sandbox.lua")
 loadfile("entities_tools/barricades.lua")
+loadfile("entities_tools/invisiblewalls.lua")
 
 --[[if SERVER then
 	AddCSLuaFile("cl_nzombies_skin.lua")
