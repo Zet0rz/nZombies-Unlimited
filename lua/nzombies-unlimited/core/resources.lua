@@ -33,7 +33,7 @@ local customtype = {
 			return p:GetSelected()
 		end,
 	},
-	NetSend = net.WriteString,
+	NetWrite = net.WriteString,
 	NetRead = net.ReadString,
 }
 

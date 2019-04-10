@@ -2,8 +2,18 @@ local EXTENSION = nzu.Extension()
 
 local settings = {
 	["StartWeapon"] = {
-		Type = TYPE_STRING,
+		Type = "Weapon",
 		Default = "weapon_pistol",
+	},
+
+	["StartKnife"] = {
+		Type = "Weapon",
+		Default = "nzu_knife_crowbar",
+	},
+
+	["StartGrenade"] = {
+		Type = "Weapon",
+		Default = "nzu_grenade_mk3a2",
 	},
 
 	["StartPoints"] = {
@@ -164,6 +174,13 @@ local settings = {
 if CLIENT then
 	-- Pre-register these as their files are located in the gamemode, not appearing in sandbox
 
+	local labelledsettings = {
+		{"StartPoints", "Starting Points"},
+		{"StartWeapon", "Starting Weapon"},
+		{"StartKnife", "Starting Knife"},
+		{"StartGrenade", "Starting Grenade"},
+	}
+
 	local components = {
 		["HUD_Round"] = "Round",
 		["HUD_Points"] = "Points",
@@ -183,34 +200,22 @@ if CLIENT then
 	end
 
 	local panelfunc = function(p, SettingPanel)
-		--p:SetBackgroundColor(Color(100,100,100))
 
-		local p_points = vgui.Create("Panel")
-		p_points:Dock(TOP)
-		p_points:DockPadding(5,2,5,2)
-		p_points:SetParent(p)
-		local lbl = p_points:Add("DLabel")
-		lbl:SetText("Starting Points")
-		lbl:Dock(LEFT)
-		lbl:SizeToContentsX()
-		lbl:DockMargin(0,0,10,0)
+		for k,v in pairs(labelledsettings) do
+			local pnl = vgui.Create("Panel", p)
+			pnl:SetTall(25)
+			pnl:Dock(TOP)
+			pnl:DockPadding(5,2,5,2)
 
-		local points = SettingPanel("StartPoints", p_points)
-		points:Dock(FILL)
+			local lbl = pnl:Add("DLabel")
+			lbl:SetText(v[2])
+			lbl:Dock(LEFT)
+			lbl:SetWide(125)
+			lbl:DockMargin(0,0,10,0)
 
-		p_points:SetTall(25)
-
-		local p_wep = p:Add("Panel")
-		p_wep:Dock(TOP)
-		p_wep:DockPadding(5,2,5,2)
-		local p_wepl = p_wep:Add("DLabel")
-		p_wepl:SetText("Starting Weapon")
-		p_wepl:Dock(LEFT)
-		p_wepl:SizeToContentsX()
-		p_wepl:DockMargin(0,0,10,0)
-		local p_wepp = SettingPanel("StartWeapon", p_wep)
-		p_wepp:Dock(FILL)
-		p_wep:SetTall(25)
+			local st = SettingPanel(v[1],pnl)
+			st:Dock(FILL)
+		end
 
 		local lbl_hud = p:Add("DLabel")
 		lbl_hud:Dock(TOP)

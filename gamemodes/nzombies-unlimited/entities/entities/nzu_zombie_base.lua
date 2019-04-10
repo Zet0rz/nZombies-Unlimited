@@ -1,7 +1,5 @@
 AddCSLuaFile()
 
-print("LOADING HERE!")
-
 ENT.Base = "base_nextbot"
 ENT.Type = "nextbot"
 ENT.Category = "nZombies Unlimited"
@@ -130,9 +128,9 @@ if SERVER then
 	end
 
 	-- Lets you determine how long until the next retarget
-	-- This is called after the path is computed; NOT after retarget
+	-- This is called after a retarget. You can use the distance, we it is known to be the smallest distance to all players
 	function ENT:CalculateNextRetarget(target, dist)
-		return 5
+		return math.Clamp(dist/200, 3, 15) -- 1 second for every 100 units to the closet player
 	end
 
 	-- Called from RunBehaviour when there is no valid target
@@ -148,6 +146,13 @@ Pathing - SERVER
 ---------------------------------------------------------------------------]]
 
 if SERVER then
+	------- Fields -------
+	ENT.Acceleration = 400
+	ENT.Deceleration = 400
+	ENT.JumpHeight = 60
+	ENT.MaxYawRate = 360
+	ENT.StepHeight = 18
+
 	------- Callables -------
 	function ENT:ForceRepath() self.NextRepath = 0 end -- Forces the Zombie to recompute its path next tick
 	function ENT:SetNextRepath(time) self.NextRepath = time end -- Sets how long until the next time the bot will repath. Relative to current path's age
@@ -174,8 +179,15 @@ if SERVER then
 
 	-- Called after a repath. This lets you determine how long before the bath should be recomputed
 	-- It is a good optimization idea to base this off of the prior path's length
-	function ENT:CalculateNextRepath()
-		return 2
+	function ENT:CalculateNextRepath(path)
+		-- Get the target player's max running speed
+		local targetspeed = IsValid(self.Target) and self.Target:IsPlayer() and self.Target:GetRunSpeed() or self.DesiredSpeed
+
+		-- Our path delay should be the time it'd take this zombie and its target to move the path together (both run to each other)
+		local result = path:GetLength()/(self.DesiredSpeed + targetspeed)
+
+		-- Clamp that result between 1 and 10 seconds
+		return math.Clamp(result, 1, 10)
 	end
 
 	-- Called when the bot recomputes its path and needs to find its target location
@@ -194,6 +206,11 @@ if SERVER then
 	ENT.AttackDamage = 30
 	ENT.AttackRange = 60
 
+	-- How much of the movement speed is looked ahead to determine an attack range while moving
+	-- This is therefore roughly equal to the average Impact time of attacks (see AttackSequences table)
+	-- Setting to 0 will make the Zombie unable to move while attacking (only attack on full Path end)
+	ENT.MovementAttackRange = 0.5
+
 	-- List of different attack sequences, and the cycle at which they impact
 	-- Impacts are in cycle (0-1), the percentage through the sequence
 	-- It may contain multiple entries, at which point the Zombie will hit multiple times
@@ -205,10 +222,17 @@ if SERVER then
 
 	------- Callables -------
 
+	-- Gets the zombie's current attack range based on its movement speed
+	-- Should be used when attempting to make a moving attack
+	-- Use ENT.AttackRange to get static attack range
+	function ENT:GetMovementAttackRange()
+		return self.AttackRange + self.DesiredSpeed*self.MovementAttackRange
+	end
+
 	-- Perform an attack
 	-- It selects an attack animation and plays it, dealing damage during its moments of impact
 	-- A damage info can be passed, otherwise a default is created
-	function ENT:AttackTarget(target, dmg)
+	function ENT:AttackTarget(target, dmg, move)
 		if IsValid(target) then
 			local dmg = dmg
 			if not dmg then
@@ -220,16 +244,22 @@ if SERVER then
 			end
 
 			-- Perform the attack with the function of hurting the target!
-			self:DoAttackFunction(target, function(self, target)
-				if self:GetRangeTo(target) <= self.AttackRange then target:TakeDamageInfo(dmg) end
-			end, true)
+			if move then
+				self:DoMovingAttackFunction(target, function(self, target)
+					if self:GetRangeTo(target) <= self.AttackRange then target:TakeDamageInfo(dmg) end
+				end, true)
+			else
+				self:DoAttackFunction(target, function(self, target)
+					if self:GetRangeTo(target) <= self.AttackRange then target:TakeDamageInfo(dmg) end
+				end, true)
+			end
 		end
 	end
 
 	-- Plays an attack animation and at the moment of impact, executes the function
 	-- This should only be called in an event handler (or otherwise in the bot's coroutine)
 	function ENT:DoAttackFunction(target, func, multihit, speed)
-		speed = speed or 1
+		local speed = speed or 1
 
 		local attack = self:SelectAttack(target)
 		self:FaceTowards(target:GetPos())
@@ -259,6 +289,64 @@ if SERVER then
 		end
 	end
 
+	-- Plays an attack animation similarly to above, but will move towards its target on a frequently recomputed path
+	-- Fifth argument are options similar to MoveToPos
+	function ENT:DoMovingAttackFunction(target, func, multihit, speed, options)
+		local speed = speed or 1
+
+		local attack = self:SelectAttack(target)
+		self:FaceTowards(target:GetPos())
+
+		local seqdur = self:SetSequence(attack.Sequence)/speed
+		self:ResetSequenceInfo()
+		self:SetCycle(0)
+		self:SetPlaybackRate(speed)
+
+		local options = options or {}
+		local compute = self.ComputePath
+		local path = Path("Follow")
+		path:SetMinLookAheadDistance(options.lookahead or 1)
+		path:SetGoalTolerance(options.tolerance or 1)
+		path:Compute(self, target:GetPos(), compute)
+
+		local repath = options.repath or 0.25
+		local function movealong(time) -- A copy of coroutine.wait, but allowing the path to be updated
+			local goal = CurTime() + time
+			while true do
+				if goal < CurTime() then return end
+				if IsValid(path) then
+					path:Update(self)
+					path:Draw()
+				end
+				if path:GetAge() > repath then path:Compute(self, target:GetPos(), compute) end
+				coroutine.yield()
+			end
+		end
+
+		self:StartMovingAttack(target, attack, speed)
+
+		if multihit then
+			-- Support using multiple hit times
+			local lasttime = 0
+			local n = #attack.Impacts
+			for i = 1,n do
+				local delay = seqdur*attack.Impacts[i]
+				movealong(delay - lasttime)
+				func(self, target) -- Call the function
+				lasttime = delay
+			end
+			movealong(seqdur - lasttime)
+		else
+			-- Only execute with the first hit
+			local time = attack.Impacts[1]
+			movealong(seqdur*time)
+			func(self, target)
+			movealong(seqdur*(1 - time))
+		end
+
+		self:FinishMovingAttack()
+	end
+
 	------- Overridables -------
 
 	-- Select which attack sequence table to use for an upcoming attack
@@ -266,6 +354,19 @@ if SERVER then
 	-- We just pick a random in the AttackSequences table here
 	function ENT:SelectAttack(target)
 		return self.AttackSequences[math.random(#self.AttackSequences)]
+	end
+
+	-- Lets you apply various effects to moving attacks
+	-- This is the place where you'll want to adjust movement speed if you want a small slowdown
+	-- The base merely applies insane acceleration to make the zombie always able to keep up
+	function ENT:StartMovingAttack(target, attack, speed)
+		self.loco:SetAcceleration(9999)
+	end
+
+	-- Called at the end of a moving attack
+	-- This is where you'll want to revert the changes made in ENT:StartMovingAttack
+	function ENT:FinishMovingAttack()
+		self.loco:SetAcceleration(self.Acceleration)
 	end
 end
 
@@ -315,8 +416,10 @@ if SERVER then
 	end
 
 	-- Perform a basic attack on the given target
+	-- We do a moving attack if the target is a player
 	function ENT:Event_Attack(target)
-		self:AttackTarget(target or self.Target)
+		local t = target or self.Target
+		self:AttackTarget(t, nil, t:IsPlayer())
 	end
 
 	-- Perform a basic vault to a target position
@@ -416,9 +519,10 @@ if SERVER then
 	-- When a path ends. Either when the goal is reached, or when no path could be found
 	-- This is where you should trigger your attack event or idle
 	function ENT:OnPathEnd()
-		print(self, self.Target, self.PreventAttack)
 		if IsValid(self.Target) and not self.PreventAttack then
-			self:TriggerEvent("Attack", self.Target)
+			if self:GetRangeTo(self.Target) <= self.AttackRange then
+				self:TriggerEvent("Attack", self.Target)
+			end
 		else
 			self:Timeout(2)
 		end
@@ -459,7 +563,6 @@ if SERVER then
 
 	------- Overridables -------
 	function ENT:PerformIdle()
-		--PrintTable(self:GetSequenceList())
 		self:ResetSequence(self.IdleSequence)
 	end
 end
@@ -476,6 +579,12 @@ function ENT:Initialize()
 
 		self:SetNextRepath(0)
 		self:SetNextRetarget(0)
+
+		self.loco:SetAcceleration(self.Acceleration)
+		self.loco:SetDeceleration(self.Deceleration)
+		self.loco:SetJumpHeight(self.JumpHeight)
+		self.loco:SetMaxYawRate(self.MaxYawRate)
+		self.loco:SetStepHeight(self.StepHeight)
 	end
 
 	self:Init()
@@ -512,7 +621,11 @@ if SERVER then
 
 			local ct = CurTime()
 			if ct >= self.NextRetarget then
+				local oldtarget = self.Target
 				self:Retarget()
+				if self.Target ~= oldtarget then
+					self:SetNextRepath(0) -- Immediately repath next cycle
+				end
 			end
 
 			if not IsValid(self.Target) then
@@ -539,7 +652,7 @@ if SERVER then
 							continue
 						end
 						path:Compute(self, self:GetTargetPosition(), self.ComputePath)
-						self:SetNextRepath(self:CalculateNextRepath())
+						self:SetNextRepath(self:CalculateNextRepath(path))
 					end
 					path:Update(self)
 

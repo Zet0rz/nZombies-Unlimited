@@ -407,6 +407,18 @@ if SERVER then
 				if not v:CanAfford(SETTINGS.StartPoints) then
 					v:SetPoints(SETTINGS.StartPoints)
 				end
+
+				if SETTINGS.StartWeapon and SETTINGS.StartWeapon ~= "" then
+					v:Give(SETTINGS.StartWeapon)
+				end
+				if SETTINGS.StartKnife and SETTINGS.StartKnife ~= "" then
+					v:GiveWeaponInSlot(SETTINGS.StartKnife, "Knife")
+				end
+				if SETTINGS.StartGrenade and SETTINGS.StartGrenade ~= "" then
+					v:GiveWeaponInSlot(SETTINGS.StartGrenade, "Grenade")
+				end
+
+				hook.Run("nzu_PlayerRespawned", ply)
 			end
 		end
 	end
@@ -423,9 +435,6 @@ if SERVER then
 
 			local spawner = spawnpoints[(k-1)%num + 1]
 			ply:SetPos(spawner:GetPos())
-			ply:Give(SETTINGS.StartWeapon)
-			ply:GiveAmmo(999, "Pistol")
-			hook.Run("nzu_PlayerRespawned", ply)
 		end
 	end)
 end
@@ -496,8 +505,6 @@ if SERVER then
 				timer.Simple(1, function()
 					ply:Give("weapon_pistol")
 					ply:Give("weapon_ar2")
-					ply:GiveAmmo(999, "Pistol")
-					ply:GiveAmmo(999, "AR2")
 				end)
 			end
 		end)
@@ -515,7 +522,7 @@ Add HUD Component. Since this file only runs in nZombies, this component has bee
 if CLIENT then
 	local font = "nzu_RoundNumber"
 	surface.CreateFont(font, {
-		font = "Edo SZ",
+		font = "DK Umbilical Noose",
 		size = 128,
 		weight = 500,
 		antialias = true,
@@ -536,6 +543,40 @@ if CLIENT then
 		Material("nzombies-unlimited/hud/tally_4.png", "unlitgeneric smooth"),
 		Material("nzombies-unlimited/hud/tally_5.png", "unlitgeneric smooth")
 	}
+	local tallyparticlepos = {
+		{0,0,10,120},
+		{45,0,10,120},
+		{70,0,10,120},
+		{115,0,-10,120},
+		{115,0,-120,120},
+	}
+
+	local burnparticles = {
+		Material("particle/particle_glow_03.vmt"),
+		Material("particle/particle_glow_04.vmt"),
+		Material("particle/particle_glow_05.vmt"),
+		nil, -- I can't tell you why this is necessary, but it is
+	}
+	local burncolors = {
+		--Color(255,255,255),
+		--color_black,color_black,color_black,
+		--Color(50,0,100),Color(10,0,50),Color(20,0,40),Color(50,0,20),Color(50,0,0), -- Purple shadows
+		Color(50,0,0),Color(20,0,0),Color(10,0,0),Color(20,0,10),Color(50,10,0),Color(100,0,0),Color(150,0,0), -- Dark blood shadows
+
+		Color(255,100,50),Color(255,100,0),Color(200,100,0),Color(255,100,50),Color(255,150,0), -- Burn colors
+		nil,
+	}
+	local particlerate = 100
+	local particlesize = 20
+	local burnwidth = 10
+
+	local particlespeed_x = 200
+	local particlespeed_y = 100
+	local particlelife = 1
+
+	local particles
+	local lasttargetround
+	local lastparticletime
 
 	nzu.RegisterHUDComponentType("HUD_Round")
 	nzu.RegisterHUDComponent("HUD_Round", "Unlimited", {
@@ -543,11 +584,15 @@ if CLIENT then
 			local r = ROUND:GetRound()
 
 			if r ~= lastdrawnround then
-				if not transitioncomplete then
+				if not transitioncomplete or lasttargetround ~= r then
 					transitioncomplete = CurTime() + transitiontime
+					particles = {}
+					lasttargetround = r
+					lastparticletime = CurTime()
 				end
 				local pct = (transitioncomplete - CurTime())/transitiontime
 				local pct2 = math.Clamp(transitioncomplete - 2 - CurTime(), 0, 1)
+				local invpct2 = 1 - pct2
 
 				if r <= 5 and r >= 0 then
 					if lastdrawnround > r then
@@ -563,10 +608,35 @@ if CLIENT then
 					-- Transition with tally marks
 					surface.SetDrawColor(255,pct*200,pct*100)
 
+					local doneparticles
 					for i = lastdrawnround + 1, r do
 						surface.SetMaterial(tallymats[i])
-						surface.DrawTexturedRectUV(75, ScrH() - 175, tallysize, tallysize - pct2*tallysize, 0,0,1, 1 - pct2)
+						surface.DrawTexturedRectUV(75, ScrH() - 175, tallysize, invpct2*tallysize, 0,0,1, invpct2)
+
+						if invpct2 < 1 then
+							local num = math.floor((CurTime() - lastparticletime)*particlerate)
+							if num > 0 then
+								for j = 1,num do
+									local x1,y1,x2,y2 = unpack(tallyparticlepos[i])
+									local x = (x1 + x2*invpct2) + math.random(burnwidth) + 75
+									local y = (y1 + y2*invpct2) + ScrH() - 175
+
+									local mat = burnparticles[math.random(#burnparticles)]
+									table.insert(particles, {
+										X = x,
+										Y = y,
+										Material = mat,
+										Color = burncolors[math.random(#burncolors)],
+										SpeedX = math.random(-particlespeed_x, particlespeed_x),
+										Time = CurTime()
+									})
+								end
+								doneparticles = true
+							end
+						end
 					end
+
+					if doneparticles then lastparticletime = CurTime() end
 				else
 					surface.SetFont(font)
 
@@ -583,23 +653,67 @@ if CLIENT then
 						surface.DrawText(lastdrawnround)
 					end
 
-					render.ClearStencil()
-					render.SetStencilEnable(true)
-					render.ClearStencilBufferRectangle(0, ScrH() - 165, 400, ScrH() - 150*pct2, 1)
+					if invpct2 < 1 then
+						local x,y = surface.GetTextSize(r)
 
-					render.SetStencilReferenceValue(1)
-					render.SetStencilCompareFunction(STENCIL_EQUAL)
+						render.ClearStencil()
+						render.SetStencilEnable(true)
+						local y1 = ScrH() - 165
+						render.ClearStencilBufferRectangle(0, y1, 400, y1 + y*invpct2, 1)
 
-					surface.SetTextColor(150 + pct*100,pct*250,pct*150,255)
-					surface.SetTextPos(100, ScrH() - 165)
-					surface.DrawText(r)
+						render.SetStencilReferenceValue(1)
+						render.SetStencilCompareFunction(STENCIL_EQUAL)
 
-					render.SetStencilEnable(false)
+						surface.SetTextColor(150 + pct*100,pct*250,pct*150,255)
+						surface.SetTextPos(100, y1)
+						surface.DrawText(r)
+
+						render.SetStencilEnable(false)
+						
+						local num = math.floor((CurTime() - lastparticletime)*particlerate*(x*0.1))
+						if num > 0 then
+							for j = 1,num do
+								local x2 = math.random(x) + 100
+								local y2 = y1 + y*invpct2
+
+								local mat = burnparticles[math.random(#burnparticles)]
+								table.insert(particles, {
+									X = x2,
+									Y = y2,
+									Material = mat,
+									Color = burncolors[math.random(#burncolors)],
+									SpeedX = math.random(-particlespeed_x, particlespeed_x),
+									Time = CurTime()
+								})
+							end
+							lastparticletime = CurTime()
+						end
+					else
+						surface.SetTextColor(150 + pct*100,pct*250,pct*150,255)
+						surface.SetTextPos(100, ScrH() - 165)
+						surface.DrawText(r)
+					end
+				end
+
+				for k,v in pairs(particles) do
+					local diff = (CurTime() - v.Time)
+					local x = v.X
+					local y = v.Y - particlespeed_y*diff
+
+					surface.SetMaterial(v.Material)
+					local col = v.Color
+					surface.SetDrawColor(col.r, col.g, col.b, (1 - diff/particlelife) * 255)
+					surface.DrawTexturedRect(x,y,particlesize,particlesize)
+
+					v.X = v.X + v.SpeedX*FrameTime()
+					v.SpeedX = v.SpeedX - (v.SpeedX*FrameTime()*3)
 				end
 
 				if pct <= 0 then
 					lastdrawnround = r
 					transitioncomplete = nil
+					particles = nil
+					lastparticletime = nil
 				end
 			else
 				if r > 5 then

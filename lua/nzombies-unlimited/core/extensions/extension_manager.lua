@@ -58,13 +58,14 @@ local writetypes = {
 local customtypes = {}
 function nzu.AddCustomExtensionSettingType(type, tbl)
 	tbl.__index = tbl
+	if SERVER then tbl.CustomPanel = nil end
 	customtypes[type] = tbl
 end
 
 local function netwritesetting(tbl,set,val)
 	net.WriteString(set)
-	if tbl.NetSend then
-		tbl.NetSend(val)
+	if tbl.NetWrite then
+		tbl.NetWrite(val)
 	elseif tbl.Type then
 		writetypes[tbl.Type](val)
 	end
@@ -515,5 +516,43 @@ end
 include("../resources.lua")
 include("../hudmanagement.lua")
 
+nzu.AddCustomExtensionSettingType("Weapon", {
+	NetWrite = net.WriteString,
+	NetRead = net.ReadString,
+	CustomPanel = {
+		Create = function(parent, ext, setting)
+			local p = vgui.Create("DSearchComboBox", parent)
+
+			p:AddChoice("  [None]", "") -- Allow the choice of none
+			for k,v in pairs(weapons.GetList()) do
+				p:AddChoice((v.PrintName or "").." ["..v.ClassName.."]", v.ClassName)
+			end
+			p:SetAllowCustomInput(true)
+
+			function p:OnSelect(index, value, data)
+				self:Send()
+			end
+
+			return p
+		end,
+		Set = function(p,v)
+			for k,class in pairs(p.Data) do
+				if class == v then
+					p:SetText(p:GetOptionText(k))
+					p.selected = k
+					return
+				end
+			end
+
+			p.Choices[0] = v
+			p.Data[0] = v
+			p.selected = 0
+		end,
+		Get = function(p)
+			local str,data = p:GetSelected()
+			return data
+		end,
+	}
+})
 
 loadextension(loadextensionprepare("Core"))

@@ -19,7 +19,7 @@ if SERVER then
 		end
 	end)
 else
-	nzu.RegisterHUDComponentType("DamageOverlay")
+	nzu.RegisterHUDComponentType("HUD_DamageOverlay")
 
 	local overlay = Material("materials/overlay_low_health.png", "unlitgeneric smooth")
 	local min_threshold = 0.7
@@ -28,7 +28,7 @@ else
 	local pulse_time = 1
 	local pulse_base = 0.75 -- How much of the full overlay is contributed by the base health (the rest is added by the pulse)
 
-	nzu.RegisterHUDComponent("DamageOverlay", "Unlimited", {
+	nzu.RegisterHUDComponent("HUD_DamageOverlay", "Unlimited", {
 		Paint = function()
 			local ply = LocalPlayer() -- TODO: When spectating exists, replace this with view target
 			local health = ply:Health()

@@ -1,5 +1,5 @@
 local customtype = {
-	NetSend = net.WriteString,
+	NetWrite = net.WriteString,
 	NetRead = net.ReadString,
 	Client = true, -- Always network these
 }
@@ -157,7 +157,6 @@ customtype.CustomPanel = {
 		p:AddChoice("None")
 		if components[setting] then
 			for k,v in pairs(nzu.GetHUDComponents(setting)) do
-				print("Building", setting, v)
 				p:AddChoice(v)
 			end
 		end

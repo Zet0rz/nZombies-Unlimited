@@ -72,7 +72,7 @@ Ammo Supply & Calculations (Max Ammo functions)
 ---------------------------------------------------------------------------]]
 if SERVER then
 	-- This can be overwritten by any weapon
-	local function calculatemaxammo(wep)
+	local function calculatemaxammo(self)
 		local x,y
 		if self:GetPrimaryAmmoType() >= 0 then
 			local clip = self:GetMaxClip1()
@@ -207,6 +207,16 @@ end)
 if SERVER then
 	util.AddNetworkString("nzu_weaponslot")
 	util.AddNetworkString("nzu_weaponslot_access")
+
+	-- Override PLAYER:Give so that our NoAmmo argument works with Max Ammo rather than Default Clip
+	local oldgive = PLAYER.Give
+	function PLAYER:Give(class, noammo)
+		local wep = oldgive(self, class, noammo) -- Give the weapon normally. If noammo, then the weapon will also have no ammo from here
+
+		if IsValid(wep) and not noammo then
+			wep:GiveMaxAmmo()
+		end
+	end
 
 	function PLAYER:StripWeaponSlot(slot)
 		local wep = self:GetWeaponInSlot(slot)
@@ -512,7 +522,6 @@ if true then
 		end)
 	end, true)
 end
-
 
 --[[-------------------------------------------------------------------------
 HUD Component for weaponry
