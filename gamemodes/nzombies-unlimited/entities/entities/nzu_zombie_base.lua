@@ -63,8 +63,14 @@ if SERVER then
 	-- It is given the curve-based speed from Round as an argument
 	-- but it can manage its own modifications if needed
 	function ENT:SelectMovementSpeed(speed)
-		return 100
+		return speed
 	end
+
+	-- Called when the speed is set on the zombie. This happens after SelectMovementSpeed
+	-- You can use this to modify the zombie's behavior based on its speed
+	-- Note: This isn't it's actual speed, but rather its desired speed
+	-- In any normal circumstance, this is only called on spawn (but any ENT:SetDesiredSpeed call will ping this too)
+	function ENT:SpeedChanged(speed) end
 
 	-- Called by the round when the Zombie should have its health set
 	-- It is given the curve-based health from Round as an argument
@@ -220,6 +226,26 @@ if SERVER then
 		{Sequence = "swing", Impacts = {0.5}}
 	}
 
+	-- List of attack sounds
+	ENT.AttackSounds = {
+		Sound("nzu/zombie/attack/attack_00.wav"),
+		Sound("nzu/zombie/attack/attack_01.wav"),
+		Sound("nzu/zombie/attack/attack_02.wav"),
+		Sound("nzu/zombie/attack/attack_03.wav"),
+		Sound("nzu/zombie/attack/attack_04.wav"),
+		Sound("nzu/zombie/attack/attack_05.wav"),
+		Sound("nzu/zombie/attack/attack_06.wav"),
+		Sound("nzu/zombie/attack/attack_07.wav"),
+		Sound("nzu/zombie/attack/attack_08.wav"),
+		Sound("nzu/zombie/attack/attack_09.wav"),
+		Sound("nzu/zombie/attack/attack_10.wav"),
+		Sound("nzu/zombie/attack/attack_11.wav"),
+		Sound("nzu/zombie/attack/attack_12.wav"),
+		Sound("nzu/zombie/attack/attack_13.wav"),
+		Sound("nzu/zombie/attack/attack_14.wav"),
+		Sound("nzu/zombie/attack/attack_15.wav"),
+	}
+
 	------- Callables -------
 
 	-- Gets the zombie's current attack range based on its movement speed
@@ -269,6 +295,9 @@ if SERVER then
 		self:SetCycle(0)
 		self:SetPlaybackRate(speed)
 
+		-- Play the attack sound (which also stops further calls to ENT:Sound() until it is done + delay)
+		self:PlaySound(self.AttackSounds[math.random(#self.AttackSounds)])
+
 		if multihit then
 			-- Support using multiple hit times
 			local lasttime = 0
@@ -301,6 +330,9 @@ if SERVER then
 		self:ResetSequenceInfo()
 		self:SetCycle(0)
 		self:SetPlaybackRate(speed)
+
+		-- Play the attack sound (which also stops further calls to ENT:Sound() until it is done + delay)
+		self:PlaySound(self.AttackSounds[math.random(#self.AttackSounds)])
 
 		local options = options or {}
 		local compute = self.ComputePath
@@ -371,6 +403,64 @@ if SERVER then
 end
 
 --[[-------------------------------------------------------------------------
+Spawn, Deaths, Point Callbacks
+Callback for when the Zombie dies, or should give points to a player
+---------------------------------------------------------------------------]]
+if SERVER then
+	------- Fields -------
+
+	-- A list of sounds to play on death
+	ENT.DeathSounds = {
+		Sound("nzu/zombie/death/death_00.wav"),
+		Sound("nzu/zombie/death/death_01.wav"),
+		Sound("nzu/zombie/death/death_02.wav"),
+		Sound("nzu/zombie/death/death_03.wav"),
+		Sound("nzu/zombie/death/death_04.wav"),
+		Sound("nzu/zombie/death/death_05.wav"),
+		Sound("nzu/zombie/death/death_06.wav"),
+		Sound("nzu/zombie/death/death_07.wav"),
+		Sound("nzu/zombie/death/death_08.wav"),
+		Sound("nzu/zombie/death/death_09.wav"),
+		Sound("nzu/zombie/death/death_10.wav"),
+	}
+
+	------- Overridables -------
+
+	-- Called when the Zombie is about to die, right before ENT:PerformDeath.
+	-- If you want to perform specific logic on the zombie dying, this is where
+	-- Default: Do nothing really
+	function ENT:OnDeath(dmg)
+
+	end
+
+	-- Called when the bot wants to perform a death. Become ragdoll or otherwise perform a death animation here
+	-- Default: Fling like a ragdoll based on the damage and play a death sound!
+	function ENT:PerformDeath(dmg)
+		self:PlaySound(self.DeathSounds[math.random(#self.DeathSounds)])
+		self:BecomeRagdoll(dmg)
+	end
+
+
+	-- Select a spawn sequence and sound to play. This is called after everything is initialized
+	-- so it can be made dependant on certain properties defined on spawning
+	function ENT:SelectSpawnSequence()
+		local s
+		if self.SpawnSounds then s = self.SpawnSounds[math.random(#self.SpawnSounds)] end
+		return self.SpawnSequence, s
+	end
+
+	-- Perform the actual spawn. This can be overwritten if you want to do something COMPLETELY
+	-- different for the spawn. This is running during the bot's "Spawn" event
+	function ENT:PerformSpawn()
+		local seq,s = self:SelectSpawnSequence()
+		if seq then
+			self:PlaySequenceAndWait(self.SpawnSequence)
+		end
+		if s then self:PlaySound(s) end
+	end
+end
+
+--[[-------------------------------------------------------------------------
 Vaults
 Similar to attacks, these are just fields along with a SelectVault function
 ---------------------------------------------------------------------------]]
@@ -408,11 +498,9 @@ if SERVER then
 
 	------- Basic Events -------
 
-	-- Play a basic spawn animation before moving on
+	-- Play whatever is defined in the bot's PerformSpawn function
 	function ENT:Event_Spawn()
-		if self.SpawnSequence then
-			self:PlaySequenceAndWait(self.SpawnSequence)
-		end
+		self:PerformSpawn()
 	end
 
 	-- Perform a basic attack on the given target
@@ -463,6 +551,7 @@ if SERVER then
 		stucktime = nil
 
 		local name,groundspeed = self:SelectVaultSequence(to)
+		if not groundspeed then groundspeed = self.VaultSpeed end
 		local seq,dur = self:LookupSequence(name)
 
 		-- Get a path to the target location so we can get the distance
@@ -545,10 +634,57 @@ if SERVER then
 
 	-- Called while a path is valid and right after the bot has moved along the path
 	-- Lets you do things such as decide to randomly stop or change targets and recompute
-	-- Note: This is called in every loop - use some delay measure to not spam expensive functions
+	-- Note: Called at the end of the coroutine. Any events triggered from here will happen immediately next cycle
+	-- Note 2: This is called in every loop - use some delay measure to not spam expensive functions
 	-- Default: Do nothing (just move along the path)
 	function ENT:AI()
 
+	end
+end
+
+
+--[[-------------------------------------------------------------------------
+Sound
+Only applies to passive sounds - if you want attack or action-based sounds,
+you need to play those yourself in your functions (see Attack section for example)
+---------------------------------------------------------------------------]]
+if SERVER then
+	------- Fields -------
+	ENT.SoundDelayMin = 1
+	ENT.SoundDelayMax = 3
+
+	-- Sounds that play through the AI
+	ENT.PassiveSounds = {
+		Sound("nzu/zombie/amb/amb_00.wav"),
+		Sound("nzu/zombie/amb/amb_01.wav"),
+		Sound("nzu/zombie/amb/amb_02.wav"),
+		Sound("nzu/zombie/amb/amb_03.wav"),
+		Sound("nzu/zombie/amb/amb_04.wav"),
+		Sound("nzu/zombie/amb/amb_05.wav"),
+	}
+
+	------- Callables -------
+
+	-- Play a sound and delay the next passive sound by this amount
+	-- Optionally manually define delay, rather than random number
+	function ENT:PlaySound(s, lvl, pitch, vol, chan, delay)
+		local delay = delay or math.Rand(self.SoundDelayMin, self.SoundDelayMax)
+		if s then
+			local dur = SoundDuration(s)
+			self:EmitSound(s, lvl, pitch, vol, chan)
+			delay = delay + dur
+		end
+		self.NextSound = CurTime() + delay
+	end
+
+
+	------- Overridables -------
+
+	-- Perform sound play logic. If you want to play sounds based on other logic (such as distance or target)
+	-- you'll overwrite this function. This is called repeatedly once the delay of a PlaySound is over
+	-- Default: Play a random sound from the PassiveSounds table
+	function ENT:Sound()
+		self:PlaySound(self.PassiveSounds[math.random(#self.PassiveSounds)])
 	end
 end
 
@@ -562,6 +698,8 @@ if SERVER then
 	ENT.IdleSequence = "nz_idle_ad"
 
 	------- Overridables -------
+
+	-- Called when the zombie wants to idle. Play an animation here
 	function ENT:PerformIdle()
 		self:ResetSequence(self.IdleSequence)
 	end
@@ -595,6 +733,7 @@ if SERVER then
 	function ENT:SetDesiredSpeed(speed)
 		self.DesiredSpeed = self:SelectMovementSpeed(speed)
 		self.loco:SetDesiredSpeed(self.DesiredSpeed)
+		self:SpeedChanged(self.DesiredSpeed)
 	end
 
 	function ENT:RunBehaviour()
@@ -656,6 +795,9 @@ if SERVER then
 					end
 					path:Update(self)
 
+					if not self.NextSound or self.NextSound < CurTime() then
+						self:Sound()
+					end
 					self:AI()
 				end
 			end
@@ -802,5 +944,13 @@ function ENT:Think()
 				self.NextCollideCheck = CurTime() + collidedelay
 			end
 		end
+	end
+end
+
+if SERVER then
+	function ENT:OnKilled(dmg)
+		hook.Run("OnNPCKilled", self, dmg:GetAttacker(), dmg:GetInflictor())
+		self:OnDeath(dmg)
+		self:PerformDeath(dmg)
 	end
 end

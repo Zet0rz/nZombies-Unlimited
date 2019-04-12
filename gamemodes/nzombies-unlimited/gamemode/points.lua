@@ -4,6 +4,7 @@ local PLAYER = FindMetaTable("Player")
 nzu.AddPlayerNetworkVar("Int", "Points")
 
 function PLAYER:CanAfford(cost)
+	if cost < 0 then return true end -- Always able to afford negative values
 	return cost <= self:GetPoints()
 end
 
@@ -18,9 +19,9 @@ if SERVER then
 		hook.Run("nzu_PlayerPointNotify", ply, n)
 	end
 
-	function PLAYER:GivePoints(n)
+	function PLAYER:GivePoints(n, type, ent)
 		local tbl = {Points = n}
-		hook.Run("nzu_PlayerGivePoints", self, tbl)
+		hook.Run("nzu_PlayerGivePoints", self, tbl, type, ent)
 		local n = tbl.Points
 		if n ~= 0 then
 			self:SetPoints(self:GetPoints() + n)
@@ -28,9 +29,9 @@ if SERVER then
 		end
 	end
 
-	function PLAYER:TakePoints(n)
+	function PLAYER:TakePoints(n, type, ent)
 		local tbl = {Points = n}
-		hook.Run("nzu_PlayerTakePoints", self, tbl)
+		hook.Run("nzu_PlayerTakePoints", self, tbl, type, ent)
 		local n = tbl.Points
 		if n ~= 0 then
 			self:SetPoints(self:GetPoints() - n)
@@ -53,12 +54,12 @@ if SERVER then
 			if IsValid(ply) and ply:IsPlayer() then
 				if dmg:GetDamage() >= ent:Health() then
 					if knifetypes[dmg:GetDamageType()] then
-						ply:GivePoints(130)
+						ply:GivePoints(130, "ZombieKnifeKill", ent)
 					else
-						ply:GivePoints(hitboxes[util.QuickTrace(dmg:GetDamagePosition(), dmg:GetDamagePosition()).HitGroup] or 50)
+						ply:GivePoints(hitboxes[util.QuickTrace(dmg:GetDamagePosition(), dmg:GetDamagePosition()).HitGroup] or 50, "ZombieKill", ent)
 					end
 				else
-					ply:GivePoints(10)
+					ply:GivePoints(10, "ZombieHit", ent)
 				end
 			end
 		end

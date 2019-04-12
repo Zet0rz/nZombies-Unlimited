@@ -88,4 +88,10 @@ else
 		toggleelec()
 		hook.Run(iselec and "nzu_OnElectricityTurnedOn" or "nzu_OnElectricityTurnedOff")
 	end)
+
+	-- Global sounds!
+	local onsound = Sound("nzu/power/power_up.wav")
+	local offsound = Sound("nzu/power/power_down.wav")
+	hook.Add("nzu_OnElectricityTurnedOn", "nzu_Electricity_GlobalSound", function() surface.PlaySound(onsound) end)
+	hook.Add("nzu_OnElectricityTurnedOff", "nzu_Electricity_GlobalSound", function() surface.PlaySound(offsound) end)
 end

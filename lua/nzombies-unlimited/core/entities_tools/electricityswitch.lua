@@ -28,9 +28,11 @@ function ENT:Initialize()
 end
 
 if SERVER and NZU_NZOMBIES then
+	local powersound = Sound("nzu/power/power_on.wav")
 	function ENT:Use(activator)
 		if not self:HasElectricity() and not nzu.Electricity() then
 			nzu.TurnOnElectricity()
+			self:EmitSound(powersound)
 		end
 	end
 end

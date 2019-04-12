@@ -162,9 +162,10 @@ if SERVER then
 		end]]
 
 		PrintMessage(HUD_PRINTTALK, "Round starting!")
+		hook.Run("nzu_RoundStart", ROUND.Round)
 	end
 
-	function ROUND:Prepare()
+	function ROUND:Prepare(time)
 		hook.Remove("Think", "nzu_Round_Spawning")
 
 		self.State = ROUND_PREPARING
@@ -179,25 +180,28 @@ if SERVER then
 		self.Zombies = {}
 
 		if not timer.Start("nzu_Round_Prepare") then
-			timer.Create("nzu_Round_Prepare", 10, 1, startongoing)
+			timer.Create("nzu_Round_Prepare", time or 10, 1, startongoing)
 		end
 	end
 
-	function ROUND:SetRound(num)
+	function ROUND:SetRound(num, time)
 		--timer.Stop("nzu_Round_Spawning")
 		self.Round = num
 		PrintMessage(HUD_PRINTTALK, "Round is now: "..num)
 		self:SpawnPlayers()
-		self:Prepare() -- This networks
+		self:Prepare(time) -- This networks
+
+		hook.Run("nzu_RoundChanged", num)
 	end
 
 	function ROUND:Progress()
+		hook.Run("nzu_RoundEnd", self:GetRound())
 		self:SetRound(self:GetRound() + 1) -- This networks
 	end
 
 	function ROUND:Start()
 		if self.State == ROUND_WAITING then
-			self:SetRound(1)
+			self:SetRound(1, 20) -- 20 second prepare phase for the first round
 			hook.Run("nzu_GameStarted")
 		end
 	end
@@ -234,6 +238,8 @@ if SERVER then
 		if not timer.Start("nzu_Round_GameOver") then
 			timer.Create("nzu_Round_GameOver", 10, 1, doreset)
 		end
+
+		hook.Run("nzu_GameOver")
 	end
 
 	function ROUND:CalculateZombieHealth()
@@ -289,36 +295,61 @@ Round Sounds using ResourceSet setting in Core extension
 ---------------------------------------------------------------------------]]
 if SERVER then
 	-- Sounds!
+	local statemap = {
+		[ROUND_ONGOING] = "Start",
+		[ROUND_PREPARING] = "End",
+		[ROUND_GAMEOVER] = "GameOver",
+	}
 	local sounds = nzu.GetResources("RoundSounds")
-	hook.Add("nzu_RoundStateChanged", "nzu_Round_RoundSounds", function(round, state)
-		if round == 1 and (state == ROUND_PREPARING or state == ROUND_ONGOING) and sounds.Start then return end -- Don't play any sounds in round 1 if we have custom start sounds
-
-		if sounds[state] then
-			local s = sounds[state][math.random(#sounds[state])]
-			nzu.PlayClientSound(s)
-		end
+	hook.Add("nzu_RoundStart", "nzu_Round_Sounds", function(num)
+		if num == 1 and sounds.Initial then return end
+		local s = sounds.Start and sounds.Start[math.random(#sounds.Start)]
+		if s then nzu.PlayClientSound(s) end
 	end)
 
-	hook.Add("nzu_GameStarted", "nzu_Round_RoundSounds", function()
-		if sounds.Start then
-			local s = sounds.Start[math.random(#sounds.Start)]
-			nzu.PlayClientSound(s)
-		end
+	hook.Add("nzu_RoundEnd", "nzu_Round_Sounds", function(num)
+		local s = sounds.End and sounds.End[math.random(#sounds.End)]
+		if s then nzu.PlayClientSound(s) end
+	end)
+
+	hook.Add("nzu_GameStarted", "nzu_Round_Sounds", function()
+		local s = sounds.Initial and sounds.Initial[math.random(#sounds.Initial)]
+		if s then nzu.PlayClientSound(s) end
+	end)
+
+	hook.Add("nzu_GameOver", "nzu_Round_Sounds", function()
+		local s = sounds.GameOver and sounds.GameOver[math.random(#sounds.GameOver)]
+		if s then nzu.PlayClientSound(s) end
 	end)
 
 	nzu.AddResourceSet("RoundSounds", "Classic", {
-		[ROUND_PREPARING] = {
-			"nzu/round/round_end.mp3"
-		},
-		[ROUND_ONGOING] = {
+		Start = {
 			"nzu/round/round_start.mp3"
 		},
-		[ROUND_GAMEOVER] = {
+		End = {
+			"nzu/round/round_end.mp3"
+		},
+		GameOver = {
+			"nzu/round/game_over_5.mp3"
+		},
+	})
+
+	nzu.AddResourceSet("RoundSounds", "The Giant", {
+		Start = {
+			"nzu/round/thegiant/round_start_1.wav",
+			"nzu/round/thegiant/round_start_2.wav",
+			"nzu/round/thegiant/round_start_3.wav",
+			"nzu/round/thegiant/round_start_4.wav"
+		},
+		End = {
+			"nzu/round/thegiant/round_end.wav"
+		},
+		GameOver = {
 			"nzu/round/game_over_derriese.mp3"
 		},
 		-- DEBUG
-		["Start"] = {
-			"nzu/round/game_over_5.mp3"
+		Initial = {
+			"nzu/round/round_-1_prepare.mp3",
 		}
 	})
 end

@@ -215,12 +215,15 @@ if SERVER then
 			if IsValid(ent) and (not ent.nzu_UseCooldown or ent.nzu_UseCooldown < CurTime()) then
 				local data = ent:GetBuyFunction()
 				if data then
-					if not ply:CanAfford(data.Price) then return false end -- Can't use entities with a buy function that we can't afford!
 					if data.Electricity and not ent:HasElectricity() then return false end -- Can't use entities that require electricity it doesn't have!
 
-					ply:Buy(data.Price, data.Function, ent)
-					if not data.Rebuyable then
-						ent:SetBuyFunction(nil) -- Remove buy function from non-rebuyables
+					if data.Price == 0 then
+						local b = data.Function(ply, ent) -- We don't use Buy for 0-cost (so we don't play sound)
+						if not b and not data.Rebuyable then ent:SetBuyFunction(nil) end
+					else
+						if ply:Buy(data.Price, data.Function, ent) then -- If the purchase was successful
+							if not data.Rebuyable then ent:SetBuyFunction(nil) end  -- Remove buy function from non-rebuyables
+						end
 					end
 				end
 				hook.Run("nzu_PlayerStartUse", ply, ent)
@@ -245,10 +248,17 @@ end
 --[[-------------------------------------------------------------------------
 Player Buy shortcut function
 ---------------------------------------------------------------------------]]
+local buysound = Sound("nzu/purchase/accept.wav")
+local denysound = Sound("nzu/purchase/deny.wav")
 function PLAYER:Buy(cost, func, args)
 	if self:CanAfford(cost) then
-		self:TakePoints(cost)
-		return true, func and func(self, args)
+		local b = func and func(self, args) -- If the function returns true, it blocked the purchase
+		if not b then
+			self:TakePoints(cost)
+			self:EmitSound(buysound)
+			return true
+		end
 	end
+	self:EmitSound(denysound)
 	return false
 end

@@ -389,6 +389,7 @@ if CLIENT then
 		[ROUND_ONGOING] = "Ongoing",
 		[ROUND_GAMEOVER] = "GAME OVER"
 	}
+	local countdownsound = Sound("nzu/menu/countdown.wav")
 	local function countdownthink(s)
 		local state = nzu.Round:GetState()
 		if s.State ~= state then
@@ -416,7 +417,7 @@ if CLIENT then
 						s.LastCountdown = diff
 
 						-- Play UI sound
-						surface.PlaySound("buttons/button17.wav")
+						surface.PlaySound(countdownsound)
 					end
 					return
 				end

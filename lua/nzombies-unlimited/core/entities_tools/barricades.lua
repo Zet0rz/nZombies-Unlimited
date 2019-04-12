@@ -325,6 +325,24 @@ else
 	end
 end
 
+
+--[[-------------------------------------------------------------------------
+Planks
+---------------------------------------------------------------------------]]
+
+-- Sounds
+local floatsound = Sound("nzu/barricade/float.wav")
+local repairsound = Sound("nzu/barricade/repair.wav")
+local slamsounds = {
+	Sound("nzu/barricade/slam_00.wav"),
+	Sound("nzu/barricade/slam_01.wav"),
+	Sound("nzu/barricade/slam_02.wav"),
+	Sound("nzu/barricade/slam_03.wav"),
+	Sound("nzu/barricade/slam_04.wav"),
+	Sound("nzu/barricade/slam_05.wav"),
+}
+local pointssound = Sound("nzu/purchase/accept.wav")
+
 local PLANK = {}
 PLANK.Type = "anim"
 PLANK.Base = "base_entity"
@@ -386,6 +404,8 @@ if SERVER then
 			self:StartMotionController()
 
 			self:GetBarricade():InternalPlankStartRepair(self)
+
+			self:EmitSound(floatsound)
 		end
 	end
 
@@ -428,6 +448,8 @@ if SERVER then
 			self:SetLocalAngles(self.TargetAng)
 
 			self:StopMotionController()
+			self:EmitSound(slamsounds[math.random(#slamsounds)])
+			self:GetBarricade():EmitSound(repairsound)
 
 			hook.Run("nzu_PlankRepaired", self, self.CurrentUser)
 
@@ -486,3 +508,26 @@ end
 
 scripted_ents.Register(ENT, "nzu_barricade")
 scripted_ents.Register(PLANK, "nzu_barricade_plank")
+
+--[[-------------------------------------------------------------------------
+Points!
+---------------------------------------------------------------------------]]
+if SERVER then
+	local maxthisround = 0
+	hook.Add("nzu_PlankRepaired", "nzu_Barricade_RepairPoints", function(plank, ply)
+		if IsValid(ply) and ply:IsPlayer() then
+			if not ply.nzu_RepairedPlanks or ply.nzu_RepairedPlanks < maxthisround then
+				ply:GivePoints(10, "BarricadeRepair", plank)
+				nzu.PlayClientSound(pointssound, ply)
+				ply.nzu_RepairedPlanks = ply.nzu_RepairedPlanks and ply.nzu_RepairedPlanks + 1 or 1
+			end
+		end
+	end)
+
+	hook.Add("nzu_RoundChanged", "nzu_Barricade_RepairPointsMax", function(num)
+		maxthisround = math.min(4 + num*5, 49)
+		for k,v in pairs(player.GetAll()) do
+			v.nzu_RepairedPlanks = nil
+		end
+	end)
+end
