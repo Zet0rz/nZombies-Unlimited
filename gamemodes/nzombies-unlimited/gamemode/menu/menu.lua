@@ -327,7 +327,7 @@ if CLIENT then
 				local state = nzu.Round:GetState()
 				if state ~= ROUND_GAMEOVER then
 					if LocalPlayer():IsUnspawned() then
-						local totext = state == ROUND_WAITING and "Ready" or "Spawn in"
+						local totext = state == ROUND_WAITING and translate.Get("ready") or translate.Get("spawn_in")
 						if self:GetText() ~= totext then
 							self:SetText(totext)
 							self.ClickFunction = nzu.Ready
@@ -336,7 +336,7 @@ if CLIENT then
 							self:SetDisabled(false)
 						end
 					else
-						local totext = state == ROUND_WAITING and "Unready" or "Unspawn"
+						local totext = state == ROUND_WAITING and translate.Get("unready") or translate.Get("unspawn")
 						if self:GetText() ~= totext then
 							self:SetText(totext)
 							self.ClickFunction = nzu.Unready
@@ -350,7 +350,7 @@ if CLIENT then
 			else
 				if self:GetText() ~= "Load selected Config" then
 					-- Different config, only admins can trigger a load
-					self:SetText("Load selected Config")
+					self:SetText(translate.Get("load_celected_config"))
 					self.ClickFunction = readybuttonload
 					self.AdminOnly = true
 					self:SetDisabled(false)
@@ -359,7 +359,7 @@ if CLIENT then
 			end
 		end
 
-		self:SetText("[No valid action]")
+		self:SetText(translate.Get("no_action"))
 		self:SetDisabled(true)
 	end
 
@@ -377,9 +377,9 @@ if CLIENT then
 			self.ConfigPanel:SetImage("vgui/black")
 			self.ConfigPanel.Map:SetText("")
 			self.ConfigPanel.Map:SizeToContents()
-			self.ConfigPanel.Name:SetText("No Config selected")
+			self.ConfigPanel.Name:SetText(translate.Get("no_config_selected"))
 			self.ConfigPanel.Name:SizeToContents()
-			self.ConfigPanel.Authors:SetText("Use the Load Configs menu to select a Config to load.")
+			self.ConfigPanel.Authors:SetText(translate.Get("use_config_load"))
 			self.ConfigPanel.Authors:SizeToContents()
 		end
 	end
@@ -394,7 +394,7 @@ if CLIENT then
 		local state = nzu.Round:GetState()
 		if s.State ~= state then
 			if countdowntextstates[state] then
-				s:SetText("GAME ACTIVE - ["..countdowntextstates[state].."]")
+				s:SetText(translate.Get("game_active").." - ["..countdowntextstates[state].."]")
 			end
 
 			local old = s.State
@@ -413,7 +413,7 @@ if CLIENT then
 				local diff = math.ceil(nzu.Round.GameStart - CurTime())
 				if diff >= 0 then
 					if diff ~= s.LastCountdown then
-						s:SetText("GAME STARTING - [Spawn in "..(diff > 0 and diff or 0).."...]")
+						s:SetText(translate.Get("game_starting").." "..(diff > 0 and diff or 0).."...]")
 						s.LastCountdown = diff
 
 						-- Play UI sound
@@ -431,7 +431,7 @@ if CLIENT then
 				for i = 1,10 do
 					str = str .. string.char(math.random(32,126))
 				end
-				s:SetText("GAME ACTIVE - ["..str.."]")
+				s:SetText(translate.Get("game_active").." - ["..str.."]")
 				s.NextRandomize = CurTime() + 0.025
 			end
 		end
@@ -493,23 +493,23 @@ if CLIENT then
 		self.PlayerIndicator:DockMargin(0,0,0,5)
 
 		self.PlayerIndicator.Model = self.PlayerIndicator:Add("DLabel")
-		self.PlayerIndicator.Model:SetText("Character")
+		self.PlayerIndicator.Model:SetText(translate.Get("character"))
 		self.PlayerIndicator.Model:DockMargin(0,0,0,0)
 		self.PlayerIndicator.Model:SetContentAlignment(5)
 		self.PlayerIndicator.Model:Dock(LEFT)
 
 		self.PlayerIndicator.Name = self.PlayerIndicator:Add("DLabel")
-		self.PlayerIndicator.Name:SetText("Name")
+		self.PlayerIndicator.Name:SetText(translate.Get("name"))
 		self.PlayerIndicator.Name:SetContentAlignment(5)
 		self.PlayerIndicator.Name:Dock(FILL)
 
 		self.PlayerIndicator.Ping = self.PlayerIndicator:Add("DLabel")
-		self.PlayerIndicator.Ping:SetText("Ping")
+		self.PlayerIndicator.Ping:SetText(translate.Get("ping"))
 		self.PlayerIndicator.Ping:SetContentAlignment(5)
 		self.PlayerIndicator.Ping:Dock(RIGHT)
 
 		self.PlayerIndicator.Mute = self.PlayerIndicator:Add("DLabel")
-		self.PlayerIndicator.Mute:SetText("Mute")
+		self.PlayerIndicator.Mute:SetText(translate.Get("mute"))
 		self.PlayerIndicator.Mute:SetContentAlignment(5)
 		self.PlayerIndicator.Mute:Dock(RIGHT)
 
@@ -709,7 +709,7 @@ if CLIENT then
 		local clist = scroll:Add("DListLayout")
 		clist:Dock(FILL)
 
-		local sub = menu:AddPanel("Load Config ...", 3, scroll)
+		local sub = menu:AddPanel(translate.Get("load_config").." ...", 3, scroll)
 
 		local function doconfigclick(p)
 			if p.Config then

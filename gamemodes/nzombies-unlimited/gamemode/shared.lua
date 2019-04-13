@@ -70,6 +70,12 @@ loadfile_s("nzombies-unlimited/core/entities_tools/navlocker_nzu.lua")
 loadfile("nzombies-unlimited/core/entities_tools/barricades.lua")
 
 --[[-------------------------------------------------------------------------
+Gamemode multi-language
+---------------------------------------------------------------------------]]
+
+include("translate.lua")
+
+--[[-------------------------------------------------------------------------
 Misc GM hooks
 ---------------------------------------------------------------------------]]
 -- No noclipping!
