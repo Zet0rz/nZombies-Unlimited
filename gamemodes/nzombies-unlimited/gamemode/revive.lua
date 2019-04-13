@@ -31,15 +31,30 @@ if SERVER then
 		end
 	end
 
+	-- Promised Revive: A downed player is promised to be revived - therefore, do not count them as out
+	function PLAYER:SetPromisedRevive(t)
+		self.nzu_PromisedRevive = t
+		hook.Run("nzu_PlayerPromisedRevive", self, t)
+	end
+	function PLAYER:GetPromisedRevive() return self.nzu_PromisedRevive end
+	function PLAYER:GetCountsDowned() return self:GetIsDowned() and not self:GetPromisedRevive() end -- Downed and not promised to be revived
+
 	function PLAYER:RevivePlayer(savior)
 		if self:GetIsDowned() then
 			self:SetHealth(100)
 			self:SetIsDowned(false)
 			self.nzu_DownedTime = nil
+			self.nzu_PromisedRevive = nil
 
 			net.Start("nzu_playerdowned")
 				net.WriteEntity(self)
 				net.WriteBool(false)
+				if IsValid(savior) then
+					net.WriteBool(true)
+					net.WriteEntity(savior)
+				else
+					net.WriteBool(false)
+				end
 			net.Broadcast()
 
 			hook.Run("nzu_PlayerRevived", self, savior)
@@ -55,6 +70,10 @@ if SERVER then
 	function PLAYER:CanBeRevived()
 		return true
 	end
+
+	hook.Add("nzu_PlayerGivePoints", "nzu_Revive_DownedPlayersNoPoints", function(ply, tbl)
+		if ply:GetIsDowned() then tbl.Points = 0 return end -- DO NOT return normally! We only return because we set to 0 anyway, no other modifiers can do anything!
+	end)
 end
 
 if CLIENT then
@@ -65,7 +84,9 @@ if CLIENT then
 			hook.Run("nzu_PlayerDowned", ply)
 		else
 			ply.nzu_DownedTime = nil
-			hook.Run("nzu_PlayerRevived", ply)
+			local savior
+			if net.ReadBool() then savior = net.ReadEntity() end
+			hook.Run("nzu_PlayerRevived", ply, savior)
 		end
 	end)
 end
@@ -203,8 +224,6 @@ if SERVER then
 			net.WriteBool(false)
 		net.Broadcast()
 
-		self.nzu_ReviveBlock = CurTime() + 0.1
-
 		hook.Run("nzu_PlayerStoppedRevive", self, target)
 	end
 
@@ -240,16 +259,11 @@ if SERVER then
 	end)
 
 	-- Downed players can't use anything
-	hook.Add("PlayerUse", "nzu_Revive_RevivePlayers", function(ply, ent)
-		if ply:GetIsDowned() then return false end
-
+	hook.Add("nzu_PlayerStartUse", "nzu_Revive_RevivePlayers", function(ply, ent)
 		if not ply.nzu_ReviveLocked then
-			if IsValid(ent) and ent:CanBeRevived() and ent:GetIsDowned() and (not ply.nzu_ReviveBlock or ply.nzu_ReviveBlock < CurTime()) then
+			if IsValid(ent) and ent:CanBeRevived() and ent:GetIsDowned() then
 				if ply.nzu_ReviveTarget ~= ent then
 					ply:StartReviving(ent)
-				--elseif CurTime() >= ply.nzu_ReviveTime then
-					--ent:RevivePlayer(ply)
-					--ply:StopReviving()
 				end
 			elseif ply.nzu_ReviveTarget then
 				ply:StopReviving()
@@ -257,9 +271,8 @@ if SERVER then
 		end
 	end)
 
-	-- Also stop for E
-	hook.Add("KeyRelease", "nzu_Revive_StopHoldingE", function(ply, key)
-		if key == IN_USE and ply.nzu_ReviveTarget and not ply.nzu_ReviveLocked then
+	hook.Add("nzu_PlayerStopUse", "nzu_Revive_StopReviving", function(ply, ent)
+		if not ply.nzu_ReviveLocked and ent == ply.nzu_ReviveTarget then
 			ply:StopReviving()
 		end
 	end)
@@ -438,8 +451,8 @@ end
 Clientside HUD Drawing
 ---------------------------------------------------------------------------]]
 if CLIENT then
-	nzu.RegisterHUDComponentType("ReviveProgress")
-	nzu.RegisterHUDComponentType("DownedIndicator")
+	nzu.RegisterHUDComponentType("HUD_ReviveProgress")
+	nzu.RegisterHUDComponentType("HUD_DownedIndicator")
 
 	local localplayer
 	local isbeingrevived = false
@@ -531,14 +544,15 @@ if CLIENT then
 	-- Draw downed indicator on other players
 	hook.Add("HUDPaint", "nzu_Revive_DownedIndicator", function()
 		for k,v in pairs(downedplayers) do
-			dopaint("DownedIndicator", k, v)
+			dopaint("HUD_DownedIndicator", k, v)
 		end
+		--dopaint("HUD_DownedIndicator", Entity(2))
 	end)
 
 	-- Draw revive progress for local player
 	hook.Add("HUDPaint", "nzu_Revive_ReviveProgress", function()
 		if IsValid(localplayer) then
-			dopaint("ReviveProgress", localplayer, isbeingrevived)
+			dopaint("HUD_ReviveProgress", localplayer, isbeingrevived)
 		end
 	end)
 
@@ -562,12 +576,37 @@ if CLIENT then
 end
 
 
+--[[-------------------------------------------------------------------------
+Stat Registers
+---------------------------------------------------------------------------]]
+nzu.AddPlayerNetworkVar("Int", "NumRevives")
+nzu.AddPlayerNetworkVar("Int", "NumDowns")
+
+if SERVER then
+	hook.Add("nzu_PlayerRevived", "nzu_Revive_ReviveStat", function(ply, savior)
+		if IsValid(savior) then savior:SetNumRevives(savior:GetNumRevives() + 1) end
+	end)
+
+	hook.Add("nzu_PlayerDowned", "nzu_Revive_DownStat", function(ply)
+		ply:SetNumDowns(ply:GetNumDowns() + 1)
+	end)
+
+	hook.Add("nzu_GameStarted", "nzu_Revive_StatReset", function()
+		for k,v in pairs(player.GetAll()) do
+			v:SetNumRevives(0)
+			v:SetNumDowns(0)
+		end
+	end)
+end
 
 --[[-------------------------------------------------------------------------
 HUD Components
 ---------------------------------------------------------------------------]]
 if CLIENT then
-	nzu.RegisterHUDComponent("ReviveProgress", "Unlimited", {
+	local mat = Material("nzombies-unlimited/hud/points_shadow.png")
+	local mat2 = Material("nzombies-unlimited/hud/points_glow.vmt")
+
+	nzu.RegisterHUDComponent("HUD_ReviveProgress", "Unlimited", {
 		Draw = function(ply, isbeingrevived)
 			local lp = LocalPlayer()
 			local w,h = ScrW()/2 ,ScrH()
@@ -591,11 +630,56 @@ if CLIENT then
 		end
 	})
 
-	nzu.RegisterHUDComponent("DownedIndicator", "Unlimited", {
+	local REVIVEfont = "nzu_Font_Revive"
+	local downedindicator = Vector(0,0,25)
+	local point = Material("gui/point.png")
+	local revivetext = "REVIVE"
+	local revivebarheight = 10
+	local outlines = 5
+	local waveheight = 40
+	local pointheight = 15
+	
+	nzu.RegisterHUDComponent("HUD_DownedIndicator", "Unlimited", {
 		Draw = function(ply, revivor)
-			local pos = ply:GetPos():ToScreen()
+			local pos = (ply:GetPos() + downedindicator):ToScreen()
 			if pos.visible then
-				draw.SimpleText(IsValid(revivor) and revivor:Nick() or "DOWNED", "DermaLarge", pos.x, pos.y, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
+				local x,y = pos.x,pos.y
+				surface.SetFont(REVIVEfont)
+				local w,h = surface.GetTextSize(revivetext)
+
+				local w2 = w + outlines*2
+				local x2 = x - w/2 - outlines
+				local y2 = y - 6
+
+				surface.SetMaterial(mat)
+				surface.SetDrawColor(0,0,0,255)
+				surface.DrawTexturedRectRotated(x, y - h, waveheight, w2, 90)
+
+				surface.DrawRect(x2, y2, w2, revivebarheight)
+
+				surface.SetMaterial(point)
+				surface.DrawTexturedRect(x2, y2 + revivebarheight, w2, pointheight)
+				
+
+				if IsValid(revivor) then
+					local diff = revivor.nzu_ReviveTime - revivor.nzu_ReviveStartTime
+					local pct = (CurTime() - revivor.nzu_ReviveStartTime)/diff
+
+					surface.SetDrawColor(255,255,255)
+					surface.SetTextColor(255,255,255)
+					surface.DrawRect(x2 + 4, y2 + 3, (w2 - 8) * pct, revivebarheight - 6)
+				elseif ply.nzu_DownedTime then
+					local pct = (1 - (CurTime() - ply.nzu_DownedTime)/bleedouttime)*255
+					surface.SetDrawColor(255,pct,0)
+					surface.SetTextColor(255,pct,0)
+					surface.DrawRect(x2 + 4, y2 + 3, w2 - 8, revivebarheight - 6)
+				end
+				surface.DrawTexturedRect(x2 + 7, y2 + revivebarheight, w2 - 14, pointheight - 4)
+				surface.SetMaterial(mat2)
+				surface.DrawTexturedRectRotated(x, y - h, waveheight, w2, 90)
+				
+				surface.SetTextPos(pos.x - w/2, pos.y - h)
+				surface.DrawText(revivetext)
 			end
 		end
 	})

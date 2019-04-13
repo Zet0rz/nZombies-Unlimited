@@ -152,6 +152,7 @@ if CLIENT then
 			end
 		end
 
+		-- DEBUG
 		print("Running here")
 		hook.Run("nzu_ConfigInfoSaved", config, new) -- Call the same hook
 
@@ -337,6 +338,12 @@ if CLIENT then
 			net.SendToServer()
 			print("Networked to server")
 			PrintTable(config)
+		end
+
+		function nzu.RequestSaveConfigSettings()
+			if not nzu.IsAdmin(LocalPlayer()) then return end
+			net.Start("nzu_saveconfig_settings")
+			net.SendToServer()
 		end
 
 		function nzu.RequestDeleteConfig(config)

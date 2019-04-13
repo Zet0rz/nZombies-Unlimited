@@ -154,6 +154,8 @@ if CLIENT then
 	-- Panel
 	local PANEL = {}
 
+	Derma_Install_Convar_Functions(PANEL)
+
 	function PANEL:Init()
 		local bottom = self:Add("Panel")
 		bottom:SetTall(20)
@@ -258,6 +260,7 @@ if CLIENT then
 				end
 
 				if anychange then
+					self:GetParent():UpdateConVar()
 					self:GetParent():OnSelectedFlagsChanged()
 				end
 
@@ -299,6 +302,7 @@ if CLIENT then
 		Line.m_fClickTime = SysTime()
 
 		if b then self:OnRowSelected(Line:GetID(), Line) end
+		self:GetParent():UpdateConVar()
 		self:GetParent():OnSelectedFlagsChanged()
 	end
 
@@ -321,11 +325,13 @@ if CLIENT then
 
 	function PANEL:LoadFlagsSelected(flags)
 		self.List:Clear()
+
 		for k,v in pairs(flags) do
 			local p = self:AddLine(k)
 			p:SetSelected(v)
 		end
 
+		self:UpdateConVar()
 		self:OnSelectedFlagsChanged()
 
 		self.ControlHelp:SetText("Use Shift/Ctrl to select multiple.")
@@ -359,8 +365,9 @@ if CLIENT then
 			end
 		end
 
-		if next(selectedflags) then -- The table is non-empty: We removed a previously selected element. Update selection callback.
-			self:OnSelectedFlagsChanged()
+		for k,v in pairs(selectedflags) do
+			local p = self:AddLine(k)
+			p:SetSelected(true) -- Re-add old selected lines
 		end
 
 		self.ControlHelp:SetText("Use Shift/Ctrl to select multiple.")
@@ -377,6 +384,7 @@ if CLIENT then
 			if v:GetColumnText(1) == str then
 				if not v:IsSelected() and selected then
 					v:SetSelected(true)
+					self:UpdateConVar()
 					self:OnSelectedFlagsChanged()
 				end
 				return
@@ -384,7 +392,10 @@ if CLIENT then
 		end
 
 		self:AddLine(str):SetSelected(selected)
-		if selected then self:OnSelectedFlagsChanged() end
+		if selected then
+			self:UpdateConVar()
+			self:OnSelectedFlagsChanged()
+		end
 	end
 
 	function PANEL:GetSelectedFlags()
@@ -397,24 +408,33 @@ if CLIENT then
 	end
 
 	function PANEL:SetSelectedFlags(flags)
+		local flags = flags or {}
 		local keys = {}
 		for k,v in pairs(flags) do
 			keys[v] = true
 		end
 
+		--local toremove = {}
 		for k,v in pairs(self.List:GetLines()) do
 			local key = v:GetColumnText(1)
 			if keys[key] then
 				v:SetSelected(true)
 				keys[key] = nil
+			else
+				v:SetSelected(false) -- It's loaded but not selected
 			end
 		end
+
+		--for k,v in pairs(toremove) do
+			--self.List:RemoveLine(v)
+		--end
 
 		-- Add all flags that aren't already in there
 		for k,v in pairs(keys) do
 			self:AddNewFlag(k, true)
 		end
 
+		self:UpdateConVar()
 		self:OnSelectedFlagsChanged()
 	end
 
@@ -471,6 +491,29 @@ if CLIENT then
 			if torefresh then torefresh[self] = nil end
 			self.RefreshGiveUp = nil
 		end
+
+		self:ConVarStringThink()
+	end
+
+	function PANEL:SetValue(str) -- Setting via string
+		local str2 = string.Trim(str)
+		local tbl = str2 == "" and {} or string.Explode(" ", str2)
+
+		self.m_bIgnoreConVar = true
+		self.m_strConVarValue = str
+		self:SetSelectedFlags(tbl)
+		self.m_bIgnoreConVar = nil
+	end
+
+	function PANEL:UpdateConVar() -- Update its ConVar
+		if self.m_strConVar and not self.m_bIgnoreConVar then
+			local str = ""
+			for k,v in pairs(self:GetSelectedFlags()) do
+				str = str .. v .. " "
+			end
+			str = string.Trim(str)
+			self:ConVarChanged(str)
+		end
 	end
 
 	function PANEL:OnSelectedFlagsChanged()
@@ -517,13 +560,13 @@ if NZU_SANDBOX then
 
 	properties.Add("nzu_MapFlags", {
 		MenuLabel = "[NZU] Edit Map Flags",
-		Order = 3000,
+		Order = 3100,
 		MenuIcon = "icon16/door_open.png",
-		PrependSpacer = true,
+		--PrependSpacer = true,
 
 		Filter = function(self, ent, ply) -- A function that determines whether an entity is valid for this property
 			if !IsValid(ent) then return false end
-			if !gamemode.Call("CanProperty", ply, "ignite", ent) then return false end
+			if !gamemode.Call("CanProperty", ply, "nzu_MapFlags", ent) then return false end
 
 			return ent.nzu_MapFlagsHandler
 		end,

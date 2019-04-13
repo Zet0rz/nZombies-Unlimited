@@ -105,7 +105,7 @@ nzu.AddSpawnmenuTab("Extension Settings", "DPanel", function(panel)
 				"Cancel"
 			):SetSkin("nZombies Unlimited")
 		else
-			nzu.RequestSaveConfigInfo(nzu.CurrentConfig)
+			nzu.RequestSaveConfigSettings(nzu.CurrentConfig)
 		end
 	end
 

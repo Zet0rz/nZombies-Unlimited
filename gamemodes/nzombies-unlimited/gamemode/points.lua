@@ -1,10 +1,14 @@
+local PLAYER = FindMetaTable("Player")
 
 -- Use these NetworkVars or use NW2Int?
 nzu.AddPlayerNetworkVar("Int", "Points")
 
-if SERVER then
-	local PLAYER = FindMetaTable("Player")
+function PLAYER:CanAfford(cost)
+	if cost < 0 then return true end -- Always able to afford negative values
+	return cost <= self:GetPoints()
+end
 
+if SERVER then
 	util.AddNetworkString("nzu_PointsNotify")
 	local function notifyplayers(ply, n)
 		net.Start("nzu_PointsNotify")
@@ -15,18 +19,24 @@ if SERVER then
 		hook.Run("nzu_PlayerPointNotify", ply, n)
 	end
 
-	function PLAYER:GivePoints(n)
-		n = hook.Run("nzu_PlayerGivePoints", self, n) or n
-		self:SetPoints(self:GetPoints() + n)
-
-		notifyplayers(self, n)
+	function PLAYER:GivePoints(n, type, ent)
+		local tbl = {Points = n}
+		hook.Run("nzu_PlayerGivePoints", self, tbl, type, ent)
+		local n = tbl.Points
+		if n ~= 0 then
+			self:SetPoints(self:GetPoints() + n)
+			notifyplayers(self, n)
+		end
 	end
 
-	function PLAYER:TakePoints(n)
-		n = hook.Run("nzu_PlayerTakePoints", self, n) or n
-		self:SetPoints(self:GetPoints() - n)
-
-		notifyplayers(self, -n)
+	function PLAYER:TakePoints(n, type, ent)
+		local tbl = {Points = n}
+		hook.Run("nzu_PlayerTakePoints", self, tbl, type, ent)
+		local n = tbl.Points
+		if n ~= 0 then
+			self:SetPoints(self:GetPoints() - n)
+			notifyplayers(self, -n)
+		end
 	end
 
 	local knifetypes = {
@@ -44,12 +54,12 @@ if SERVER then
 			if IsValid(ply) and ply:IsPlayer() then
 				if dmg:GetDamage() >= ent:Health() then
 					if knifetypes[dmg:GetDamageType()] then
-						ply:GivePoints(130)
+						ply:GivePoints(130, "ZombieKnifeKill", ent)
 					else
-						ply:GivePoints(hitboxes[util.QuickTrace(dmg:GetDamagePosition(), dmg:GetDamagePosition()).HitGroup] or 50)
+						ply:GivePoints(hitboxes[util.QuickTrace(dmg:GetDamagePosition(), dmg:GetDamagePosition()).HitGroup] or 50, "ZombieKill", ent)
 					end
 				else
-					ply:GivePoints(10)
+					ply:GivePoints(10, "ZombieHit", ent)
 				end
 			end
 		end
@@ -120,33 +130,13 @@ if CLIENT then
 	local selfsize = 50
 	local othersize = 35
 
-	local namefont = "nzu_HUD_Points_LocalPlayerName"
-	surface.CreateFont(namefont, {
-		font = "Trebuchet MS",
-		size = 23,
-		weight = 1000,
-		antialias = true,
-	})
-	local othernamefont = "Default"
-
-	local pointsfont = "nzu_HUD_Points_PointsLarge"
-	surface.CreateFont(pointsfont, {
-		font = "Trebuchet MS",
-		size = 32,
-		weight = 600,
-		antialias = true,
-	})
-
-	local pointsfont2 = "nzu_HUD_Points_PointsSmall"
-	surface.CreateFont(pointsfont2, {
-		font = "Trebuchet MS",
-		size = 24,
-		weight = 500,
-		antialias = true,
-	})
-
-	nzu.RegisterHUDComponentType("Points")
-	nzu.RegisterHUDComponent("Points", "Unlimited", {
+	local namefont = "nzu_Font_Points_NameLarge"
+	local othernamefont = "nzu_Font_Points_NameSmall"
+	local pointsfont = "nzu_Font_Points_PointsLarge"
+	local pointsfont2 = "nzu_Font_Points_PointsSmall"
+	
+	--nzu.RegisterHUDComponentType("HUD_Points")
+	nzu.RegisterHUDComponent("HUD_Points", "Unlimited", {
 		Create = function()
 			local pnl = vgui.Create("DPanel")
 			pnl:ParentToHUD()
@@ -235,7 +225,6 @@ if CLIENT then
 							local num = #s.PointNotifies
 							local i = 1
 							while i <= num do
-								print(i,num)
 								local v = s.PointNotifies[i]
 								local pct = (ct - v[3])/totaltime
 								local points = v[1]

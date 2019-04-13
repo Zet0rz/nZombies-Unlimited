@@ -23,12 +23,14 @@ function nzu.IsAdmin(ply) return ply:IsAdmin() end -- Replace this later
 NZU_SANDBOX = false
 NZU_NZOMBIES = true
 
+loadfile_c("fonts.lua")
+
 --[[-------------------------------------------------------------------------
 Extension Manager
 ---------------------------------------------------------------------------]]
 loadfile("nzombies-unlimited/core/extensions/extension_manager.lua")
 loadfile_c("nzombies-unlimited/core/extensions/extension_panels.lua")
-loadfile_c("nzombies-unlimited/core/hudmanagement.lua") -- Needed for the settings panel
+--loadfile_c("nzombies-unlimited/core/hudmanagement.lua") -- Needed for the settings panel
 
 --[[-------------------------------------------------------------------------
 Core Modules shared with Sandbox
@@ -43,14 +45,32 @@ loadfile_s("nzombies-unlimited/core/mapflags.lua") -- Only Server outside Sandbo
 Gamemode-specific files
 ---------------------------------------------------------------------------]]
 loadfile("player.lua")
+loadfile("playeruse.lua")
 
+loadfile_c("menu/scoreboard.lua")
+
+loadfile("electricity.lua")
 loadfile("revive.lua")
 loadfile("round.lua")
 loadfile("points.lua")
-loadfile("targeting.lua")
+loadfile_s("targeting.lua")
 loadfile("weapons.lua")
+loadfile("health.lua")
 
 loadfile("menu/menu.lua")
-loadfile_c("menu/menu_customizeplayer.lua")
 
+--[[-------------------------------------------------------------------------
+Gamemode modules
+---------------------------------------------------------------------------]]
+loadfile_c("menu/menu_customizeplayer.lua")
 loadfile_s("nzombies-unlimited/core/entities_tools/spawnpoints_nzu.lua")
+loadfile("nzombies-unlimited/core/entities_tools/doors_nzu.lua")
+loadfile("nzombies-unlimited/core/entities_tools/electricityswitch.lua")
+loadfile_s("nzombies-unlimited/core/entities_tools/navlocker_nzu.lua")
+loadfile("nzombies-unlimited/core/entities_tools/barricades.lua")
+
+--[[-------------------------------------------------------------------------
+Misc GM hooks
+---------------------------------------------------------------------------]]
+-- No noclipping!
+function GM:PlayerNoClip(ply,on) return false end

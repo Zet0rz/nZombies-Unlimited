@@ -36,7 +36,8 @@ loadfile_c("extensions/extension_panels.lua")
 --[[-------------------------------------------------------------------------
 Components & Modules
 ---------------------------------------------------------------------------]]
-loadfile_c("hudmanagement.lua")
+--loadfile("resources.lua")
+--loadfile_c("hudmanagement.lua")
 loadfile("logic/logic_manager.lua")
 loadfile("mapflags.lua")
 
@@ -57,6 +58,12 @@ loadfile("logic/nzu_logic_testunit.lua")
 loadfile("spawnmenu_entities_test.lua")
 
 loadfile("entities_tools/spawnpoints_sandbox.lua")
+loadfile("entities_tools/doors_sandbox.lua")
+loadfile("entities_tools/electricityswitch.lua")
+loadfile("entities_tools/wallbuys.lua")
+loadfile("entities_tools/navlocker_sandbox.lua")
+loadfile("entities_tools/barricades.lua")
+loadfile("entities_tools/invisiblewalls.lua")
 
 --[[if SERVER then
 	AddCSLuaFile("cl_nzombies_skin.lua")

@@ -20,6 +20,7 @@ duplicator.RegisterEntityModifier("nzu_saveid", function(ply, ent, data)
 end)
 
 local function loadconfig(config)
+	hook.Run("nzu_PreLoadConfig")
 
 	-- 1) Load Extensions
 	if file.Exists(config.Path.."/settings.txt", "GAME") then
@@ -111,6 +112,8 @@ local function loadconfig(config)
 			v(tab.SaveExtensions[k].PostSave)
 		end
 	end)
+
+	hook.Run("nzu_PostLoadConfig")
 end
 
 
@@ -138,6 +141,7 @@ Networking of Configs
 util.AddNetworkString("nzu_saveconfig") -- SERVER: Update clients' config cache || CLIENT: Request a config save
 util.AddNetworkString("nzu_configsnetworked") -- SERVER: Tell client request received || CLIENT: Request full list of configs for cache
 util.AddNetworkString("nzu_deleteconfig") -- SERVER: Remove from clients' config cache || CLIENT: Request config deletion
+util.AddNetworkString("nzu_saveconfig_settings") -- CLIENT: Request a save of the config's settings
 
 local function networkconfig(config, ply, loaded)
 	net.Start("nzu_saveconfig")
@@ -360,6 +364,11 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 		ent.nzu_SaveIgnore = true
 	end
 
+	local ignoredfields = {}
+	function nzu.IgnoreSaveField(key)
+		ignoredfields[key] = true
+	end
+
 	local function getmapjson()
 		local tbl = {}
 		tbl.SaveExtensions = {}
@@ -377,15 +386,27 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 
 
 		local Ents = ents.GetAll()
+		local map = {Entities = {}, Constraints = {}}
 		for k,v in pairs(Ents) do
 			if v.nzu_SaveIgnore or not gmsave.ShouldSaveEntity(v, v:GetSaveTable()) or v:IsConstraint() then
-				Ents[k] = nil
 				v.nzu_SaveIgnore = nil
 			else
-				duplicator.StoreEntityModifier(v, "nzu_saveid", {id = k})
+				duplicator.StoreEntityModifier(v, "nzu_saveid", {id = v:EntIndex()})
+
+				local temp = {}
+				for k2,v2 in pairs(ignoredfields) do
+					if v[k2] then
+						temp[k2] = v[k2]
+						v[k2] = nil
+					end
+				end
+				map = duplicator.Copy(v, map)
+				for k2,v2 in pairs(temp) do
+					v[k2] = v2
+				end
 			end
 		end
-		tbl.Map = duplicator.CopyEnts(Ents)
+		tbl.Map = map
 		
 		local postsaves = {}
 		for k,v in pairs(savefuncs) do
@@ -562,6 +583,11 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 			dontnetwork = false
 			hook.Run("nzu_ConfigLoaded", config)
 		end
+	end)
+
+	net.Receive("nzu_saveconfig_settings", function(len, ply)
+		if not nzu.IsAdmin(ply) then return end
+		nzu.SaveConfigSettings()
 	end)
 
 
