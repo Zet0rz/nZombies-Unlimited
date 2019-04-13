@@ -8,14 +8,13 @@ ENTITY.GetDoorData = ENTITY.GetBuyFunction -- Since Door Data is just stored in 
 if SERVER then
 	local nzu = nzu
 
-	local doorgroups
-	local nongroups
+	local doorgroups = {}
+	local nongroups = {}
 	util.AddNetworkString("nzu_doors") -- Server: Broadcast door information to clients, individual doors
 	util.AddNetworkString("nzu_doors_groups") -- Server: Broadcast door information to clients, group-optimized
 
 	-- In nZombies, we only have to network the price and whether it requires electricity
 	local function writedoordata(data)
-		PrintTable(data)
 		net.WriteUInt(data.Price, 32)
 		net.WriteBool(data.Electricity)
 	end
@@ -31,6 +30,7 @@ if SERVER then
 			return
 		end
 
+		net.WriteBool(false)
 		writedoordata(data)
 	end
 
@@ -96,15 +96,34 @@ if SERVER then
 		end
 	})
 
+	-- Open doors when bought
 	local function opendoorfunc(ply, ent)
 		local data = ent:GetDoorData()
 		if data then
+			-- Since this is a BuyFunction, it is triggered on player using the entity
+			-- We can return true to allow the entity to be used normally so doors can display its effects
+			-- nzu.OpenDoor returns the result of the OpenDoor function on that entity
+			-- nzu.OpenDoorGroup returns a table of results
+
 			if data.Group then
-				nzu.OpenDoorGroup(data.Group, ply)
+				local results = nzu.OpenDoorGroup(data.Group, ply, ent)
+				return results[ent]
 			else
-				nzu.OpenDoor(ent, ply)
+				return nzu.OpenDoor(ent, ply)
 			end
 		end
+	end
+
+	-- Simulate door being locked if attempted to be opened when you can't
+	local doorclasses = {
+		["func_door"] = true,
+		["func_door_rotating"] = true,
+		["prop_door_rotating"] = true,
+	}
+	local function failopendoor(ply, ent)
+		ent:SetSaveValue("m_bLocked", true) -- Set to locked, then try to open. That'll play the door's locked effect
+		--ent:Use(ply, ply, USE_ON, 1)
+		return true -- Allow the normal use, but we're locked
 	end
 
 	function ENTITY:CreateDoor(data)
@@ -156,6 +175,10 @@ if SERVER then
 
 		-- Apply stuff for the buy function
 		data.Function = opendoorfunc
+		if doorclasses[self:GetClass()] then
+			data.FailFunction = failopendoor
+			self:SetSaveValue("m_bLocked", true) -- For good measure
+		end
 		self:SetBuyFunction(data, true) -- Don't network it, we do it ourselves
 
 		if not nonetwork then
@@ -195,7 +218,8 @@ if SERVER then
 	Opening doors
 	---------------------------------------------------------------------------]]
 	local effectdelay = 2
-	local function openprops(ent)
+	local function openprops(ent, ply)
+		ent:SetCollisionGroup(COLLISION_GROUP_DEBRIS) -- No longer collide
 		local e = EffectData()
 		e:SetEntity(ent)
 		e:SetScale(effectdelay)
@@ -203,9 +227,67 @@ if SERVER then
 		SafeRemoveEntityDelayed(ent, effectdelay)
 	end
 
-	-- Change this later to Open -> Lock, but support double doors
-	local function opendoors(ent)
-		ent:Remove()
+	-- Functions for getting whether a door is open by its SaveTable
+	local opentest = {
+		["func_door"] = function(e) return e.m_toggle_state == 0 end,
+		["func_door_rotating"] = function(e) return e.m_toggle_state == 0 end,
+		["prop_door_rotating"] = function(e) return e.m_eDoorState ~= 0 end,
+	}
+
+	local function opendoors(ent, ply, t, initial)
+		local svtbl = ent:GetSaveTable()
+		local slave = svtbl.slavename
+
+		-- Do nothing if the enslaved door group was already triggered this Door Group cycle!
+		if t then
+			if t[ent] ~= nil then return initial == ent end
+		end
+
+		local doors = {}
+		if not opentest[ent:GetClass()](svtbl) then
+			doors[ent] = svtbl.m_bLocked
+		end
+
+		-- If we're paired to other doors, get all of those too
+		if slave and slave ~= "" then
+			for k,v in pairs(ents.FindByName(slave)) do
+				if not v:IsPlayer() and v ~= ent then
+					local tbl = v:GetSaveTable()
+					if not opentest[v:GetClass()](tbl) then
+						doors[v] = tbl.m_bLocked -- Save the door as key and whether locked as value
+					end
+					t[v] = true -- Don't handle this in another cycle
+				end
+			end
+		end
+
+		-- Loop through all doors and unlock the locked ones
+		for k,v in pairs(doors) do
+			if v then k:SetSaveValue("m_bLocked", false) end
+		end
+
+		
+		if IsValid(ply) then -- Use the targeted door to open it as if the player did
+			if initial and ent ~= initial then ent:Use(ply, ply, USE_ON, 1) end
+
+			timer.Simple(0, function()
+				for k,v in pairs(doors) do
+					if IsValid(k) then
+						k:SetSaveValue("m_bLocked", true)
+						k:SetSaveValue("returndelay", -1)
+					end
+				end
+			end)
+
+			return true
+		else -- Open it as if no one did (any direction)
+			local awayfrom = slave or ent:GetName()
+			for k,v in pairs(doors) do
+				k:Fire("OpenAwayFrom", "!player")
+				k:SetSaveValue("returndelay", -1)
+				timer.Simple(0.1, function() if IsValid(k) then k:SetSaveValue("m_bLocked", true) end end)
+			end
+		end
 	end
 
 	local doortypes = {
@@ -218,32 +300,40 @@ if SERVER then
 		["prop_physics_override"] = openprops,
 		["prop_dynamic_override"] = openprops,
 	}
-	local function dooropeneffect(ent)
-		if ent.OpenDoor then ent:OpenDoor() return end -- Call their own door effect
+	function dooropeneffect(ent, ply, t, initial)
+		if ent.OpenDoor then return ent:OpenDoor(ply, t, initial) return end -- Call their own door effect
 
 		local func = doortypes[ent:GetClass()]
-		if func then func(ent) else ent:Remove() end
+		if func then return func(ent, ply, t, initial) else
+			ent:Fire("Open") -- Just to ensure area portals/whatnot are opened with it
+			ent:Remove()
+		end
 	end
 
-	function nzu.OpenDoor(ent, ply)
+	function nzu.OpenDoor(ent, ply, t, initial)
 		local data = ent:GetDoorData()
 		if data and data.Flags then
 			for k,v in pairs(data.Flags) do
 				nzu.OpenMapFlag(v)
 			end
 		end
-		dooropeneffect(ent)
+		ent:RemoveDoor()
+		local b = dooropeneffect(ent, ply, t, initial)
 		hook.Run("nzu_DoorOpened", ent, ply)
+		return b
 	end
 
-	function nzu.OpenDoorGroup(id, ply)
+	function nzu.OpenDoorGroup(id, ply, initial)
 		local doors = doorgroups[id]
 		if doors then
+			local t = {}
 			for k,v in pairs(doors) do
-				nzu.OpenDoor(k, ply)
+				t[k] = nzu.OpenDoor(k, ply, t, initial)
 			end
 			doorgroups[id] = nil
 			hook.Run("nzu_DoorGroupOpened", id, ply)
+
+			return t
 		end
 	end
 
@@ -313,14 +403,20 @@ if CLIENT then
 	net.Receive("nzu_doors", function()
 		local ent = net.ReadUInt(16)
 		if net.ReadBool() then
-			local tbl = {}
-			tbl.Price = net.ReadUInt(32)
+			local tbl
 			if net.ReadBool() then
-				tbl.Electricity = true
-			end
+				local ent2 = net.ReadUInt(16)
+				if IsValid(Entity(ent2)) then tbl = Entity(ent2):GetBuyFunction() else tbl = queue[ent2] end
+			else
+				tbl = {}
+				tbl.Price = net.ReadUInt(32)
+				if net.ReadBool() then
+					tbl.Electricity = true
+				end
 
-			tbl.TargetIDType = TARGETID_TYPE_USECOST
-			tbl.Text = " clear debris "
+				tbl.TargetIDType = TARGETID_TYPE_USECOST
+				tbl.Text = " clear debris "
+			end
 
 			doapplydoordata(ent, tbl)
 			hook.Run("nzu_DoorLockCreated", ent, tbl)
