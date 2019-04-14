@@ -40,7 +40,7 @@ SWEP.Primary.Damage = 150
 SWEP.Primary.DamageType = DMG_CLUB
 SWEP.Primary.DamageForce = 10
 
-if CLIENT then SWEP.HUDIcon = Material("nzombies-unlimited/hud/CrowbarIcon.png", "unlitgeneric smooth") end -- CONTENT + change this to crowbar png!
+if CLIENT then SWEP.HUDIcon = Material("nzombies-unlimited/hud/crowbar_icon.png", "unlitgeneric smooth") end -- CONTENT + change this to crowbar png!
 
 --[[-------------------------------------------------------------------------
 Force the weapon to always be loaded into the Knife slot (unless otherwise specified)
