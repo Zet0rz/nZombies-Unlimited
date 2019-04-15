@@ -41,7 +41,7 @@ SWEP.GrenadeTime = 3
 SWEP.GrenadeDamage = 150
 SWEP.GrenadeDamageRadius = 250
 
-if CLIENT then SWEP.HUDIcon = Material("nzombies-unlimited/hud/MK3A2Icon.png", "unlitgeneric smooth") end -- CONTENT
+if CLIENT then SWEP.HUDIcon = Material("nzombies-unlimited/hud/mk3a2_icon.png", "unlitgeneric smooth") end -- CONTENT
 
 --[[-------------------------------------------------------------------------
 Force the weapon to always be loaded into the Grenade slot (unless otherwise specified)
