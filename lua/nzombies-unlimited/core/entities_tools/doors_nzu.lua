@@ -301,7 +301,7 @@ if SERVER then
 		["prop_dynamic_override"] = openprops,
 	}
 	function dooropeneffect(ent, ply, t, initial)
-		if ent.OpenDoor then return ent:OpenDoor(ply, t, initial) return end -- Call their own door effect
+		if ent.OpenDoor then return ent:OpenDoor(ply, t, initial) end -- Call their own door effect
 
 		local func = doortypes[ent:GetClass()]
 		if func then return func(ent, ply, t, initial) else

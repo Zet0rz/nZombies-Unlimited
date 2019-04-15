@@ -34,6 +34,7 @@ SWEP.KnifeRange = 100
 SWEP.KnifeDelay = 0.4
 SWEP.HullAttackMins = Vector(-5,-5,-5)
 SWEP.HullAttackMaxs = Vector(5,5,5)
+SWEP.DamageAllNPCs = false -- Only damage 1 zombie!
 
 -- Damage, types, and forces (for TraceHullAttack)
 SWEP.Primary.Damage = 150
@@ -97,7 +98,28 @@ if SERVER then
 		local startpos = self.Owner:GetShootPos()
 		local endpos = startpos + self.Owner:GetAimVector()*self.KnifeRange
 
-		self.Owner:TraceHullAttack(startpos, endpos, self.HullAttackMins, self.HullAttackMaxs, self.Primary.Damage, self.Primary.DamageType, self.Primary.DamageForce, self.DamageAllNPCs)
+		if self.DamageAllNPCs then
+			self.Owner:TraceHullAttack(startpos, endpos, self.HullAttackMins, self.HullAttackMaxs, self.Primary.Damage, self.Primary.DamageType, self.Primary.DamageForce, self.DamageAllNPCs)
+		else
+			local tr = util.TraceHull({
+				start = startpos,
+				endpos = endpos,
+				mins = self.HullAttackMins,
+				maxs = self.HullAttackMaxs,
+				filter = self.Owner,
+			})
+			if IsValid(tr.Entity) then
+				local dmg = DamageInfo()
+				dmg:SetDamage(self.Primary.Damage)
+				dmg:SetDamageType(self.Primary.DamageType)
+				dmg:SetDamageForce(self.Owner:GetAimVector()*self.Primary.DamageForce)
+
+				dmg:SetAttacker(self.Owner)
+				dmg:SetInflictor(self)
+
+				tr.Entity:TakeDamageInfo(dmg)
+			end
+		end
 	end
 end
 

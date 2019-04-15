@@ -135,7 +135,7 @@ local function loadextensionprepare(name)
 						local s = settings[k]
 						if s.Parse then v = s.Parse(v) end
 						tbl[k] = v -- Actually set the value of course
-						if s.ServerNotify then loadingextension[s.ServerNotify](v,k) end -- Call the notify if it exists
+						if s.Notify then s.Notify(k,v) end
 
 						net.Start("nzu_extension_setting")
 							net.WriteString(loadingextension.ID)
@@ -150,7 +150,7 @@ local function loadextensionprepare(name)
 						local s = settings[k]
 						if s.Parse then v = s.Parse(v) end
 						tbl[k] = v
-						if s.ServerNotify then loadingextension[s.ServerNotify](v,k) end -- Call the notify if it exists
+						if s.Notify then s.Notify(k,v) end
 
 						if s.Client then
 							net.Start("nzu_extension_setting")
@@ -196,13 +196,13 @@ local function loadextension(loadingextension, st)
 					if parse then t[k] = parse(t[k]) end
 				end
 
-				if v.ServerNotify then notifies[k] = {v.ServerNotify, t[k]} end
+				if v.Notify then notifies[k] = {v.Notify, t[k]} end
 			end
 		elseif CLIENT and st then -- On Client and not in Sandbox: Only read settings in the 'st' table
 			for k,v in pairs(st) do
 				t[k] = st[k]
 
-				local notify = loadingextension.GetSettingsMeta()[k].ClientNotify
+				local notify = loadingextension.GetSettingsMeta()[k].Notify
 				if notify then notifies[k] = {notify, t[k]} end
 			end
 		end
@@ -228,7 +228,7 @@ local function loadextension(loadingextension, st)
 
 	if notifies then
 		for k,v in pairs(notifies) do
-			loadingextension[v[1]](v[2],k)
+			v[1](v[2],k)
 		end
 	end
 
@@ -422,7 +422,7 @@ else
 			local v = netreadsetting(s)
 			ext.Settings[k] = v
 
-			if s.ClientNotify then ext[s.ClientNotify](v,k) end
+			if s.Notify then s.Notify(v,k) end
 
 			hook.Run("nzu_ExtensionSettingChanged", ext.ID, k, v)
 		end
@@ -510,11 +510,11 @@ settings used by the main gamemode.
 ---------------------------------------------------------------------------]]
 -- This is needed here cause Core uses some of these for its settings
 if SERVER then
-	AddCSLuaFile("../hudmanagement.lua")
-	AddCSLuaFile("../resources.lua")
+	AddCSLuaFile("hudmanagement.lua")
+	AddCSLuaFile("resources.lua")
 end
-include("../resources.lua")
-include("../hudmanagement.lua")
+include("resources.lua")
+include("hudmanagement.lua")
 
 nzu.AddCustomExtensionSettingType("Weapon", {
 	NetWrite = net.WriteString,

@@ -70,3 +70,10 @@ surface.CreateFont("nzu_Font_Bloody_Small", {
 	weight = 500,
 	antialias = true,
 })
+
+surface.CreateFont("nzu_Font_Bloody_Biggest", {
+	font = "DK Umbilical Noose",
+	size = 128,
+	weight = 500,
+	antialias = true,
+})

@@ -171,8 +171,6 @@ if SERVER then
 		self.State = ROUND_PREPARING
 		donetwork()
 
-		-- Change this later, the curve isn't quite accurate
-		-- Based on the Z = 0.15*R x (24 + 6*[P-1])
 		self.ZombiesToSpawn = self:CalculateZombieAmount()
 		self.ZombieHealth = self:CalculateZombieHealth()
 
@@ -185,6 +183,7 @@ if SERVER then
 	end
 
 	function ROUND:SetRound(num, time)
+		timer.Remove("nzu_Round_Prepare")
 		--timer.Stop("nzu_Round_Spawning")
 		self.Round = num
 		PrintMessage(HUD_PRINTTALK, "Round is now: "..num)
@@ -199,16 +198,43 @@ if SERVER then
 		self:SetRound(self:GetRound() + 1) -- This networks
 	end
 
-	function ROUND:Start()
+	util.AddNetworkString("nzu_gamestartend")
+	local initialpreparetime = 15
+	function ROUND:Start(r, init)
 		if self.State == ROUND_WAITING then
-			self:SetRound(1, 20) -- 20 second prepare phase for the first round
-			hook.Run("nzu_GameStarted")
+			local time = init or initialpreparetime
+			self.State = ROUND_PREPARING
+			self.Round = r or 1
+
+			net.Start("nzu_gamestartend")
+				net.WriteBool(true)
+				net.WriteUInt(self.Round, roundbits)
+				net.WriteFloat(time)
+			net.Broadcast()
+
+			hook.Remove("Think", "nzu_Round_Spawning")
+
+			self:SpawnPlayers()
+
+			self.ZombiesToSpawn = self:CalculateZombieAmount()
+			self.ZombieHealth = self:CalculateZombieHealth()
+
+			self.CurrentZombies = 0
+			self.Zombies = {}
+
+			if not timer.Start("nzu_Round_Prepare") then
+				timer.Create("nzu_Round_Prepare", time, 1, startongoing)
+			end
+
+			hook.Run("nzu_RoundStateChanged", ROUND.Round, ROUND.State)
+			hook.Run("nzu_RoundChanged", self.Round)
+			hook.Run("nzu_GameStarted", time)
 		end
 	end
 
 	local function doreset()
 		for k,v in pairs(ROUND:GetPlayers()) do
-			nzu.Unspawn(v)
+			v:Unready()
 		end
 
 		local tbl = ROUND:GetZombies()
@@ -227,29 +253,53 @@ if SERVER then
 
 		-- TODO: Reload config? Respawn props and such. A map reload is not needed to replay the same config
 	end
+
+	local gameoversequencetime = 10
+	local gameoverpresequencetime = 10
+	local function dogameoversequence()
+
+		net.Start("nzu_gamestartend")
+			net.WriteBool(false)
+			net.WriteBool(true)
+			net.WriteFloat(gameoversequencetime)
+		net.Broadcast()
+
+		hook.Run("nzu_GameOverSequence", gameoversequencetime)
+
+		if not timer.Start("nzu_Round_GameOver") then
+			timer.Create("nzu_Round_GameOver", gameoversequencetime, 1, doreset)
+		end
+	end
 	function ROUND:GameOver()
+		timer.Remove("nzu_Round_Prepare")
 		hook.Remove("Think", "nzu_Round_Spawning")
 		self.State = ROUND_GAMEOVER
 
 		PrintMessage(HUD_PRINTTALK, "GAME OVER! You survived "..self.Round.." rounds.")
 
-		donetwork()
+		--donetwork()
+
+		net.Start("nzu_gamestartend")
+			net.WriteBool(false)
+			net.WriteBool(false)
+			net.WriteFloat(gameoverpresequencetime)
+		net.Broadcast()
 
 		if not timer.Start("nzu_Round_GameOver") then
-			timer.Create("nzu_Round_GameOver", 10, 1, doreset)
+			timer.Create("nzu_Round_GameOver", gameoverpresequencetime, 1, dogameoversequence)
 		end
 
-		hook.Run("nzu_GameOver")
+		hook.Run("nzu_GameOver", gameoverpresequencetime)
 	end
 
 	function ROUND:CalculateZombieHealth()
 		-- 950 for round 10, multiply 1.1 for each round after
 		local val = self.Round < 10 and 50 + 100*self.Round or 950*(math.pow(1.1, self.Round-10))
-		return val * 0.5 -- Scale down to gmod levels (for now)
+		return val * 0.5 -- Scale down to gmod levels (for now). TODO: Balance
 	end
 
 	function ROUND:CalculateZombieAmount()
-		return math.Round(0.15 * self.Round * (18 + 6 * #self:GetPlayers()))
+		return math.Round(0.15 * self.Round * (18 + 6 * self:GetPlayerCount()))
 	end
 
 	function ROUND:GetZombieHealth() return self.ZombieHealth end
@@ -266,6 +316,21 @@ if CLIENT then
 
 		hook.Run("nzu_RoundStateChanged", ROUND.Round, ROUND.State)
 	end)
+
+	net.Receive("nzu_gamestartend", function()
+		if net.ReadBool() then
+			ROUND.Round = net.ReadUInt(roundbits)
+			ROUND.State = ROUND_PREPARING
+			local time = net.ReadFloat()
+
+			hook.Run("nzu_GameStarted", time)
+			hook.Run("nzu_RoundStateChanged", ROUND.Round, ROUND.State)
+		else
+			ROUND.State = ROUND_GAMEOVER
+			local h = net.ReadBool() and "nzu_GameOverSequence" or "nzu_GameOver"
+			hook.Run(h, net.ReadFloat())
+		end
+	end)
 end
 
 --[[-------------------------------------------------------------------------
@@ -276,7 +341,7 @@ if SERVER then
 		if ROUND.State == ROUND_WAITING or ROUND.State == ROUND_GAMEOVER then return end
 
 		for k,v in pairs(ROUND:GetPlayers()) do
-			if not v:GetCountsDowned() then
+			if v:Alive() and not v:GetCountsDowned() then
 				return
 			end
 		end
@@ -355,33 +420,39 @@ if SERVER then
 end
 
 
---[[-------------------------------------------------------------------------
-Player Management
-We use Teams to network the players belonging to the round system or not
----------------------------------------------------------------------------]]
--- The "Unspawned". A mysterious class of people that seemingly has no interaction with the world, yet await their place in it.
-team.SetUp(TEAM_UNASSIGNED, "Unspawned", Color(100,100,100))
 
-function ROUND:SetUpTeam(...)
-	local i = 1
-	team.SetUp(i, ...)
-	self.Team = i
-end
+--[[-------------------------------------------------------------------------
+Round Players: Team networking
+---------------------------------------------------------------------------]]
+ROUND.Team = TEAM_SURVIVORS
 function ROUND:GetPlayers() return team.GetPlayers(self.Team) end
 function ROUND:GetPlayerCount() return team.NumPlayers(self.Team) end
 function ROUND:HasPlayer(ply) return ply:Team() == self.Team end
+
+
+
+
+--[[-------------------------------------------------------------------------
+Unspawn/Spawn system
+Readying and dropping in/out
+---------------------------------------------------------------------------]]
+local PLAYER = FindMetaTable("Player")
+function PLAYER:IsReady() return self.nzu_Ready end
 
 --
 local countdowntime = 5
 --
 
 if SERVER then
+	util.AddNetworkString("nzu_ready") -- Client: Request readying || Server: Broadcast player ready states
+	util.AddNetworkString("nzu_countdown") -- Server: Broadcast countdown start/stop
+
 	local function docountdownstart()
 		if not timer.Exists("nzu_RoundCountdown") then
 			timer.Create("nzu_RoundCountdown", countdowntime, 1, function() nzu.Round:Start() end)
 			hook.Run("nzu_RoundCountdown", countdowntime)
 
-			net.Start("nzu_ready")
+			net.Start("nzu_countdown")
 				net.WriteBool(true)
 			net.Broadcast()
 		end
@@ -391,7 +462,7 @@ if SERVER then
 			timer.Destroy("nzu_RoundCountdown")
 			hook.Run("nzu_RoundCountdownCancelled")
 
-			net.Start("nzu_ready")
+			net.Start("nzu_countdown")
 				net.WriteBool(false)
 			net.Broadcast()
 		end
@@ -402,7 +473,7 @@ if SERVER then
 		-- For now, just queue countdown and start game
 
 		for k,v in pairs(player.GetAll()) do
-			if not v:IsUnspawned() then -- Someone is ready
+			if v:IsReady() then -- Someone is ready
 				docountdownstart()
 				return
 			end
@@ -411,45 +482,71 @@ if SERVER then
 		docountdowncancel()
 	end
 
-	function ROUND:AddPlayer(ply)
-		ply:SetTeam(self.Team)
+	function PLAYER:ReadyUp()
+		if not self.nzu_Ready then
+			self.nzu_Ready = true
 
-		local state = self:GetState()
-		if state == ROUND_PREPARING then
-			self:SpawnPlayer(ply)
-		elseif state == ROUND_WAITING then
-			doreadycheck()
+			net.Start("nzu_ready")
+				net.WriteEntity(self)
+				net.WriteBool(true)
+			net.Broadcast()
+
+			hook.Run("nzu_PlayerReady", self)
+
+			if ROUND:GetState() == ROUND_WAITING then
+				doreadycheck()
+			elseif ROUND:GetState() == ROUND_PREPARING then
+				ROUND:SpawnPlayer(self)
+			end
+		end
+	end
+
+	function PLAYER:Unready()
+		if self.nzu_Ready then
+			self.nzu_Ready = false
+
+			net.Start("nzu_ready")
+				net.WriteEntity(self)
+				net.WriteBool(false)
+			net.Broadcast()
+
+			hook.Run("nzu_PlayerUnready", self)
+
+			if ROUND:GetState() == ROUND_WAITING then
+				doreadycheck()
+			end
 		end
 
-		hook.Run("nzu_PlayerReady", ply)
+		self:Unspawn()
 	end
-	function ROUND:RemovePlayer(ply)
-		nzu.Unspawn(ply)
-		if nzu.Round:GetState() == ROUND_WAITING then doreadycheck() end
-		hook.Run("nzu_PlayerUnready", ply)
+
+	net.Receive("nzu_ready", function(len, ply)
+		if net.ReadBool() then ply:ReadyUp() else ply:Unready() end
+	end)
+
+	function ROUND:SpawnPlayer(v)
+		v:Spawn()
+		if not v:CanAfford(SETTINGS.StartPoints) then
+			v:SetPoints(SETTINGS.StartPoints)
+		end
+
+		if SETTINGS.StartWeapon and SETTINGS.StartWeapon ~= "" then
+			v:Give(SETTINGS.StartWeapon)
+		end
+		if SETTINGS.StartKnife and SETTINGS.StartKnife ~= "" then
+			v:GiveWeaponInSlot(SETTINGS.StartKnife, "Knife")
+		end
+		if SETTINGS.StartGrenade and SETTINGS.StartGrenade ~= "" then
+			v:GiveWeaponInSlot(SETTINGS.StartGrenade, "Grenade")
+		end
+
+		hook.Run("nzu_PlayerRespawned", ply)
 	end
 
 	function ROUND:SpawnPlayers()
-		local spawnpoints = nzu.GetSpawners("player")
-		local num = #spawnpoints
-		for k,v in pairs(self:GetPlayers()) do
-			if not v:Alive() then
-				v:Spawn()
-				if not v:CanAfford(SETTINGS.StartPoints) then
-					v:SetPoints(SETTINGS.StartPoints)
-				end
-
-				if SETTINGS.StartWeapon and SETTINGS.StartWeapon ~= "" then
-					v:Give(SETTINGS.StartWeapon)
-				end
-				if SETTINGS.StartKnife and SETTINGS.StartKnife ~= "" then
-					v:GiveWeaponInSlot(SETTINGS.StartKnife, "Knife")
-				end
-				if SETTINGS.StartGrenade and SETTINGS.StartGrenade ~= "" then
-					v:GiveWeaponInSlot(SETTINGS.StartGrenade, "Grenade")
-				end
-
-				hook.Run("nzu_PlayerRespawned", ply)
+		for k,v in pairs(player.GetAll()) do
+			if v:IsReady() and not v:Alive() then
+				self:SpawnPlayer(v)
 			end
 		end
 	end
@@ -468,31 +565,18 @@ if SERVER then
 			ply:SetPos(spawner:GetPos())
 		end
 	end)
-end
-ROUND:SetUpTeam("Survivors", Color(100,255,150))
 
-
---[[-------------------------------------------------------------------------
-Readying and dropping in/out
----------------------------------------------------------------------------]]
-local PLAYER = FindMetaTable("Player")
-function PLAYER:IsUnspawned()
-	return self:Team() == TEAM_UNASSIGNED
-end
-
-if SERVER then
-	util.AddNetworkString("nzu_ready") -- Client: Request readying || Server: Broadcast game countdown initialize
-	net.Receive("nzu_ready", function(len, ply)
-		local b = net.ReadBool()
-		if b then
-			if ply:IsUnspawned() then ROUND:AddPlayer(ply) end
-		else
-			if not ply:IsUnspawned() then ROUND:RemovePlayer(ply) end
+	hook.Add("PlayerInitialSpawn", "nzu_Round_ReadySync", function(ply)
+		for k,v in pairs(player.GetAll()) do
+			net.Start("nzu_ready")
+				net.WriteEntity(v)
+				net.WriteBool(v.nzu_Ready)
+			net.Send(ply)
 		end
 	end)
 else
 	-- Receiving countdown
-	net.Receive("nzu_ready", function()
+	net.Receive("nzu_countdown", function()
 		if net.ReadBool() then
 			nzu.Round.GameStart = CurTime() + countdowntime
 			hook.Run("nzu_RoundCountdown", countdowntime)
@@ -513,17 +597,23 @@ else
 			net.WriteBool(false)
 		net.SendToServer()
 	end
+
+	net.Receive("nzu_ready", function()
+		local ply = net.ReadEntity()
+		if net.ReadBool() then
+			ply.nzu_Ready = true
+			hook.Run("nzu_PlayerReady", ply)
+		else
+			ply.nzu_Ready = false
+			hook.Run("nzu_PlayerUnready", ply)
+		end
+	end)
 end
 
 
 if SERVER then
 	-- This is basically dropping out and being on the main menu
 	-- You can spectate from here too (later)
-	function nzu.Unspawn(ply)
-		ply:SetTeam(TEAM_UNASSIGNED)
-		ply:KillSilent()
-		hook.Run("nzu_PlayerUnspawned", ply)
-	end
 	
 	function GM:PlayerInitialSpawn(ply)
 		-- Is this timer really necessary? :(
@@ -540,11 +630,8 @@ if SERVER then
 			end
 		end)
 	end
-	function GM:PlayerDeathThink() end
 
-	function GM:PlayerDisconnected(ply)
-		if ROUND:HasPlayer(ply) then ROUND:RemovePlayer(ply) end
-	end
+	function GM:PlayerDeathThink() end
 end
 
 --[[-------------------------------------------------------------------------
@@ -605,34 +692,95 @@ if CLIENT then
 	local particlespeed_y = 100
 	local particlelife = 1
 
+	local whiterisespeed = 1.5
+	local initialtime = 7
+	local initialmove = 2
+
 	local particles
-	local lasttargetround
+	local lasttargetround = 0
 	local lastparticletime
+	local riser
+	local initialcounter
 
 	nzu.RegisterHUDComponentType("HUD_Round")
 	nzu.RegisterHUDComponent("HUD_Round", "Unlimited", {
 		Paint = function()
+			local CT = CurTime()
 			local r = ROUND:GetRound()
+			local state = ROUND:GetState()
 
-			if r ~= lastdrawnround then
+			if riser or state == ROUND_PREPARING and r ~= 1 then
+				if not riser then riser = 0 end
+				riser = riser + whiterisespeed*FrameTime()
+				if riser > 1 and whiterisespeed > 0 then
+					if state ~= ROUND_PREPARING then
+						riser = nil
+					else
+						riser = 1
+						whiterisespeed = -whiterisespeed
+					end
+				elseif riser < 0 and whiterisespeed < 0 then
+					riser = 0
+					whiterisespeed = -whiterisespeed
+				end
+			end
+
+			if not riser and r ~= lastdrawnround then
 				if not transitioncomplete or lasttargetround ~= r then
-					transitioncomplete = CurTime() + transitiontime
+					transitioncomplete = CT + transitiontime
 					particles = {}
 					lasttargetround = r
-					lastparticletime = CurTime()
+					lastparticletime = CT
 				end
-				local pct = (transitioncomplete - CurTime())/transitiontime
-				local pct2 = math.Clamp(transitioncomplete - 2 - CurTime(), 0, 1)
+				local pct = (transitioncomplete - CT)/transitiontime
+				local pct2 = math.Clamp(transitioncomplete - 2 - CT, 0, 1)
 				local invpct2 = 1 - pct2
+
+				-- Special first round display
+				local px,py = 75,ScrH()-175
+				if r == 1 then
+					if not initialcounter then
+						initialcounter = CT + initialtime
+					end
+
+					local px2 = ScrW()/2 - tallysize/5
+					local py2 = ScrH()/2
+					if CT > initialcounter then
+						local pct3 = 1 - (CT - initialcounter)/initialmove
+
+						if pct3 <= 0 then
+							initialcounter = nil
+						else
+							px = px + (px2 - px)*pct3
+							py = py + (py2 - py)*pct3
+							surface.SetTextColor(150, 0, 0, pct3*255)
+						end
+					else
+						px = px2
+						py = py2
+
+						local fade = 255*pct2
+						surface.SetTextColor(150 + 155*pct2, fade, fade)
+					end
+
+					surface.SetFont(font)
+					local x,y = surface.GetTextSize("Round")
+					surface.SetTextPos(ScrW()/2 - x/2, ScrH()/2 - y)
+					surface.DrawText("Round")
+
+					surface.SetMaterial(tallymats[1])
+					surface.DrawTexturedRectUV(75, ScrH() - 175, tallysize, invpct2*tallysize, 0,0,1, invpct2)
+				end
 
 				if r <= 5 and r >= 0 then
 					if lastdrawnround > r then
 						lastdrawnround = 0
 					elseif lastdrawnround <= 5 then
-						surface.SetDrawColor(255,0,0)
+						local max = pct2*255
+						surface.SetDrawColor(255,max,max)
 						for i = 1, lastdrawnround do
 							surface.SetMaterial(tallymats[i])
-							surface.DrawTexturedRect(75, ScrH() - 175, tallysize, tallysize)
+							surface.DrawTexturedRect(px, py, tallysize, tallysize)
 						end
 					end
 
@@ -642,15 +790,15 @@ if CLIENT then
 					local doneparticles
 					for i = lastdrawnround + 1, r do
 						surface.SetMaterial(tallymats[i])
-						surface.DrawTexturedRectUV(75, ScrH() - 175, tallysize, invpct2*tallysize, 0,0,1, invpct2)
+						surface.DrawTexturedRectUV(px, py, tallysize, invpct2*tallysize, 0,0,1, invpct2)
 
 						if invpct2 < 1 then
-							local num = math.floor((CurTime() - lastparticletime)*particlerate)
+							local num = math.floor((CT - lastparticletime)*particlerate)
 							if num > 0 then
 								for j = 1,num do
 									local x1,y1,x2,y2 = unpack(tallyparticlepos[i])
-									local x = (x1 + x2*invpct2) + math.random(burnwidth) + 75
-									local y = (y1 + y2*invpct2) + ScrH() - 175
+									local x = (x1 + x2*invpct2) + math.random(burnwidth) + px
+									local y = (y1 + y2*invpct2) + py
 
 									local mat = burnparticles[math.random(#burnparticles)]
 									table.insert(particles, {
@@ -659,7 +807,7 @@ if CLIENT then
 										Material = mat,
 										Color = burncolors[math.random(#burncolors)],
 										SpeedX = math.random(-particlespeed_x, particlespeed_x),
-										Time = CurTime()
+										Time = CT
 									})
 								end
 								doneparticles = true
@@ -667,20 +815,21 @@ if CLIENT then
 						end
 					end
 
-					if doneparticles then lastparticletime = CurTime() end
+					if doneparticles then lastparticletime = CT end
 				else
 					surface.SetFont(font)
 
 					-- Transition with number
+					local max = 255*pct2
 					if lastdrawnround <= 5 then
-						surface.SetDrawColor(255,0,0,255*pct2)
+						surface.SetDrawColor(255,max,max,max)
 						for i = 1, lastdrawnround do
 							surface.SetMaterial(tallymats[i])
-							surface.DrawTexturedRect(75, ScrH() - 175, tallysize, tallysize)
+							surface.DrawTexturedRect(px, py, tallysize, tallysize)
 						end
 					else
-						surface.SetTextPos(100, ScrH() - 165)
-						surface.SetTextColor(150,0,0,255*pct2)
+						surface.SetTextPos(px + 25, py + 10)
+						surface.SetTextColor(150 + 155*pct2,max,max,max)
 						surface.DrawText(lastdrawnround)
 					end
 
@@ -689,7 +838,7 @@ if CLIENT then
 
 						render.ClearStencil()
 						render.SetStencilEnable(true)
-						local y1 = ScrH() - 165
+						local y1 = py + 10
 						render.ClearStencilBufferRectangle(0, y1, 400, y1 + y*invpct2, 1)
 
 						render.SetStencilReferenceValue(1)
@@ -701,7 +850,7 @@ if CLIENT then
 
 						render.SetStencilEnable(false)
 						
-						local num = math.floor((CurTime() - lastparticletime)*particlerate*(x*0.1))
+						local num = math.floor((CT - lastparticletime)*particlerate*(x*0.1))
 						if num > 0 then
 							for j = 1,num do
 								local x2 = math.random(x) + 100
@@ -714,20 +863,20 @@ if CLIENT then
 									Material = mat,
 									Color = burncolors[math.random(#burncolors)],
 									SpeedX = math.random(-particlespeed_x, particlespeed_x),
-									Time = CurTime()
+									Time = CT
 								})
 							end
-							lastparticletime = CurTime()
+							lastparticletime = CT
 						end
 					else
 						surface.SetTextColor(150 + pct*100,pct*250,pct*150,255)
-						surface.SetTextPos(100, ScrH() - 165)
+						surface.SetTextPos(px + 25, py + 10)
 						surface.DrawText(r)
 					end
 				end
 
 				for k,v in pairs(particles) do
-					local diff = (CurTime() - v.Time)
+					local diff = (CT - v.Time)
 					local x = v.X
 					local y = v.Y - particlespeed_y*diff
 
@@ -740,21 +889,33 @@ if CLIENT then
 					v.SpeedX = v.SpeedX - (v.SpeedX*FrameTime()*3)
 				end
 
-				if pct <= 0 then
+				if not initialcounter and pct <= 0 then
 					lastdrawnround = r
 					transitioncomplete = nil
 					particles = nil
 					lastparticletime = nil
 				end
 			else
-				if r > 5 then
+				if lastdrawnround > 5 then
 					surface.SetFont(font)
 					surface.SetTextPos(100, ScrH() - 165)
-					surface.SetTextColor(150,0,0)
-					surface.DrawText(r)
+
+					if riser then
+						local max = riser*255
+						surface.SetTextColor(150 + riser*155,max,max)
+					else
+						surface.SetTextColor(150,0,0)
+					end
+
+					surface.DrawText(lastdrawnround)
 				else
-					surface.SetDrawColor(255,0,0)
-					for i = 1, r do
+					if riser then
+						local max = riser*255
+						surface.SetDrawColor(255,max,max)
+					else
+						surface.SetDrawColor(255,0,0)
+					end
+					for i = 1, lastdrawnround do
 						surface.SetMaterial(tallymats[i])
 						surface.DrawTexturedRect(75, ScrH() - 175, tallysize, tallysize)
 					end

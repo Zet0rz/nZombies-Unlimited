@@ -60,24 +60,39 @@ if NZU_SANDBOX then
 		exts[setting] = ext
 	end
 else
+	local selected = {}
 	local enabled = {}
 	local paints = {}
+
+	local function disable(type)
+		local t = enabled[type]
+		if t then
+			if t.Remove then t.Remove(t.Value) end
+			t.Value = nil
+		end
+		enabled[type] = nil
+		paints[type] = nil
+	end
+
 	local function enable(type, name)
 		local new = components[type][name]
 		if new then
-			local t2 = {ID = name}
+			local t2 = new
 			local value
 			if new.Create then
 				value = new.Create()
 				t2.Value = value
 			end
 
-			t2.Draw = new.Draw -- Function-triggered (context) drawing
-			t2.Remove = new.Remove
-			if new.Paint then t2.PaintIndex = table.insert(paints, function() new.Paint(value) end) end -- Auto drawing (HUD)
+			if new.Paint then paints[type] = function() new.Paint(value) end end-- Auto drawing (HUD)
 
 			enabled[type] = t2
 		end
+	end
+
+	local function doreset(type, name)
+		disable(type)
+		enable(type, name)
 	end
 
 	local queue = {}
@@ -86,53 +101,47 @@ else
 
 		components[type][name] = component
 
-		if queue[type] == name or name == "Unlimited" then -- DEBUG
-			enable(type, name)
+		if queue[type] == name then
+			doreset(type, name)
 			queue[type] = nil
 		else
 			-- Refresh
 			local v = enabled[type]
 			if v and v.ID == name then
-				if v.Remove then v.Remove(v.Value) end
-				enable(type, name)
+				doreset(type, name)
 			end
 		end
 	end
 
-	local function doenable(k,v)
-		if enabled[k] then
-			local t = enabled[k]
-			if t.ID == k then return end
-			
-			if t.Remove then t.Remove(t.Value) end
-			if t.PaintIndex then table.remove(paints, t.PaintIndex) end
-			enabled[k] = nil
+	function nzu.SelectHUDComponent(type, name)
+		if components[type][name] then
+			selected[type] = name
+		else
+			selected[type] = nil
 		end
-		enable(k,v)
 	end
+	hook.Add("nzu_PlayerUnspawned", "nzu_HUDComponents_Disable", function(ply)
+		if ply == LocalPlayer() then
+			for k,v in pairs(selected) do
+				disable(k)
+			end
+		end
+	end)
 
-	local hookedsets = {}
+	hook.Add("nzu_PlayerInitialSpawned", "nzu_HUDComponents_Enable", function(ply)
+		if ply == LocalPlayer() then
+			for k,v in pairs(selected) do
+				if components[k][v] and not components[k][v].Manual then enable(k,v) end
+			end
+		end
+	end)
+	
 	customtype.Create = function(ext, setting)
 		nzu.RegisterHUDComponentType(setting)
-		hookedsets[ext.ID] = true
 	end
-
-	hook.Add("nzu_ExtensionSettingChanged", "nzu_HUD_AutoSettingChangeSet", function(id, k, v)
-		if hookedsets[id] and nzu.GetExtension(id).GetSettingsMeta()[k].Type == "HUDComponent" then
-			doenable(k,v)
-		end
-	end)
-
-	hook.Add("nzu_ExtensionLoaded", "nzu_HUD_AutoSettingLoad", function(name)
-		if hookedsets[name] then
-			local ext = nzu.GetExtension(name)
-			for k,v in pairs(ext.GetSettingsMeta()) do
-				if v.Type == "HUDComponent" then
-					doenable(k,ext.Settings[k])
-				end
-			end
-		end
-	end)
+	customtype.Notify = function(v,k)
+		nzu.SelectHUDComponent(k,v)
+	end
 
 	hook.Add("HUDPaint", "nzu_HUDComponentsPaint", function()
 		for k,v in pairs(paints) do

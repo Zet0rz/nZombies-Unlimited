@@ -30,33 +30,30 @@ Configs & Saving
 ---------------------------------------------------------------------------]]
 loadfile("configs.lua")
 loadfile_s("sv_saveload.lua")
-loadfile("extensions/extension_manager.lua")
-loadfile_c("extensions/extension_panels.lua")
+loadfile("extension_manager.lua")
+loadfile_c("extension_panels.lua")
 
 --[[-------------------------------------------------------------------------
 Components & Modules
 ---------------------------------------------------------------------------]]
 --loadfile("resources.lua")
 --loadfile_c("hudmanagement.lua")
-loadfile("logic/logic_manager.lua")
+--loadfile("logic/logic_manager.lua")
 loadfile("mapflags.lua")
 
 --[[-------------------------------------------------------------------------
 Spawnmenu & Networking
 ---------------------------------------------------------------------------]]
-loadfile_s("logic/sv_logicmap.lua")
-loadfile_c("logic/cl_logicmap.lua")
+--loadfile_s("logic/sv_logicmap.lua")
+--loadfile_c("logic/cl_logicmap.lua")
 loadfile_c("spawnmenu_saveload.lua")
-loadfile("spawnmenu_entities.lua")
+--loadfile("spawnmenu_entities.lua")
 loadfile_c("spawnmenu_extensions.lua")
 loadfile("spawnmenu_tools.lua")
 
 --[[-------------------------------------------------------------------------
 Core item population
 ---------------------------------------------------------------------------]]
-loadfile("logic/nzu_logic_testunit.lua")
-loadfile("spawnmenu_entities_test.lua")
-
 loadfile("entities_tools/spawnpoints_sandbox.lua")
 loadfile("entities_tools/doors_sandbox.lua")
 loadfile("entities_tools/electricityswitch.lua")
@@ -64,6 +61,8 @@ loadfile("entities_tools/wallbuys.lua")
 loadfile("entities_tools/navlocker_sandbox.lua")
 loadfile("entities_tools/barricades.lua")
 loadfile("entities_tools/invisiblewalls.lua")
+
+loadfile("entities_tools/thumbnail_camera.lua")
 
 --[[if SERVER then
 	AddCSLuaFile("cl_nzombies_skin.lua")

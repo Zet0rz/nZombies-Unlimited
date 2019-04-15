@@ -90,3 +90,55 @@ if SERVER then
 		ply:UpdateModel()
 	end)
 end
+
+
+
+--[[-------------------------------------------------------------------------
+Unspawn/Spawn system
+---------------------------------------------------------------------------]]
+
+-- The "Unspawned". A mysterious class of people that seemingly has no interaction with the world, yet await their place in it.
+team.SetUp(TEAM_UNASSIGNED, "Unspawned", Color(100,100,100))
+
+TEAM_SURVIVORS = 1
+team.SetUp(TEAM_SURVIVORS, "Survivors", Color(100,255,150))
+
+function PLAYER:IsUnspawned()
+	return self:Team() == TEAM_UNASSIGNED
+end
+
+if SERVER then
+	util.AddNetworkString("nzu_playerunspawn")
+	function PLAYER:Unspawn()
+		if self:Alive() then self:KillSilent() end
+
+		if not self:IsUnspawned() then
+			self:SetTeam(TEAM_UNASSIGNED)
+			net.Start("nzu_playerunspawn")
+				net.WriteEntity(self)
+				net.WriteBool(false)
+			net.Broadcast()
+
+			hook.Run("nzu_PlayerUnspawned", self)
+		end
+	end
+
+
+	hook.Add("PlayerSpawn", "nzu_Player_Spawn", function(ply)
+		if ply:IsUnspawned() then
+			ply:SetTeam(TEAM_SURVIVORS)
+			net.Start("nzu_playerunspawn")
+				net.WriteEntity(ply)
+				net.WriteBool(true)
+			net.Broadcast()
+
+			hook.Run("nzu_PlayerInitialSpawned", ply)
+		end
+	end)
+else
+	net.Receive("nzu_playerunspawn", function()
+		local ply = net.ReadEntity()
+		local b = net.ReadBool()
+		hook.Run(b and "nzu_PlayerInitialSpawned" or "nzu_PlayerUnspawned", ply)
+	end)
+end

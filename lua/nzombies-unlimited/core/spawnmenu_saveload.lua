@@ -99,13 +99,18 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	configlist:Dock(FILL)
 	
 	local img = infopanel:Add("DImage")
-	img:SetImage("maps/thumb/gm_construct.png")
+	img:SetImage("vgui/black.png")
 	img:Dock(TOP)
 	img:DockMargin(0,0,0,15)
 	function img:PerformLayout()
 		local w = self:GetWide()
 		self:SetTall(w/16 * 9)
 	end
+
+	local img_but = img:Add("DButton")
+	img_but:Dock(FILL)
+	img_but:SetText("")
+	img_but:SetVisible(false)
 	
 	local editpanel = infopanel:Add("Panel")
 	editpanel:Dock(FILL)
@@ -130,7 +135,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 		local t = self:GetTall()
 		self:SetWide(t)
 	end
-	widinfo:SetTooltip("Hi")
+	--widinfo:SetTooltip("Hi") -- TODO: Get this to work and fill in with proper tooltip
 	local widentry = addonarea:Add("DTextEntry")
 	widentry:SetPlaceholderText("123456789")
 	widentry:SetPlaceholderColor(Color(75,75,75))
@@ -313,6 +318,8 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 		mapname:SetText("File: " .. cfg.Codename .. " || Map: "..cfg.Map)
 		widentry:SetText(cfg.WorkshopID or "")
 
+		img:SetImage(nzu.GetConfigThumbnail(cfg) or "vgui/black.png")
+
 		-- Edits and stuff
 		if cfg == editedconfig and cfg.Type == "Local" then
 			addonscroll:SetVisible(true)
@@ -475,7 +482,6 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	end
 	local configs = nzu.GetConfigs()
 	if configs then
-		PrintTable(configs)
 		for k,v in pairs(configs) do
 			for k2,v2 in pairs(v) do
 				addconfig(nil, v2, true)

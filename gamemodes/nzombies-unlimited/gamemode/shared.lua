@@ -28,8 +28,8 @@ loadfile_c("fonts.lua")
 --[[-------------------------------------------------------------------------
 Extension Manager
 ---------------------------------------------------------------------------]]
-loadfile("nzombies-unlimited/core/extensions/extension_manager.lua")
-loadfile_c("nzombies-unlimited/core/extensions/extension_panels.lua")
+loadfile("nzombies-unlimited/core/extension_manager.lua")
+loadfile_c("nzombies-unlimited/core/extension_panels.lua")
 --loadfile_c("nzombies-unlimited/core/hudmanagement.lua") -- Needed for the settings panel
 
 --[[-------------------------------------------------------------------------
@@ -56,6 +56,7 @@ loadfile("points.lua")
 loadfile_s("targeting.lua")
 loadfile("weapons.lua")
 loadfile("health.lua")
+loadfile("stamina.lua")
 
 loadfile("menu/menu.lua")
 

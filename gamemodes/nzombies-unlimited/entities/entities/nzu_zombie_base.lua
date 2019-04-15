@@ -44,12 +44,18 @@ local coroutine = coroutine
 Initialization
 ---------------------------------------------------------------------------]]
 if SERVER then
+	------- Fields -------
+	ENT.Models = {
+		{Model = "models/nzu/nzombie_honorguard.mdl", Skin = 0, Bodygroups = {0,0}},
+		{Model = "models/nzu/nzombie_honorguard.mdl", Skin = 0, Bodygroups = {0,1}},
+	}
+
 	------- Overridables -------
 
 	-- Lets you determine what class of model this zombie is, along with a default
 	-- if it cannot be chosen by the gamemode's Model Packs settings
 	function ENT:SelectModel()
-		return "ZombieModels", "models/nzu/nzombie_honorguard.mdl"
+		return "ZombieModels", self.Models
 	end
 
 	-- Called after each event to determine its base movement animation
@@ -96,7 +102,7 @@ Targeting
 if SERVER then
 	------- Callables -------
 	function ENT:GetTarget() return self.Target end -- Get the current target
-	function ENT:SetTarget(t) if self:AcceptTarget(t) then self.Target = t end end -- Sets the target for the next path update
+	function ENT:SetTarget(t) if self:AcceptTarget(t) then self.Target = t return true else return false end end -- Sets the target for the next path update
 	function ENT:SetTargetLocked(b) self.TargetLocked = b end -- Stops the Zombie from retargetting and keeps this target while it is valid and targetable
 	function ENT:SetNextRetarget(time) self.NextRetarget = CurTime() + time end -- Sets the next time the Zombie will repath to its target
 	function ENT:Retarget() -- Causes a retarget
@@ -593,17 +599,78 @@ if SERVER then
 end
 
 --[[-------------------------------------------------------------------------
+Anti-Stuck
+Functions and callables relating to being stuck or getting obstructing entities
+---------------------------------------------------------------------------]]
+if SERVER then
+	------- Fields -------
+	ENT.MaxStuckTime = 5 -- How long to be stuck for for the zombie to give up and call ENT:OnFullyStuck()
+	ENT.StuckPushDelay = 0.5 -- How long time between random pushes when stuck
+	ENT.RandomPushForce = 100 -- How powerful a ENT:ApplyRandomPush() is when supplied no arguments
+
+	------- Callables -------
+
+	-- Applies a push to the locomotion of the the zombie in a random direction
+	-- If force is not supplied, ENT.RandomPushForce is used
+	function ENT:ApplyRandomPush(force)
+		local force = force or self.RandomPushForce
+		self.loco:SetVelocity(self.loco:GetVelocity() + VectorRand()*force)
+	end
+
+	------- Overridables -------
+
+	-- Called when the Zombie is stuck and attempting to handle it
+	-- Runs continuously as the zombie remains stuck
+	-- Default: Perform random pushes at the interval specified in StuckPushDelay
+	function ENT:Stuck()
+		if not self.NextRandomPush or CurTime() > self.NextRandomPush then
+			self:ApplyRandomPush()
+			self.NextRandomPush = CurTime() + self.StuckPushDelay
+		end
+	end
+
+	-- Called when the Zombie is stuck for longer than MaxStuckTime
+	-- You can call self.loco:ClearStuck() here for the timer to reset if you want
+	-- Default: Respawn the zombie completely
+	function ENT:OnFullyStuck()
+		self:Respawn()
+	end
+
+
+
+	------- Internals -------
+	-- You really shouldn't overwrite these unless you know what you're doing
+	-- Called from the Nextbot itself when stuck. Handles the calling of ENT:Stuck() and ENT:OnFullyStuck()
+	-- You can overwrite these if you don't want that system, but just want your own
+	
+	-- Perform the two functions based on the time
+	function ENT:HandleStuck()
+		if self.ActiveEvent then return end
+		if self.FullyStuckTime and CurTime() > self.FullyStuckTime then
+			self:OnFullyStuck()
+		else
+			self:Stuck()
+		end
+	end
+
+	-- Initialize the time
+	function ENT:OnStuck()
+		self.FullyStuckTime = CurTime() + self.MaxStuckTime
+	end
+
+	-- Reset the time
+	function ENT:OnUnStuck()
+		self.FullyStuckTime = nil
+	end
+end
+
+--[[-------------------------------------------------------------------------
 AI
 A stack of functions that are called from the bot's RunBehaviour
 These let you modify the bot's AI and behavior completely
 ---------------------------------------------------------------------------]]
 if SERVER then
 	------- Overridables -------
-
-	-- Called when the zombie is stuck
-	function ENT:OnStuck()
-		self:Respawn()
-	end
 
 	-- When a path ends. Either when the goal is reached, or when no path could be found
 	-- This is where you should trigger your attack event or idle
@@ -638,6 +705,31 @@ if SERVER then
 	-- Note 2: This is called in every loop - use some delay measure to not spam expensive functions
 	-- Default: Do nothing (just move along the path)
 	function ENT:AI()
+
+	end
+
+	-- Called when the zombie collides with a non-target player according to its collision boxes
+	-- You can use this to call attacks before the end of the path is reached
+	-- Default: Change targets and attack if successful!
+	-- Note: If the player is the target, ENT:InteractTarget is called instead!
+	function ENT:InteractPlayer(ply)
+		if self:SetTarget(ply) then -- If we succeeded in targetting this player
+			--self:TriggerEvent("Attack", ply)
+		end
+	end
+
+	-- Called when the zombie collides with the target. Note that this isn't necessarily a player!
+	-- Monkey bombs and other target entities go here as well
+	-- Default: Attack the target! (Even if it is a non-player!)
+	function ENT:InteractTarget(target)
+		self:TriggerEvent("Attack", target)
+	end
+
+	-- Called when bumping into any entity that doesn't have a ZombieInteract function and isn't a player
+	-- This is not affected by "zombie proxying", so it cannot be used to detect walking into a crowd of zombies
+	-- interacting with something else. You can use this to make special interactions that only this zombie can do
+	-- Default: Do nothing (ignore it)
+	function ENT:Interact(ent)
 
 	end
 end
@@ -713,7 +805,16 @@ Below here is the base code that you shouldn't override
 function ENT:Initialize()
 	if SERVER then
 		local m,fallback = self:SelectModel()
-		self:SetModel(fallback)
+
+		local models = m and nzu.GetResources(m) or fallback
+		local choice = models[math.random(#models)]
+		self:SetModel(choice.Model)
+		if choice.Skin then self:SetSkin(choice.Skin) end
+		if choice.Bodygroups then
+			for k,v in pairs(choice.Bodygroups) do
+				self:SetBodygroup(k,v)
+			end
+		end
 
 		self:SetNextRepath(0)
 		self:SetNextRetarget(0)
@@ -756,6 +857,8 @@ if SERVER then
 				end
 
 				if IsValid(self.Path) then self:ResetMovementSequence() end
+
+				if self.loco:IsStuck() then self.FullyStuckTime = CurTime() + self.MaxStuckTime end
 			end
 
 			local ct = CurTime()
@@ -793,7 +896,9 @@ if SERVER then
 						path:Compute(self, self:GetTargetPosition(), self.ComputePath)
 						self:SetNextRepath(self:CalculateNextRepath(path))
 					end
+
 					path:Update(self)
+					if self.loco:IsStuck() then self:HandleStuck() end
 
 					if not self.NextSound or self.NextSound < CurTime() then
 						self:Sound()
@@ -808,18 +913,25 @@ if SERVER then
 
 	function ENT:OnContact(ent)
 		if not self.ActiveEvent and IsValid(ent) then
-			local ent2 = ent
-			if ent.nzu_InteractTarget then ent2 = ent.nzu_InteractTarget else ent2 = ent end -- Bumping into a proxy interactor
+			local ent2 = ent.nzu_InteractTarget or ent -- Bumping into a proxy interactor
 
-			if IsValid(ent2) and ent2.ZombieInteract then
-				self.nzu_InteractTarget = ent2 -- Turn ourselves into a proxy for the duration of the interaction
-				ent2:ZombieInteract(self, ent)
+			if IsValid(ent2) then
+				if ent2.ZombieInteract then
+					self.nzu_InteractTarget = ent2 -- Turn ourselves into a proxy for the duration of the interaction
+					ent2:ZombieInteract(self, ent)
 
-				-- Remove our proxy only if the interaction did not cause an event
-				-- Otherwise, the end of the event will remove the proxy
-				if not self.ActiveEvent then
-					self.nzu_InteractTarget = nil
-					if ent2.ZombieInteractEnd then ent2:ZombieInteractEnd(self) end
+					-- Remove our proxy only if the interaction did not cause an event
+					-- Otherwise, the end of the event will remove the proxy
+					if not self.ActiveEvent then
+						self.nzu_InteractTarget = nil
+						if ent2.ZombieInteractEnd then ent2:ZombieInteractEnd(self) end
+					end
+				elseif ent2 == self.Target then
+					self:InteractTarget(ent2)
+				elseif ent2:IsPlayer() then
+					self:InteractPlayer(ent2)
+				else
+					self:Interact(ent2)
 				end
 			end
 		end

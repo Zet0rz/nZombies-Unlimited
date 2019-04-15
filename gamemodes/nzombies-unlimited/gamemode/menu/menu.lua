@@ -326,7 +326,16 @@ if CLIENT then
 				-- Same config
 				local state = nzu.Round:GetState()
 				if state ~= ROUND_GAMEOVER then
-					if LocalPlayer():IsUnspawned() then
+					if LocalPlayer():Alive() then
+						local totext = "Unspawn"
+						if self:GetText() ~= totext then
+							self:SetText(totext)
+							self.ClickFunction = nzu.Unready
+
+							self.AdminOnly = false
+							self:SetDisabled(false)
+						end
+					elseif not LocalPlayer():IsReady() then
 						local totext = state == ROUND_WAITING and "Ready" or "Spawn in"
 						if self:GetText() ~= totext then
 							self:SetText(totext)
@@ -336,7 +345,7 @@ if CLIENT then
 							self:SetDisabled(false)
 						end
 					else
-						local totext = state == ROUND_WAITING and "Unready" or "Unspawn"
+						local totext = "Unready"
 						if self:GetText() ~= totext then
 							self:SetText(totext)
 							self.ClickFunction = nzu.Unready
@@ -402,7 +411,7 @@ if CLIENT then
 			s.LastCountdown = nil
 			s:SetVisible(state ~= ROUND_WAITING)
 
-			if old == ROUND_WAITING and not LocalPlayer():IsUnspawned() then
+			if old == ROUND_WAITING and LocalPlayer():IsReady() then
 				s.Menu:Close() -- Close menu on game start
 			end
 		end

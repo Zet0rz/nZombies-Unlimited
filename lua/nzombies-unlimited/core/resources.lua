@@ -92,28 +92,12 @@ if NZU_NZOMBIES then
 		end
 	end
 
-	local hookedsets = {}
 	customtype.Create = function(ext, setting)
 		nzu.RegisterResourceSet(setting)
-		hookedsets[ext.ID] = true
 	end
-
-	hook.Add("nzu_ExtensionSettingChanged", "nzu_Resources_AutoSettingChangeSet", function(id, k, v)
-		if hookedsets[id] and nzu.GetExtension(id).GetSettingsMeta()[k].Type == "ResourceSet" then
-			nzu.SelectResourceSet(k,v)
-		end
-	end)
-
-	hook.Add("nzu_ExtensionLoaded", "nzu_Resources_AutoSettingLoad", function(name)
-		if hookedsets[name] then
-			local ext = nzu.GetExtension(name)
-			for k,v in pairs(ext.GetSettingsMeta()) do
-				if v.Type == "ResourceSet" then
-					nzu.SelectResourceSet(k,ext.Settings[k])
-				end
-			end
-		end
-	end)
+	customtype.Notify = function(v,k)
+		nzu.SelectResourceSet(k,v)
+	end
 
 	function nzu.GetResources(set)
 		return selected[set]

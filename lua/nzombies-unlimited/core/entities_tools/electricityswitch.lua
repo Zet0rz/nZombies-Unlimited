@@ -2,8 +2,8 @@ local ENT = {}
 
 ENT.Type = "anim"
 ENT.Base = "base_entity"
-ENT.Model = "models/nzprops/zombies_power_lever.mdl"
-ENT.HandleModel = "models/nzprops/zombies_power_lever_handle.mdl"
+ENT.Model = "models/nzu/electricityswitch/zombies_power_lever.mdl"
+ENT.HandleModel = "models/nzu/electricityswitch/zombies_power_lever_handle.mdl"
 
 -- Why not also allow it to be spawned in the normal Entities menu?
 ENT.Category = "nZombies Unlimited"
