@@ -11,7 +11,7 @@ function nzu.AddSpawnmenuTab(name, paneltype, func, icon, tooltip)
 	end
 
 	tabs[name] = {type = paneltype, func = func, icon = icon, tooltip = tooltip}
-	if IsValid(tab) then
+	if IsValid(tab) and tab.Initialized then
 		local p = vgui.Create(paneltype, tab)
 		func(p)
 		tab:AddSheet(name, p, icon, false, false, tooltip)
@@ -23,15 +23,25 @@ function nzu.GetSpawnmenuTab(name)
 	return tabs[name] and tabs[name].panel
 end
 
-spawnmenu.AddCreationTab(tabname, function()
-	tab = vgui.Create("DPropertySheet")
+local function createtabs(tab)
 	for k,v in pairs(tabs) do
 		local p = vgui.Create(v.type, tab)
+		p:SetSkin("nZombies Unlimited")
 		v.func(p)
 		tab:AddSheet(k, p, v.icon, false, false, v.tooltip)
 		v.panel = p
 	end
+end
+
+spawnmenu.AddCreationTab(tabname, function()
+	tab = vgui.Create("DPropertySheet")
 	tab:SetSkin("nZombies Unlimited")
+
+	if IsValid(LocalPlayer()) then createtabs(tab) end
+	
 	return tab
 end, "icon16/control_repeat_blue.png", 1000, "nZombies Unlimited - Control Panel")
 
+hook.Add("InitPostEntity", "nzu_Spawnmenu_Initialize", function()
+	if IsValid(tab) then createtabs(tab) end
+end)

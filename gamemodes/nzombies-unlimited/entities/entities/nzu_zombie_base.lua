@@ -159,8 +159,8 @@ Pathing - SERVER
 
 if SERVER then
 	------- Fields -------
-	ENT.Acceleration = 400
-	ENT.Deceleration = 400
+	ENT.Acceleration = 500
+	ENT.Deceleration = 500
 	ENT.JumpHeight = 60
 	ENT.MaxYawRate = 360
 	ENT.StepHeight = 18
@@ -184,6 +184,11 @@ if SERVER then
 	-- Returns whether the current path goal exists and it is in the same 180-degree direction as the argument position
 	function ENT:IsMovingTowards(pos)
 		return self.Path and (pos - self:GetPos()):Dot(self.Path:GetCurrentGoal().forward) > 0
+	end
+
+	-- Opposite of above. But instead of using 'not', this would return false if we don't have a path at all (arbitrary what direction we move - we'll always move towards the target pos)
+	function ENT:IsNotMovingTowards(pos)
+		return self.Path and (pos - self:GetPos()):Dot(self.Path:GetCurrentGoal().forward) < 0
 	end
 
 	------- Overridables -------
@@ -398,13 +403,13 @@ if SERVER then
 	-- This is the place where you'll want to adjust movement speed if you want a small slowdown
 	-- The base merely applies insane acceleration to make the zombie always able to keep up
 	function ENT:StartMovingAttack(target, attack, speed)
-		self.loco:SetAcceleration(9999)
+		--self.loco:SetAcceleration(10000)
 	end
 
 	-- Called at the end of a moving attack
 	-- This is where you'll want to revert the changes made in ENT:StartMovingAttack
 	function ENT:FinishMovingAttack()
-		self.loco:SetAcceleration(self.Acceleration)
+		--self.loco:SetAcceleration(self.Acceleration)
 	end
 end
 
@@ -473,7 +478,7 @@ Similar to attacks, these are just fields along with a SelectVault function
 if SERVER then
 	------- Fields -------
 	ENT.VaultSequence = "nz_barricade_walk_1" -- What animation to vault with
-	ENT.VaultSpeed = 50 -- How fast the zombie moves over the vault
+	ENT.VaultSpeed = 30 -- How fast the zombie moves over the vault
 
 	------- Overridables -------
 
@@ -527,14 +532,15 @@ if SERVER then
 			to = pos
 		end
 
-		if self.Path and (to - self:GetPos()):Dot(self.Path:GetCurrentGoal().forward) < 0 then return end -- Don't vault at all if the direction of vault is away from where we want to go
+		if self:IsNotMovingTowards(to) then return end -- Don't vault at all if the direction of vault is away from where we want to go
 
 		local stucktime
 
 		-- If from exists, move to that position first
 		if from then
 			local path = Path("Follow")
-			path:SetGoalTolerance(20)
+			path:SetGoalTolerance(10)
+			path:SetMinLookAheadDistance(10)
 			path:Compute(self, from, self.ComputePath)
 			if not path:IsValid() then return end
 
@@ -556,23 +562,26 @@ if SERVER then
 		end
 		stucktime = nil
 
+		-- Get a path to the target location so we can get the distance
+		local path = Path("Follow")
+		path:SetGoalTolerance(10)
+		path:Compute(self, to, self.ComputePath)
+		if not path:IsValid() then return end
+
 		local name,groundspeed = self:SelectVaultSequence(to)
 		if not groundspeed then groundspeed = self.VaultSpeed end
 		local seq,dur = self:LookupSequence(name)
 
-		-- Get a path to the target location so we can get the distance
-		local path = Path("Follow")
-		path:SetGoalTolerance(20)
-		path:Compute(self, to, self.ComputePath)
-		if not path:IsValid() then return end
-
 		local dist = path:GetLength()
 		self:ResetSequence(seq)
 		self:SetCycle(0)
+
 		local rate = dur/(dist/groundspeed)
 		self:SetPlaybackRate(rate)
-		self.loco:SetDesiredSpeed(dist/dur)
+		local t = CurTime()
 
+		self.loco:SetAcceleration(500)
+		self.loco:SetDesiredSpeed(groundspeed)
 		self:SetSolidMask(MASK_NPCWORLDSTATIC) -- Nocollide with props and other entities (we remove this with CollideWhenPossible)
 
 		while path:IsValid() do
@@ -584,7 +593,7 @@ if SERVER then
 					self:SetPlaybackRate(0)
 				elseif stucktime < CurTime() then
 					self:SetPos(to) -- Give up and teleport
-					return
+					break
 				end
 			elseif stucktime then -- Resume the vault
 				stucktime = nil
@@ -593,6 +602,7 @@ if SERVER then
 			coroutine.yield()
 		end
 
+		self.loco:SetAcceleration(self.Acceleration)
 		self.loco:SetDesiredSpeed(self.DesiredSpeed)
 		self:CollideWhenPossible() -- Remove the mask as soon as we can
 	end
@@ -838,6 +848,9 @@ if SERVER then
 	end
 
 	function ENT:RunBehaviour()
+		self:Retarget()
+		self:InitializePath()
+
 		while true do
 			if self.ActiveEvent then
 				self:EventHandler(self.EventData) -- This handler should be holding the routine until it is done
@@ -872,40 +885,42 @@ if SERVER then
 
 			if not IsValid(self.Target) then
 				self:OnNoTarget()
-			else
-				local path = self.Path
-				if not path then
-					self:InitializePath()
-				elseif not IsValid(path) then -- We reached the goal, or path terminated for another reason
-					self:OnPathEnd()
-					self.Path = nil
-
-					if not IsValid(self.Target) or not self:AcceptTarget(self.Target) then
-						self:SetNextRetarget(0) -- Always retarget at the end of a path if the current target no longer exists or is not acceptable anymore (such as downed)
-					end
-				else
-					-- DEBUG
-					path:Draw()
-
-					if path:GetAge() >= self.NextRepath then
-						if not IsValid(self.Target) then
-							self:SetNextRetarget(0) -- Retarget next cycle
-							coroutine.yield()
-							continue
-						end
-						path:Compute(self, self:GetTargetPosition(), self.ComputePath)
-						self:SetNextRepath(self:CalculateNextRepath(path))
-					end
-
-					path:Update(self)
-					if self.loco:IsStuck() then self:HandleStuck() end
-
-					if not self.NextSound or self.NextSound < CurTime() then
-						self:Sound()
-					end
-					self:AI()
-				end
 			end
+
+			local path = self.Path
+			if not path then
+				self:InitializePath()
+				path = self.Path
+			elseif not IsValid(path) then -- We reached the goal, or path terminated for another reason
+				self:OnPathEnd()
+
+				if not IsValid(self.Target) or not self:AcceptTarget(self.Target) then
+					self:Retarget() -- Retarget on path end if the previous target is no longer valid
+				end
+
+				-- Recompute the path
+				path:Compute(self, self:GetTargetPosition(), self.ComputePath)
+				self:SetNextRepath(self:CalculateNextRepath(path))
+			end
+
+			if path:GetAge() >= self.NextRepath then
+				if not IsValid(self.Target) then
+					self:SetNextRetarget(0) -- Retarget next cycle
+					coroutine.yield()
+					continue
+				end
+				path:Compute(self, self:GetTargetPosition(), self.ComputePath)
+				self:SetNextRepath(self:CalculateNextRepath(path))
+			end
+			-- DEBUG
+			path:Draw()
+			path:Update(self)
+			if self.loco:IsStuck() then self:HandleStuck() end
+
+			if not self.NextSound or self.NextSound < CurTime() then
+				self:Sound()
+			end
+			self:AI()
 
 			coroutine.yield()
 		end

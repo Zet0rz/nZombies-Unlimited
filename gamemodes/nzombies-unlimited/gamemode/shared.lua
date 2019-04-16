@@ -69,6 +69,8 @@ loadfile("nzombies-unlimited/core/entities_tools/doors_nzu.lua")
 loadfile("nzombies-unlimited/core/entities_tools/electricityswitch.lua")
 loadfile_s("nzombies-unlimited/core/entities_tools/navlocker_nzu.lua")
 loadfile("nzombies-unlimited/core/entities_tools/barricades.lua")
+loadfile("nzombies-unlimited/core/entities_tools/wallbuys.lua")
+loadfile("nzombies-unlimited/core/entities_tools/invisiblewalls.lua")
 
 --[[-------------------------------------------------------------------------
 Misc GM hooks

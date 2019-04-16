@@ -43,7 +43,7 @@ if CLIENT then function ENT:Draw() self:DrawModel() end end
 
 scripted_ents.Register(ENT, "nzu_prop_playerclip")
 
-
+if not NZU_SANDBOX then return end
 --[[-------------------------------------------------------------------------
 Tool for spawning wall buys, browses weapon classes through filters
 ---------------------------------------------------------------------------]]

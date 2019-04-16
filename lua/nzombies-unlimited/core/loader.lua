@@ -1,7 +1,7 @@
 -- Create a global module
 nzu = nzu or {}
 
-function nzu.IsAdmin(ply) return ply:IsAdmin() end -- Replace this later
+function nzu.IsAdmin(ply) return ply:IsAdmin() end -- TODO: Replace this later
 
 -- Globals to act like SERVER and CLIENT (reversed when modules are loaded in the main mode)
 NZU_SANDBOX = true
@@ -62,7 +62,7 @@ loadfile("entities_tools/navlocker_sandbox.lua")
 loadfile("entities_tools/barricades.lua")
 loadfile("entities_tools/invisiblewalls.lua")
 
-loadfile("entities_tools/thumbnail_camera.lua")
+--loadfile("entities_tools/thumbnail_camera.lua")
 
 --[[if SERVER then
 	AddCSLuaFile("cl_nzombies_skin.lua")

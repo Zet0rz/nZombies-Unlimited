@@ -47,7 +47,11 @@ function ENT:Initialize()
 		self:SetUseType(SIMPLE_USE)
 		self:SetCollisionGroup(COLLISION_GROUP_DEBRIS_TRIGGER)
 
-		self:SetModel(defaultmodel)
+		local model = defaultmodel
+		if self:GetWeaponClass() then
+			local wep = weapons.GetStored(self:GetWeaponClass())
+			if wep then model = wep.WM or wep.WorldModel end
+		end
 		local a,b = self:GetModelBounds()
 		self:PhysicsInitBox(matrix*a, matrix*b)
 	else
@@ -66,7 +70,7 @@ if SERVER then
 	function ENT:WeaponClassChanged(_, old, new)
 		if old ~= new then
 			local wep = weapons.GetStored(new)
-			local model = wep and wep.WM or wep.WorldModel or defaultmodel
+			local model = wep and (wep.WM or wep.WorldModel) or defaultmodel
 
 			if model ~= self:GetModel() then
 				self:SetModel(model)
@@ -175,7 +179,7 @@ if CLIENT then
 end
 scripted_ents.Register(ENT, "nzu_wallbuy")
 
-
+if not NZU_SANDBOX then return end
 --[[-------------------------------------------------------------------------
 Tool for spawning wall buys, browses weapon classes through filters
 ---------------------------------------------------------------------------]]
@@ -205,23 +209,25 @@ function TOOL:LeftClick(trace)
 				undo.AddEntity(e)
 			undo.Finish()
 		end
-		return true
 	end
+	return true
 end
 
 function TOOL:RightClick(trace)
 	if IsValid(trace.Entity) and trace.Entity:GetClass() == "nzu_wallbuy" then
-		local tr = util.TraceLine({
-			start = trace.HitPos,
-			endpos = trace.HitPos + trace.Normal * 100,
-			filter = trace.Entity
-		})
+		if SERVER then
+			local tr = util.TraceLine({
+				start = trace.HitPos,
+				endpos = trace.HitPos + trace.Normal * 100,
+				filter = trace.Entity
+			})
 
-		if tr.Hit and tr.HitNormal then
-			trace.Entity:SetPos(tr.HitPos + tr.HitNormal*0.5)
-			trace.Entity:SetAngles(tr.HitNormal:Angle())
-		else
-			self:GetOwner():ChatPrint("Couldn't find wall behind Wall Buy to align to.")
+			if tr.Hit and tr.HitNormal then
+				trace.Entity:SetPos(tr.HitPos + tr.HitNormal*0.5)
+				trace.Entity:SetAngles(tr.HitNormal:Angle())
+			else
+				self:GetOwner():ChatPrint("Couldn't find wall behind Wall Buy to align to.")
+			end
 		end
 		return true
 	end
@@ -229,7 +235,7 @@ end
 
 function TOOL:Reload(trace)
 	if IsValid(trace.Entity) and trace.Entity:GetClass() == "nzu_wallbuy" then
-		trace.Entity:Remove()
+		if SERVER then trace.Entity:Remove() end
 		return true
 	end
 end

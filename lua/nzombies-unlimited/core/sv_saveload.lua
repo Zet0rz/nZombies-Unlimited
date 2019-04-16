@@ -369,6 +369,12 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 		ignoredfields[key] = true
 	end
 
+	local ENTITY = FindMetaTable("Entity")
+	function ENTITY:IgnoreField(key)
+		if not self.nzu_IgnoredFields then self.nzu_IgnoredFields = {} end
+		self.nzu_IgnoredFields[key] = true
+	end
+
 	local function getmapjson()
 		local tbl = {}
 		tbl.SaveExtensions = {}
@@ -400,6 +406,16 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 						v[k2] = nil
 					end
 				end
+
+				if v.nzu_IgnoredFields then
+					for k2,v2 in pairs(v.nzu_IgnoredFields) do
+						temp[k2] = v[k2]
+						v[k2] = nil
+					end
+					temp.nzu_IgnoredFields = v.nzu_IgnoredFields
+					v.nzu_IgnoredFields = nil
+				end
+
 				map = duplicator.Copy(v, map)
 				for k2,v2 in pairs(temp) do
 					v[k2] = v2
