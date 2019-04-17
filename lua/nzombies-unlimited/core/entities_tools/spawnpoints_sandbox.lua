@@ -62,32 +62,33 @@ function TOOL:LeftClick(trace)
 					undo.AddEntity(e)
 				undo.Finish()
 			end
-
-			return true
 		end
 	end
+	return true
 end
 
 function TOOL:RightClick(trace)
 	if IsValid(trace.Entity) and trace.Entity:GetClass() == "nzu_spawnpoint" then
-		if self:GetClientNumber("filter") ~= 0 then
-			if trace.Entity.SpawnpointType ~= self:GetClientInfo("type") then return end
+		if SERVER then
+			if self:GetClientNumber("filter") == 0 or trace.Entity.SpawnpointType == self:GetClientInfo("type") then
+				trace.Entity:Remove()
+			end
 		end
-
-		trace.Entity:Remove()
 		return true
 	end
 end
 
 function TOOL:Reload(trace)
 	if IsValid(trace.Entity) and trace.Entity:GetClass() == "nzu_spawnpoint" then
-		if self:GetClientNumber("filter") ~= 0 then
-			if trace.Entity.SpawnpointType ~= self:GetClientInfo("type") then return end
-		end
+		if SERVER then
+			if self:GetClientNumber("filter") ~= 0 then
+				if trace.Entity.SpawnpointType ~= self:GetClientInfo("type") then return end
+			end
 
-		local flags = self:GetClientInfo("flags")
-		local tbl = flags == "" and {} or string.Explode(" ", flags)
-		trace.Entity:SetMapFlags(tbl)
+			local flags = self:GetClientInfo("flags")
+			local tbl = flags == "" and {} or string.Explode(" ", flags)
+			trace.Entity:SetMapFlags(tbl)
+		end
 		return true
 	end
 end

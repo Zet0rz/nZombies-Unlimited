@@ -104,69 +104,66 @@ local function loadextensionprepare(name)
 	local loadingextension = loaded_extensions[name] or {ID = name}
 	local settings, panelfunc
 	local filename = extensionpath..name.."/settings.lua"
-	if file.Exists(prefix..filename, searchpath) then
-		AddCSLuaFile(filename)
-		settings, panelfunc = include(filename)
+	settings, panelfunc = include(filename)
 
-		if settings then
-			-- Inherit from custom types
-			for k,v in pairs(settings) do
-				if v.Type and customtypes[v.Type] then
-					-- Inherit all data from the table that Settings didn't define itself
-					setmetatable(v, customtypes[v.Type])
-					--for k2,v2 in pairs(customtypes[v.Type]) do
-						--if v[k2] == nil then v[k2] = v2 end
-					--end
-				end
-
-				if SERVER or NZU_SANDBOX or v.Client then
-					if v.Create then v.Create(loadingextension, k) end
-				else
-					settings[k] = nil
-				end
+	if settings then
+		-- Inherit from custom types
+		for k,v in pairs(settings) do
+			if v.Type and customtypes[v.Type] then
+				-- Inherit all data from the table that Settings didn't define itself
+				setmetatable(v, customtypes[v.Type])
+				--for k2,v2 in pairs(customtypes[v.Type]) do
+					--if v[k2] == nil then v[k2] = v2 end
+				--end
 			end
 
-			if SERVER then
-				local t = {}
-				if NZU_SANDBOX then
-					-- Calling the settings table with a field as first argument and value as second will set it and network it
-					-- In Sandbox, it always does this with all settings
-					setmetatable(t, {__call = function(tbl,k,v)
-						local s = settings[k]
-						if s.Parse then v = s.Parse(v) end
-						tbl[k] = v -- Actually set the value of course
-						if s.Notify then s.Notify(k,v) end
+			if SERVER or NZU_SANDBOX or v.Client then
+				if v.Create then v.Create(loadingextension, k) end
+			else
+				settings[k] = nil
+			end
+		end
 
+		if SERVER then
+			local t = {}
+			if NZU_SANDBOX then
+				-- Calling the settings table with a field as first argument and value as second will set it and network it
+				-- In Sandbox, it always does this with all settings
+				setmetatable(t, {__call = function(tbl,k,v)
+					local s = settings[k]
+					if s.Parse then v = s.Parse(v) end
+					tbl[k] = v -- Actually set the value of course
+					if s.Notify then s.Notify(k,v) end
+
+					net.Start("nzu_extension_setting")
+						net.WriteString(loadingextension.ID)
+						netwritesetting(settings[k],k,v)
+					net.Broadcast()
+
+					hook.Run("nzu_ExtensionSettingChanged", loadingextension.ID, k, v)
+				end})
+			else
+				-- In nZombies, only network settings that are marked as Client = true
+				setmetatable(t, {__call = function(tbl,k,v)
+					local s = settings[k]
+					if s.Parse then v = s.Parse(v) end
+					tbl[k] = v
+					if s.Notify then s.Notify(k,v) end
+
+					if s.Client then
 						net.Start("nzu_extension_setting")
 							net.WriteString(loadingextension.ID)
 							netwritesetting(settings[k],k,v)
 						net.Broadcast()
+					end
 
-						hook.Run("nzu_ExtensionSettingChanged", loadingextension.ID, k, v)
-					end})
-				else
-					-- In nZombies, only network settings that are marked as Client = true
-					setmetatable(t, {__call = function(tbl,k,v)
-						local s = settings[k]
-						if s.Parse then v = s.Parse(v) end
-						tbl[k] = v
-						if s.Notify then s.Notify(k,v) end
-
-						if s.Client then
-							net.Start("nzu_extension_setting")
-								net.WriteString(loadingextension.ID)
-								netwritesetting(settings[k],k,v)
-							net.Broadcast()
-						end
-
-						hook.Run("nzu_ExtensionSettingChanged", loadingextension.ID, k, v)
-					end})
-				end
-
-				loadingextension.Settings = t
-			else
-				loadingextension.Settings = {} -- Empty for clients by default; we wait expected networking here
+					hook.Run("nzu_ExtensionSettingChanged", loadingextension.ID, k, v)
+				end})
 			end
+
+			loadingextension.Settings = t
+		else
+			loadingextension.Settings = {} -- Empty for clients by default; we wait expected networking here
 		end
 	end
 	loadingextension.GetSettingsMeta = function() return settings end
@@ -493,6 +490,7 @@ if SERVER then
 			for k2,v2 in pairs(files) do
 				if file.Exists(prefix..prefix2..v2..".lua", searchpath) then
 					AddCSLuaFile(prefix2..v2..".lua")
+					print("Adding", prefix2..v2..".lua")
 				end
 			end
 		end

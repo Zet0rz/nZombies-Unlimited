@@ -121,13 +121,13 @@ if NZU_SANDBOX then
 					undo.AddEntity(e)
 				undo.Finish()
 			end
-			return true
 		end
+		return true
 	end
 
 	function TOOL:RightClick(trace)
 		if IsValid(trace.Entity) and trace.Entity:GetClass() == "nzu_electricityswitch" then
-			trace.Entity:Remove()
+			if SERVER then trace.Entity:Remove() end
 			return true
 		end
 	end

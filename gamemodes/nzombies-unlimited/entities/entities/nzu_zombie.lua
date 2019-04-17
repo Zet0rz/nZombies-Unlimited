@@ -364,57 +364,65 @@ function ENT:Event_BarricadeTear(barricade)
 	-- We got a barricade position, move towards it
 	self:SolidMaskDuringEvent(MASK_NPCSOLID_BRUSHONLY)
 	self.loco:ClearStuck()
-	local result = self:MoveToPos(pos, {lookahead = 10, tolerance = 5, maxage = 3, draw = true})
+	local result = self:MoveToPos(pos, {lookahead = 10, tolerance = 5, maxage = 3, draw = true}) -- DEBUG (draw = true)
 	if result == "ok" and not self:ShouldEventTerminate() then
 		-- We're in position
 		self:SetPos(pos) -- Just because the animations are very precise here
 		self:FaceTowards(barricade:LocalToWorld(Vector(0,barricade:WorldToLocal(pos).y,0))) -- Just face fowards, not towards the center of the barricade
 
-		local planktotear = barricade:StartTear(self)
-		while IsValid(planktotear) do
-			local pos = planktotear:GetGrabPos()
-			local ang = planktotear:GetGrabAngles()
+		
+		while not self:ShouldEventTerminate() and not barricade:GetIsClear() do
+			local planktotear = barricade:StartTear(self)
+			if IsValid(planktotear) then
+				local pos = planktotear:GetGrabPos()
+				local ang = planktotear:GetGrabAngles()
 
-			local a,b,c = self:CalculateBarricadeAnims(pos, ang)
+				local a,b,c = self:CalculateBarricadeAnims(pos, ang)
 
-			-- Get times and sequences
-			local grab,gdur = self:LookupSequence(a)
-			local hold,hdur = self:LookupSequence(b)
-			local pull,pdur = self:LookupSequence(c)
+				-- Get times and sequences
+				local grab,gdur = self:LookupSequence(a)
+				local hold,hdur = self:LookupSequence(b)
+				local pull,pdur = self:LookupSequence(c)
 
-			-- Perform grab and wait its duration
-			self:SetCycle(0)
-			self:ResetSequence(grab)
-			coroutine.wait(gdur)
+				-- Perform grab and wait its duration
+				self:SetCycle(0)
+				self:ResetSequence(grab)
+				coroutine.wait(gdur)
 
-			-- Determine hold duration and play that loop for that long
-			local time = planktotear:GetPlankTearTime() - gdur - pdur
-			if time > 0 then
-				self:ResetSequence(hold)
-				coroutine.wait(time)
+				-- Determine hold duration and play that loop for that long
+				local time = planktotear:GetPlankTearTime() - gdur - pdur
+				if time > 0 then
+					self:ResetSequence(hold)
+					coroutine.wait(time)
+				end
+
+				-- Pull the plank!
+				self:ResetSequence(pull)
+				self:SetCycle(0)
+				coroutine.wait(pulldelay)
+
+				barricade:TearPlank(self, planktotear)
+				local phys = planktotear:GetPhysicsObject()
+				if IsValid(phys) then
+					local vec = self:GetPos() - planktotear:GetPos()
+					vec.z = 0
+					phys:SetVelocity(vec*3)
+				end
+				coroutine.wait(pdur - pulldelay)
+			else
+				self:Timeout(2)
 			end
+		end
 
-			-- Pull the plank!
-			self:ResetSequence(pull)
-			self:SetCycle(0)
-			coroutine.wait(pulldelay)
-
-			barricade:TearPlank(self, planktotear)
-			local phys = planktotear:GetPhysicsObject()
-			if IsValid(phys) then
-				local vec = self:GetPos() - planktotear:GetPos()
-				vec.z = 0
-				phys:SetVelocity(vec*3)
-			end
-			coroutine.wait(pdur - pulldelay)
-
-			if self:ShouldEventTerminate() then break end
-			planktotear = barricade:StartTear(self)
+		if not self:ShouldEventTerminate() then
+			if barricade.m_tReservedSpots[pos] == self then barricade.m_tReservedSpots[pos] = NULL end
+			self:TriggerEvent("BarricadeVault", barricade.VaultHandler, barricade)
+			return
 		end
 	else
 		self:Timeout(2)
 	end
-	if barricade.m_tReservedSpots[pos] == self then barricade.m_tReservedSpots[pos] = nil end
+	if barricade.m_tReservedSpots[pos] == self then barricade.m_tReservedSpots[pos] = NULL end
 end
 
 -- DEBUG

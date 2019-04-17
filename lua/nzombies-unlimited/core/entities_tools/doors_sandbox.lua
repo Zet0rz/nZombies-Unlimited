@@ -162,9 +162,9 @@ TOOL.ClientConVar = {
 }
 
 function TOOL:LeftClick(trace)
-	if SERVER then
-		if IsValid(trace.Entity) then
-			if trace.Entity:CanCreateDoor() then
+	if IsValid(trace.Entity) then
+		if trace.Entity:CanCreateDoor() then
+			if SERVER then
 				local flags = self:GetClientInfo("flags")
 				local tbl
 				if flags ~= "" then
@@ -177,11 +177,11 @@ function TOOL:LeftClick(trace)
 					Flags = tbl,
 				}
 				trace.Entity:CreateDoor(data)
-
-				return true
-			else
-				self:GetOwner():ChatPrint("This entity does not support Locks.")
 			end
+
+			return true
+		elseif SERVER then
+			self:GetOwner():ChatPrint("This entity does not support Locks.")
 		end
 	end
 end
@@ -190,20 +190,22 @@ function TOOL:RightClick(trace)
 	if IsValid(trace.Entity) then
 		local data = trace.Entity:GetDoorData()
 		if data then
-			local owner = self:GetOwner()
-			owner:ConCommand("nzu_tool_doorlock_price "..data.Price)
-			owner:ConCommand("nzu_tool_doorlock_group \""..(data.Group or "\""))
-			owner:ConCommand("nzu_tool_doorlock_electricity "..(data.Electricity and "1" or "0"))
+			if SERVER then
+				local owner = self:GetOwner()
+				owner:ConCommand("nzu_tool_doorlock_price "..data.Price)
+				owner:ConCommand("nzu_tool_doorlock_group \""..(data.Group or "\""))
+				owner:ConCommand("nzu_tool_doorlock_electricity "..(data.Electricity and "1" or "0"))
 
-			local str = ""
-			if data.Flags then
-				for k,v in pairs(data.Flags) do
-					str = str .. v .. " "
+				local str = ""
+				if data.Flags then
+					for k,v in pairs(data.Flags) do
+						str = str .. v .. " "
+					end
+					str = string.Trim(str)
 				end
-				str = string.Trim(str)
+				owner:ConCommand("nzu_tool_doorlock_flags \""..str.."\"")
+				owner:ChatPrint("Copied door data!")
 			end
-			owner:ConCommand("nzu_tool_doorlock_flags \""..str.."\"")
-			owner:ChatPrint("Copied door data!")
 			return true
 		end
 	end
@@ -211,7 +213,7 @@ end
 
 function TOOL:Reload(trace)
 	if IsValid(trace.Entity) and trace.Entity:GetDoorData() then
-		trace.Entity:RemoveDoor()
+		if SERVER then trace.Entity:RemoveDoor() end
 		return true
 	end
 end

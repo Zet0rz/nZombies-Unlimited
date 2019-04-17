@@ -51,14 +51,16 @@ if SERVER then
 	ROUND.ZombiesToSpawn = 0 -- Zombies still not spawned
 	function ROUND:GetRemainingZombies() return self.NumberZombies + self.ZombiesToSpawn end
 
+	local weightedrandom = nzu.WeightedRandom
 	local function dozombiespawn(z, spawner)
 		z:ShouldGivePoints(true)
 
-		local health = ROUND:CalculateZombieHealth()
+		local health = ROUND.ZombieHealth
 		health = z.SelectHealth and z:SelectHealth(health) or health
 		z:SetMaxHealth(health)
 		z:SetHealth(health)
 
+		--local speed = weightedrandom(ROUND.ZombieSpeeds)
 		local speed = ROUND:CalculateZombieSpeed()
 		speed = z.SelectMovementSpeed and z:SelectMovementSpeed(speed) or speed
 		z:SetDesiredSpeed(speed)
@@ -173,6 +175,7 @@ if SERVER then
 
 		self.ZombiesToSpawn = self:CalculateZombieAmount()
 		self.ZombieHealth = self:CalculateZombieHealth()
+		--self.ZombieSpeeds = self:CalculateZombieSpeed()
 
 		self.CurrentZombies = 0
 		self.Zombies = {}
@@ -304,8 +307,12 @@ if SERVER then
 
 	function ROUND:GetZombieHealth() return self.ZombieHealth end
 
-	function ROUND:CalculateZombieSpeed()
-		return 100
+	function ROUND:CalculateZombieSpeed(r)
+		-- Generate a random number from a normal distribution
+		-- Mean is based on the round itself
+		-- Variance is 500, which gives nicely spread values averaging 20-50 away from the mean
+		local r = r or self.Round
+		return math.Clamp(math.Round(math.sqrt(-2 * 500 * math.log(math.random())) * math.cos(2*math.pi*math.random()) + r*15), 30,300)
 	end
 end
 
@@ -552,18 +559,16 @@ if SERVER then
 	end
 
 	hook.Add("PlayerSpawn", "nzu_Round_PlayerSpawn", function(ply)
-		if not ply:IsUnspawned() then
-			local spawnpoints = nzu.GetSpawners("player")
-			if not spawnpoints then return end
+		local spawnpoints = nzu.GetSpawners("player")
+		if not spawnpoints then return end
 
-			local num = #spawnpoints
-			if num == 0 then return end
+		local num = #spawnpoints
+		if num == 0 then return end
 
-			local k = ply:EntIndex()
+		local k = ply:EntIndex()
 
-			local spawner = spawnpoints[(k-1)%num + 1]
-			ply:SetPos(spawner:GetPos())
-		end
+		local spawner = spawnpoints[(k-1)%num + 1]
+		ply:SetPos(spawner:GetPos())
 	end)
 
 	hook.Add("PlayerInitialSpawn", "nzu_Round_ReadySync", function(ply)

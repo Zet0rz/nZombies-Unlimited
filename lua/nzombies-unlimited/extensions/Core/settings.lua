@@ -247,7 +247,6 @@ if CLIENT then
 
 		return p
 	end
-
 	return settings, panelfunc
 end
 

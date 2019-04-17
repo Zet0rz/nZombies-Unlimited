@@ -31,6 +31,20 @@ if SERVER then
 		["m_tPlanks"] = true,
 		["m_tReservedSpots"] = true,
 	}
+
+	-- What positions the barricade can possibly use
+	ENT.BarricadeTearPositions = {
+		Front = {
+			Vector(-33,0,0),
+			Vector(-33,35,0),
+			Vector(-33,-35,0),
+		},
+		Back = {
+			Vector(33,0,0),
+			Vector(33,35,0),
+			Vector(33,-35,0),
+		}
+	}
 end
 
 function ENT:SetupDataTables()
@@ -49,7 +63,7 @@ function ENT:Initialize()
 		self:SetPlankCount(0)
 		self.m_iNumBlockingPlanks = 0
 		self.m_tPlanks = {}
-		self.m_tReservedSpots = {}
+		
 
 		if not self:GetMaxPlanks() then self:SetMaxPlanks(6) end
 		if not self:GetPlankRepairTime() then self:SetPlankRepairTime(1) end
@@ -66,6 +80,31 @@ function ENT:Initialize()
 	end
 
 	self:SetMaterial("models/wireframe")
+
+	-- Determine what positions are available
+	if SERVER then --and NZU_NZOMBIES then
+		local t = {}
+
+		local ms,mx = Vector(-15,-15,0), Vector(15,15,70)
+		for k,v in pairs(self.BarricadeTearPositions) do
+			local t2 = {}
+			for k2,v2 in pairs(v) do
+				local pos = self:LocalToWorld(v2)
+				local tr = util.TraceHull({
+					start = pos,
+					endpos = pos,
+					mins = ms,
+					maxs = mx,
+					filter = self
+				})
+				if not tr.Hit then
+					t2[pos] = NULL
+				end
+			end
+			t[k] = t2
+		end
+		self.m_tReservedSpots = t
+	end
 end
 
 if SERVER then
@@ -209,25 +248,12 @@ if SERVER then
 		end
 	end
 
-	ENT.BarricadeTearPositions = {
-		Front = {
-			Vector(-33,0,0),
-			Vector(-33,35,0),
-			Vector(-33,-35,0),
-		},
-		Back = {
-			Vector(33,0,0),
-			Vector(33,35,0),
-			Vector(33,-35,0),
-		}
-	}
 	function ENT:ReserveAvailableTearPosition(z)
-		local tbl = (z:GetPos() - self:GetPos()):Dot(self:GetAngles():Forward()) < 0 and self.BarricadeTearPositions.Front or self.BarricadeTearPositions.Back
+		local tbl = (z:GetPos() - self:GetPos()):Dot(self:GetAngles():Forward()) < 0 and self.m_tReservedSpots.Front or self.m_tReservedSpots.Back
 		for k,v in pairs(tbl) do
-			local zomb = self.m_tReservedSpots[v]
-			if not IsValid(zomb) or zomb == z then
-				self.m_tReservedSpots[v] = z
-				return self:LocalToWorld(v)
+			if not IsValid(v) or v == z then
+				tbl[k] = z
+				return k
 			end
 		end
 	end
@@ -291,6 +317,7 @@ if SERVER then
 		end
 		z:SubEvent("Vault", nil, tbl) -- It's a SUB-event! This means the zombie's event is still "BarricadeVault", we just run the equivalent function
 	end
+	ENT.VaultHandler = triggervault
 
 	function ENT:ZombieInteract(z)
 		if not self:GetIsClear() then
@@ -320,35 +347,43 @@ if SERVER then
 			-- We're in position
 			self:FaceTowards(barricade:GetPos())
 
-			local planktotear = barricade:StartTear(self)
-			while IsValid(planktotear) do
-				local attack = self:SelectAttack(barricade)
-				local impact = attack.Impacts[1]
-				local seqdur = self:SequenceDuration(self:LookupSequence(attack.Sequence))
-				local time = seqdur*impact
+			while not self:ShouldEventTerminate() and not barricade:GetIsClear() do
+				local planktotear = barricade:StartTear(self)
 
-				self:Timeout(planktotear:GetPlankTearTime() - time) -- We wait as long so that the attack matches the tear time
-				self:ResetSequence(attack.Sequence)
+				if IsValid(planktotear) then
+					local attack = self:SelectAttack(barricade)
+					local impact = attack.Impacts[1]
+					local seqdur = self:SequenceDuration(self:LookupSequence(attack.Sequence))
+					local time = seqdur*impact
 
-				coroutine.wait(time)
+					self:Timeout(planktotear:GetPlankTearTime() - time) -- We wait as long so that the attack matches the tear time
+					self:ResetSequence(attack.Sequence)
 
-				barricade:TearPlank(self, planktotear)
-				local phys = planktotear:GetPhysicsObject()
-				if IsValid(phys) then
-					local vec = self:GetPos() - planktotear:GetPos()
-					vec.z = 0
-					phys:SetVelocity(vec*2)
+					coroutine.wait(time)
+
+					barricade:TearPlank(self, planktotear)
+					local phys = planktotear:GetPhysicsObject()
+					if IsValid(phys) then
+						local vec = self:GetPos() - planktotear:GetPos()
+						vec.z = 0
+						phys:SetVelocity(vec*2)
+					end
+
+					coroutine.wait(seqdur - time)
+				else
+					self:Timeout(2)
 				end
+			end
 
-				coroutine.wait(seqdur - time)
-
-				if self:ShouldEventTerminate() then break end
-				planktotear = barricade:StartTear(self)
+			if not self:ShouldEventTerminate() then
+				if barricade.m_tReservedSpots[pos] == self then barricade.m_tReservedSpots[pos] = NULL end
+				self:TriggerEvent("BarricadeVault", triggervault, self)
+				return
 			end
 		else
 			self:Timeout(2)
 		end
-		if barricade.m_tReservedSpots[pos] == self then barricade.m_tReservedSpots[pos] = nil end
+		if barricade.m_tReservedSpots[pos] == self then barricade.m_tReservedSpots[pos] = NULL end
 	end
 else
 	local mat = Material("cable/redlaser")
@@ -657,8 +692,8 @@ end
 if CLIENT then
 	TOOL.Information = {
 		{name = "left"},
+		{name = "right"},
 		{name = "reload"},
-		{name = "right"}
 	}
 
 	language.Add("tool.nzu_tool_barricade.name", "Barricade Creator")

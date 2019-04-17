@@ -149,8 +149,10 @@ local function NewSpawner(type, pos, ang)
 	return Spawner
 end
 
-local spawnpoints = {}
-local openspawns = {}
+nzu.Spawns = nzu.Spawns or {}
+local spawnpoints = nzu.Spawns
+nzu.OpenSpawns = nzu.OpenSpawns or {}
+local openspawns = nzu.OpenSpawns
 function SPAWNER:Activate()
 	if not self.Active then
 		openspawns[self.Type][self] = true

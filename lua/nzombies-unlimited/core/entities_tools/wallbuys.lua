@@ -63,8 +63,8 @@ end
 if SERVER then
 	function ENT:UpdateCollisionBounds()
 		local a,b = self:GetModelBounds()
+		local diff = matrix*(self:GetPos() - self:WorldSpaceCenter())
 		self:SetCollisionBounds(matrix*a, matrix*b)
-		self:SetAngles(self:GetAngles())
 	end
 
 	function ENT:WeaponClassChanged(_, old, new)
@@ -198,7 +198,7 @@ function TOOL:LeftClick(trace)
 
 		local e = ents.Create("nzu_wallbuy")
 		e:SetPos(trace.HitPos + trace.HitNormal*0.5)
-		e:SetAngles(trace.HitNormal:Angle())
+		e:SetAngles(trace.HitNormal:Angle() + Angle(0,90,0))
 		e:Spawn()
 		e:SetWeaponClass(self:GetClientInfo("class"))
 		e:SetPrice(self:GetClientNumber("price"))

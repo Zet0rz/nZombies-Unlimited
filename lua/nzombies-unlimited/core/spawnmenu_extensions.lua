@@ -49,7 +49,7 @@ local function generateextensionpanel(ext, save)
 	local f = vgui.Create("DCollapsibleCategory")
 	local details = nzu.GetExtensionDetails(ext)
 
-	f:SetLabel((details.Name or "[Unknown Name]") .. " ["..ext.."]")
+	f:SetLabel((details and details.Name or "[Unknown Name]") .. " ["..ext.."]")
 
 	local checkbox = f.Header:Add("DCheckBoxLabel")
 	checkbox:Dock(RIGHT)

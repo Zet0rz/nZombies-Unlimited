@@ -50,6 +50,10 @@ if SERVER then
 		{Model = "models/nzu/nzombie_honorguard.mdl", Skin = 0, Bodygroups = {0,1}},
 	}
 
+	-- Smaller than players except in the forward direction
+	ENT.CollisionMins = Vector(-12,-8,0)
+	ENT.CollisionMaxs = Vector(12,16,64)
+
 	------- Overridables -------
 
 	-- Lets you determine what class of model this zombie is, along with a default
@@ -826,6 +830,8 @@ function ENT:Initialize()
 			end
 		end
 
+		self:SetCollisionBounds(self.CollisionMins, self.CollisionMaxs)
+
 		self:SetNextRepath(0)
 		self:SetNextRetarget(0)
 
@@ -858,7 +864,7 @@ if SERVER then
 				self.ActiveEvent = nil
 				self.EventData = nil
 
-				if self.EventMask then
+				if self.EventMask and not self.DoCollideWhenPossible then
 					self:SetSolidMask(MASK_NPCSOLID)
 					self.EventMask = nil
 				end
@@ -926,29 +932,56 @@ if SERVER then
 		end
 	end
 
+	ENT.CollisionBoxCheckInterval = 1
 	function ENT:OnContact(ent)
 		if not self.ActiveEvent and IsValid(ent) then
 			local ent2 = ent.nzu_InteractTarget or ent -- Bumping into a proxy interactor
+			if ent2.ZombieInteract then
+				self.nzu_InteractTarget = ent2 -- Turn ourselves into a proxy for the duration of the interaction
+				ent2:ZombieInteract(self, ent)
 
-			if IsValid(ent2) then
-				if ent2.ZombieInteract then
-					self.nzu_InteractTarget = ent2 -- Turn ourselves into a proxy for the duration of the interaction
-					ent2:ZombieInteract(self, ent)
-
-					-- Remove our proxy only if the interaction did not cause an event
-					-- Otherwise, the end of the event will remove the proxy
-					if not self.ActiveEvent then
-						self.nzu_InteractTarget = nil
-						if ent2.ZombieInteractEnd then ent2:ZombieInteractEnd(self) end
-					end
-				elseif ent2 == self.Target then
-					self:InteractTarget(ent2)
-				elseif ent2:IsPlayer() then
-					self:InteractPlayer(ent2)
-				else
-					self:Interact(ent2)
+				-- Remove our proxy only if the interaction did not cause an event
+				-- Otherwise, the end of the event will remove the proxy
+				if not self.ActiveEvent then
+					self.nzu_InteractTarget = nil
+					if ent2.ZombieInteractEnd then ent2:ZombieInteractEnd(self) end
 				end
+				return
 			end
+			if ent2 == self.Target then self:InteractTarget(ent2, ent) return end
+			if ent2:IsPlayer() then self:InteractPlayer(ent2, ent) return end
+
+			-- The entity or its proxy did not pass any of the interactions
+			-- Attempt to find an interactable entity in a box 30 units ahead of us
+			if not self.NextBoxCheck or self.NextBoxCheck < CurTime() then
+				self.NextBoxCheck = CurTime() + self.CollisionBoxCheckInterval
+
+				-- TODO: Make this if-statement say only if static entity? Is that optimized? i.e. prevent this when bumping into moving zombies
+				--if self.loco:GetVelocity():Length2D() <= 10 then
+					local targetforward = IsValid(self.Path) and self.Path:GetCurrentGoal().forward*30 or self:GetAngles():Forward()*30
+					local a,b = self:GetCollisionBounds()
+
+					local p = self:GetPos() + targetforward
+					local tbl = ents.FindInBox(p+a,p+b)
+					--debugoverlay.Box(p, a, b, 1, Color(255,255,255,10))
+
+					for k,v in pairs(tbl) do
+						if v.ZombieInteract then -- This only works for entities with ZombieInteract
+							self.nzu_InteractTarget = v
+							v:ZombieInteract(self, ent)
+
+							if not self.ActiveEvent then
+								self.nzu_InteractTarget = nil
+								if v.ZombieInteractEnd then v:ZombieInteractEnd(self) end
+							end
+							return
+						end
+					end
+				--end
+			end
+
+			-- In the end, call our own Interact function on the initial (potentially proxied) entity we collided with
+			self:Interact(ent2)
 		end
 	end
 
@@ -976,7 +1009,16 @@ Pass potential data as the third argument rather than directly in the handler
 ---------------------------------------------------------------------------]]
 if SERVER then
 	function ENT:TriggerEvent(id, handler, data)
-		if self.ActiveEvent then return end
+		-- Lapsing events
+		if self.ActiveEvent then
+			local func = self["Event_"..id] or handler
+			if func then
+				self.ActiveEvent = id
+				self.EventHandler = func
+				self.EventData = data
+				func(self, data)
+			end
+		return end
 		
 		local func = self["Event_"..id] or handler
 		if func then
@@ -1067,6 +1109,7 @@ function ENT:Think()
 				self:SetSolidMask(MASK_NPCSOLID)
 				self.DoCollideWhenPossible = nil
 				self.NextCollideCheck = nil
+				self.EventMask = nil
 			else
 				self.NextCollideCheck = CurTime() + collidedelay
 			end
