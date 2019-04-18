@@ -281,14 +281,14 @@ properties.Add("nzu_DoorLock", {
 	PrependSpacer = true,
 
 	Filter = function(self, ent, ply) -- A function that determines whether an entity is valid for this property
-		if !IsValid(ent) then return false end
-		if !gamemode.Call("CanProperty", ply, "nzu_DoorLock", ent) then return false end
+		if not IsValid(ent) then return false end
+		if not gamemode.Call("CanProperty", ply, "nzu_DoorLock", ent) then return false end
 
 		return ent:GetDoorData() or ent:CanCreateDoor()
 	end,
 	Receive = function(self, length, player)
 		local ent = net.ReadEntity()
-		if !self:Filter(ent, player) then return end
+		if not self:Filter(ent, player) then return end
 
 		local tbl = {}
 		tbl.Price = net.ReadUInt(32)
