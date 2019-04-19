@@ -222,19 +222,19 @@ if CLIENT then
 
 	function PANEL:OnClickLine(Line, bClear) -- Copied from DListView but modified to check overall change too
 		local bMultiSelect = self:GetMultiSelect()
-		if ( !bMultiSelect && !bClear ) then return end
+		if ( not bMultiSelect and not bClear ) then return end
 
 		--
 		-- Control, multi select
 		--
-		if ( bMultiSelect && input.IsKeyDown( KEY_LCONTROL ) ) then
+		if ( bMultiSelect and input.IsKeyDown( KEY_LCONTROL ) ) then
 			bClear = false
 		end
 
 		--
 		-- Shift block select
 		--
-		if ( bMultiSelect && input.IsKeyDown( KEY_LSHIFT ) ) then
+		if ( bMultiSelect and input.IsKeyDown( KEY_LSHIFT ) ) then
 
 			local Selected = self:GetSortedID( self:GetSelectedLine() )
 			if ( Selected ) then
@@ -247,7 +247,7 @@ if CLIENT then
 				-- Fire off OnRowSelected for each non selected row
 				for id = First, Last do
 					local line = self.Sorted[ id ]
-					if ( !line:IsLineSelected() ) then self:OnRowSelected( line:GetID(), line ) anychange = true end
+					if ( not line:IsLineSelected() ) then self:OnRowSelected( line:GetID(), line ) anychange = true end
 					line:SetSelected( true )
 				end
 
@@ -273,7 +273,7 @@ if CLIENT then
 		--
 		-- Check for double click
 		--
-		if ( Line:IsSelected() && Line.m_fClickTime && ( !bMultiSelect || bClear ) ) then
+		if ( Line:IsSelected() and Line.m_fClickTime and ( not bMultiSelect or bClear ) ) then
 
 			local fTimeDistance = SysTime() - Line.m_fClickTime
 
@@ -290,7 +290,7 @@ if CLIENT then
 		--
 		local b = Line:IsSelected()
 
-		if ( !bMultiSelect || bClear ) then
+		if ( not bMultiSelect or bClear ) then
 			if b and table.Count(self:GetSelected()) > 1 then
 				b = false
 			end
@@ -565,14 +565,14 @@ if NZU_SANDBOX then
 		--PrependSpacer = true,
 
 		Filter = function(self, ent, ply) -- A function that determines whether an entity is valid for this property
-			if !IsValid(ent) then return false end
-			if !gamemode.Call("CanProperty", ply, "nzu_MapFlags", ent) then return false end
+			if not IsValid(ent) then return false end
+			if not gamemode.Call("CanProperty", ply, "nzu_MapFlags", ent) then return false end
 
 			return ent.nzu_MapFlagsHandler
 		end,
 		Receive = function(self, length, player)
 			local ent = net.ReadEntity()
-			if !self:Filter(ent, player) then return end
+			if not self:Filter(ent, player) then return end
 
 			local num = net.ReadUInt(8)
 			local tbl = {}
