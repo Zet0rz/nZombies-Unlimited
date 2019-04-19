@@ -35,6 +35,62 @@ end
 
 
 
+--[[-------------------------------------------------------------------------
+Networking Extension availability
+---------------------------------------------------------------------------]]
+if NZU_SANDBOX then
+	if SERVER then
+		util.AddNetworkString("nzu_extensions")
+		local function networkextensionavailability(name, ply)
+			local data = nzu.GetExtensionDetails(name)
+			net.Start("nzu_extensions")
+				net.WriteString(name)
+				net.WriteString(data.Name)
+				net.WriteString(data.Description)
+				net.WriteString(data.Author)
+				
+				local num = data.Prerequisites and #data.Prerequisites or 0
+				net.WriteUInt(num, 8)
+				for i = 1,num do
+					net.WriteString(data.Prerequisites[i])
+				end
+			if ply then net.Send(ply) else net.Broadcast() end
+		end
+		
+		hook.Add("PlayerInitialSpawn", "nzu_Extensions_NetworkList", function(ply)
+			for k,v in pairs(nzu.GetExtensionList()) do
+				networkextensionavailability(v, ply)
+			end
+		end)
+	else
+		local availableextensions = {}
+		net.Receive("nzu_extensions", function()
+			local id = net.ReadString()
+			local ext = {ID = id}
+			ext.Name = net.ReadString()
+			ext.Description = net.ReadString()
+			ext.Author = net.ReadString()
+			
+			local num = net.ReadUInt(8)
+			if num > 0 then
+				ext.Prerequisites = {}
+				for i = 1,num do
+					table.insert(ext.Prerequisites, net.ReadString())
+				end
+			end
+			
+			availableextensions[id] = ext
+		end)
+		
+		function nzu.GetAvailableExtensions()
+			return availableextensions
+		end
+		
+		function nzu.GetExtensionDetails(id)
+			return availableextensions[id]
+		end
+	end
+end
 
 
 

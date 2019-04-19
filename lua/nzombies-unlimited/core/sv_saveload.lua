@@ -96,7 +96,7 @@ local function loadconfig(config)
 						end
 					end
 				end
-				savefuncs[k].Load(data, entities)
+				if savefuncs[k].Load then savefuncs[k].Load(data, entities) end
 
 				if savefuncs[k].PostLoad then table.insert(postloads, savefuncs[k].PostLoad) end
 			else
@@ -223,8 +223,8 @@ function nzu.LoadConfig(config, ctype)
 
 	if not nzu.CurrentConfig and config.Map == game.GetMap() then
 		-- Allow immediate loading if no config has previously been loaded (default gamemode state)
-		loadconfig(config)
 		nzu.CurrentConfig = config
+		loadconfig(config)
 		networkconfig(config, player.GetAll(), true)
 		hook.Run("nzu_ConfigLoaded", config)
 		return
@@ -426,16 +426,18 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 		
 		local postsaves = {}
 		for k,v in pairs(savefuncs) do
-			local data, entities = v.Save()
-			if data or entities then
-				local save = {Data = data}
-				if entities then
-					save.Entities = {}
-					for k2,v2 in pairs(entities) do
-						table.insert(save.Entities, v2:EntIndex())
+			if v.Save then
+				local data, entities = v.Save()
+				if data or entities then
+					local save = {Data = data}
+					if entities then
+						save.Entities = {}
+						for k2,v2 in pairs(entities) do
+							table.insert(save.Entities, v2:EntIndex())
+						end
 					end
+					tbl.SaveExtensions[k].Save = save
 				end
-				tbl.SaveExtensions[k].Save = save
 			end
 
 			if v.PostSave then table.insert(postsaves, v.PostSave) end
@@ -474,15 +476,18 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 		for k,v in pairs(nzu.GetLoadedExtensionOrder()) do
 			local ext = nzu.GetExtension(v)
 			if ext then
-				local t = {}
-				-- Loop through the settings meta; If any have a "Save" we will save the value of that function instead
-				for k,v in pairs(ext.GetSettingsMeta()) do
-					local tosave = ext.Settings[k]
-					if v.Save then tosave = v.Save(tosave) end
-					t[k] = tosave
-				end
-
-				table.insert(tbl, {ID = ext.ID, Settings = t})
+				if ext.GetSettingsMeta() then
+					local t = {}
+					-- Loop through the settings meta; If any have a "Save" we will save the value of that function instead
+					for k,v in pairs(ext.GetSettingsMeta()) do
+						local tosave = ext.Settings[k]
+						if v.Save then tosave = v.Save(tosave) end
+						t[k] = tosave
+					end
+					table.insert(tbl, {ID = ext.ID, Settings = t})
+				else
+					table.insert(tbl, {ID = ext.ID})
+				end				
 			end
 		end
 		return util.TableToJSON(tbl)
@@ -648,6 +653,25 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 		if not nzu.IsAdmin(ply) then return end -- Of course only admins can delete folders and files!!
 		nzu.DeleteConfig(net.ReadString())
 	end)
+end
+
+
+
+--[[-------------------------------------------------------------------------
+Additional Config folder file read/write
+---------------------------------------------------------------------------]]
+function nzu.WriteConfigFile(name, str)
+	if nzu.CurrentConfig and nzu.CurrentConfig.Type == "Local" then
+		file.Write("nzombies-unlimited/localconfigs/"..nzu.CurrentConfig.Codename.."/"..name, str)
+		return true
+	end
+	return false
+end
+
+function nzu.ReadConfigFile(name)
+	if nzu.CurrentConfig then
+		return file.Read(nzu.CurrentConfig.Path.."/"..name, "GAME")
+	end
 end
 
 

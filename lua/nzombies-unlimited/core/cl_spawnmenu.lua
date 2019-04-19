@@ -25,11 +25,13 @@ end
 
 local function createtabs(tab)
 	for k,v in pairs(tabs) do
-		local p = vgui.Create(v.type, tab)
-		p:SetSkin("nZombies Unlimited")
-		v.func(p)
-		tab:AddSheet(k, p, v.icon, false, false, v.tooltip)
-		v.panel = p
+		if not v.panel then
+			local p = vgui.Create(v.type, tab)
+			p:SetSkin("nZombies Unlimited")
+			v.func(p)
+			tab:AddSheet(k, p, v.icon, false, false, v.tooltip)
+			v.panel = p
+		end
 	end
 end
 

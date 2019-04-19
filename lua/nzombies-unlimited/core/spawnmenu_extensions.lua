@@ -1,30 +1,8 @@
 
-local function generatesettingspanel(ext)
-	local p = vgui.Create("nzu_ExtensionPanel")
+local function generatesettingspanel(ext, f)
+	local p = vgui.Create("nzu_ExtensionPanel", f)
 	p:SetExtension(ext)
 	return p
-end
-
-local function createextensionsettingspanel(ext, pnl)
-	--[[local p = vgui.Create("DPanel")
-	p:SetBackgroundColor(Color(0,255,0))
-	p:SetSize(100,500)
-
-	extpanels[ext]:SetContents(p)]]
-
-	local p = vgui.Create("nzu_ExtensionPanel", pnl)
-	p:SetExtension(nzu.GetExtension(ext))
-
-	if IsValid(pnl.Contents) then pnl.Contents:Remove() end
-	timer.Simple(0, function()
-		if pnl:GetExpanded() then
-			pnl:SetTall(p:GetTall() + pnl.Header:GetTall())
-		else
-			pnl.OldHeight = p:GetTall() + pnl.Header:GetTall()
-			pnl:DoExpansion(true)
-		end
-		pnl:SetContents(p)
-	end)
 end
 
 local tounload = {}
@@ -45,37 +23,75 @@ local function checkboxchange(self,b)
 	end
 end
 
-local function generateextensionpanel(ext, save)
-	local f = vgui.Create("DCollapsibleCategory")
-	local details = nzu.GetExtensionDetails(ext)
-
-	f:SetLabel((details and details.Name or "[Unknown Name]") .. " ["..ext.."]")
-
-	local checkbox = f.Header:Add("DCheckBoxLabel")
-	checkbox:Dock(RIGHT)
-	checkbox:SetWide(20)
-	checkbox:SetChecked(nzu.IsExtensionLoaded(ext))
-	checkbox:SetDisabled(not nzu.IsAdmin(LocalPlayer()))
-	f.LoadedCheckbox = checkbox
-
-	if nzu.IsExtensionLoaded(ext) then
-		createextensionsettingspanel(ext, f)
-	else
-		local p = vgui.Create("DPanel", f)
-		local lbl = vgui.Create("DLabel", p)
-		lbl:SetText("Extension not loaded.")
-		lbl:SetTextColor(Color(255,0,0))
-		lbl:SetContentAlignment(5)
-		lbl:Dock(FILL)
-		p:SetTall(30)
-		f:SetContents(p)
+local function generateinfopanel(details, f)
+	local p = vgui.Create("DPanel", f)
+	local lbl = vgui.Create("DLabel", p)
+	lbl:SetText("Extension not loaded.")
+	lbl:SetTextColor(Color(255,0,0))
+	lbl:SetContentAlignment(5)
+	lbl:SetFont("Trebuchet18")
+	lbl:DockMargin(5,5,5,0)
+	lbl:Dock(TOP)
+	
+	local desc = p:Add("DLabel")
+	desc:Dock(TOP)
+	desc:SetText(details.Name)
+	desc:SizeToContentsY()
+	desc:SetFont("Trebuchet18")
+	desc:DockMargin(5,5,5,0)
+	desc:SetTextColor(Color(255,200,180))
+	
+	local d = p:Add("DLabel")
+	d:Dock(TOP)
+	d:SetText(details.Description or "")
+	d:SetWrap(true)
+	d:SetAutoStretchVertical(true)
+	d:SetTextInset(5,0)
+	
+	local auth = p:Add("Panel")
+	auth:Dock(TOP)
+	auth:DockMargin(5,5,5,0)
+	local atxt = auth:Add("DLabel")
+	atxt:SetFont("Trebuchet18")
+	atxt:SetText("Author(s): ")
+	atxt:SetTextColor(Color(255,200,180))
+	atxt:Dock(LEFT)
+	atxt:SizeToContents()
+	local authors = auth:Add("DLabel")
+	authors:SetText(details.Author)
+	authors:Dock(FILL)
+	auth:SizeToChildren(false,true)
+	
+	if details.Prerequisites and #details.Prerequisites > 0 then
+		local preq = p:Add("DLabel")
+		preq:SetFont("Trebuchet18")
+		preq:SetText("Requires:")
+		preq:SetTextColor(Color(255,200,180))
+		preq:DockMargin(5,5,5,0)
+		preq:Dock(TOP)
+		
+		for k,v in pairs(details.Prerequisites) do
+			local id = p:Add("DLabel")
+			local det = nzu.GetExtensionDetails(v)
+			id:SetText("- "..(det and det.Name or "[Unknown Name]") .. " ["..v.."]")
+			id:SetTextInset(15,0)
+			if nzu.IsExtensionLoaded(v) then
+				id:SetTextColor(Color(100,255,100))
+			else
+				id:SetTextColor(Color(255,100,100))
+				id.Think = function(s)
+					if nzu.IsExtensionLoaded(v) then
+						s:SetTextColor(Color(255,100,100))
+						s.Think = function() end
+					end
+				end
+			end
+			id:Dock(TOP)
+		end
 	end
 	
-	checkbox.Extension = ext
-	checkbox.SaveButton = save
-	checkbox.OnChange = checkboxchange
-
-	return f
+	p:SizeToChildren(false,true)
+	return p
 end
 
 local columns = 3
@@ -135,6 +151,7 @@ nzu.AddSpawnmenuTab("Extension Settings", "DPanel", function(panel)
 	alert:Dock(FILL)
 	alert:SetContentAlignment(5)
 	alert:SetTextColor(Color(255,0,0))
+	block:SetVisible(false) -- DEBUG
 	hook.Add("nzu_ConfigLoaded", curconfig, function(s,config)
 		if config then
 			print("We're here")
@@ -150,7 +167,7 @@ nzu.AddSpawnmenuTab("Extension Settings", "DPanel", function(panel)
 
 	panel.Lists = {}
 	for i = 1,columns do
-		local p = fill:Add("DScrollPanel")
+		local p = fill:Add("DCategoryList")
 		p:Dock(LEFT)
 		p:DockMargin(pad,2,0,2)
 
@@ -165,11 +182,24 @@ nzu.AddSpawnmenuTab("Extension Settings", "DPanel", function(panel)
 	end
 
 	local loadedexts = 1
-	for k,v in pairs(nzu.GetExtensionList()) do
-		local f = generateextensionpanel(v, save)
-		panel.Lists[loadedexts]:Add(f)
-		f:Dock(TOP)
-		f:SetHeight(50)
+	for k,v in pairs(nzu.GetAvailableExtensions()) do
+		local f = panel.Lists[loadedexts]:Add((v and v.Name or "[Unknown Name]") .. " ["..k.."]")
+		local checkbox = f.Header:Add("DCheckBoxLabel")
+		checkbox:Dock(RIGHT)
+		checkbox:SetWide(20)
+		checkbox:SetChecked(nzu.IsExtensionLoaded(k))
+		checkbox:SetDisabled(not nzu.IsAdmin(LocalPlayer()))
+		
+		checkbox.Extension = k
+		checkbox.SaveButton = save
+		checkbox.OnChange = checkboxchange
+		
+		local p = nzu.IsExtensionLoaded(k) and generatesettingspanel(k, f) or generateinfopanel(v, f)
+		f.LoadedCheckbox = checkbox
+		f:SetContents(p)
+		if not nzu.IsExtensionLoaded(k) and f:GetExpanded() then
+			f:Toggle()
+		end
 
 		loadedexts = loadedexts < columns and loadedexts + 1 or 1
 		panel.ExtensionPanels[v] = f
@@ -179,7 +209,10 @@ nzu.AddSpawnmenuTab("Extension Settings", "DPanel", function(panel)
 		local pnl = s.ExtensionPanels[ext]
 		if pnl then
 			pnl.LoadedCheckbox:SetChecked(true)
-			createextensionsettingspanel(ext, pnl)
+			
+			if pnl.Contents then pnl.Contents:Remove() end
+			local p = generatesettingspanel(ext)
+			pnl:SetContents(p)
 		end
 	end)
 end, "icon16/plugin.png", "Control Config Settings and Extensions")
