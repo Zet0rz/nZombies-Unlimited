@@ -151,7 +151,7 @@ end
 Tool!
 ---------------------------------------------------------------------------]]
 local TOOL = {}
-TOOL.Category = "Basic"
+TOOL.Category = "Mapping"
 TOOL.Name = "#tool.nzu_tool_doorlock.name"
 
 TOOL.ClientConVar = {

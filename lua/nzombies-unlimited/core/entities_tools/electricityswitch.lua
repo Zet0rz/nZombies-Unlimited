@@ -104,7 +104,7 @@ Tool for creating switch
 ---------------------------------------------------------------------------]]
 if NZU_SANDBOX then
 	local TOOL = {}
-	TOOL.Category = "Basic"
+	TOOL.Category = "Power"
 	TOOL.Name = "#tool.nzu_tool_electricityswitch.name"
 
 	function TOOL:LeftClick(trace)

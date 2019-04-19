@@ -30,7 +30,7 @@ SWEP.Secondary.Automatic = false
 SWEP.Secondary.Ammo = "none"
 
 -- Knife-specific values
-SWEP.KnifeRange = 100
+SWEP.KnifeRange = 75
 SWEP.KnifeDelay = 0.4
 SWEP.HullAttackMins = Vector(-5,-5,-5)
 SWEP.HullAttackMaxs = Vector(5,5,5)
@@ -39,7 +39,7 @@ SWEP.DamageAllNPCs = false -- Only damage 1 zombie!
 -- Damage, types, and forces (for TraceHullAttack)
 SWEP.Primary.Damage = 150
 SWEP.Primary.DamageType = DMG_CLUB
-SWEP.Primary.DamageForce = 10
+SWEP.Primary.DamageForce = 100
 
 if CLIENT then SWEP.HUDIcon = Material("nzombies-unlimited/hud/crowbar_icon.png", "unlitgeneric smooth") end -- CONTENT + change this to crowbar png!
 
@@ -47,6 +47,7 @@ if CLIENT then SWEP.HUDIcon = Material("nzombies-unlimited/hud/crowbar_icon.png"
 Force the weapon to always be loaded into the Knife slot (unless otherwise specified)
 ---------------------------------------------------------------------------]]
 SWEP.nzu_DefaultWeaponSlot = "Knife"
+SWEP.nzu_InstantDeploy = true -- Ignore Holster functions when deploying this weapon
 
 -- We do our own logic for special deploying this weapon if it is in the knife slot
 -- This function replaces SWEP:Deploy() on creation when given into a Knife slot
@@ -58,6 +59,7 @@ end
 
 function SWEP:PrimaryAttack()
 	self.IsKnifing = true
+	self.nzu_CanSpecialHolster = false
 
 	self:SwingAnimation()
 	if SERVER then
@@ -139,6 +141,7 @@ Internals
 function SWEP:Think()
 	if self.IsKnifing and CurTime() >= self:GetNextPrimaryFire() then
 		self.IsKnifing = nil
+		self.nzu_CanSpecialHolster = true
 		self:OnSwingFinished()
 	end
 end

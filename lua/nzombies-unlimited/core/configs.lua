@@ -33,7 +33,7 @@ local configdirs = {
 }
 function nzu.GetConfigDir(ctype) return configdirs[ctype] end
 function nzu.GetConfigThumbnail(config)
-	return "../"..configdirs[config.Type]..config.Codename.."/thumb.jpg"
+	return configdirs[config.Type] and "../"..configdirs[config.Type]..config.Codename.."/thumb.jpg"
 end
 
 -- Making this shared. It has little meaning clientside, but could be used to determine what configs the client may have locally saved
@@ -232,8 +232,10 @@ if CLIENT then
 		Official = Color(255,0,0),
 		Local = Color(0,0,255),
 		Workshop = Color(150,0,255),
+		Unsaved = Color(255,200,100),
 	}
 	local mapinstalled,mapnotinstalled = Color(100,255,100), Color(255,100,100)
+	local fallback = "vgui/black.png"
 	function CONFIGPANEL:Update(config)
 		--print(self, config.Name, self.Config.Name)
 		if self.Config == config then
@@ -246,8 +248,8 @@ if CLIENT then
 
 			self.Type:SetText(config.Type)
 			self.Type:SetTextColor(typecolors[config.Type] or color_white)
-
-			self.Thumbnail:SetImage(nzu.GetConfigThumbnail(config))
+			
+			self.Thumbnail:SetImage(nzu.GetConfigThumbnail(config) or fallback)
 		end
 	end
 

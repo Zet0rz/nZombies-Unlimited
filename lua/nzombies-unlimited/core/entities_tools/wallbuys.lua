@@ -42,6 +42,11 @@ local defaultmodel = "models/weapons/w_rif_m4a1.mdl"
 local matrix = Matrix()
 matrix:Rotate(rotang)
 matrix:Scale(scale)
+function ENT:GetWallBounds()
+	local a,b = self:GetModelBounds()
+	return matrix*a, matrix*b
+end
+
 function ENT:Initialize()
 	if SERVER then
 		self:SetUseType(SIMPLE_USE)
@@ -52,8 +57,9 @@ function ENT:Initialize()
 			local wep = weapons.GetStored(self:GetWeaponClass())
 			if wep then model = wep.WM or wep.WorldModel end
 		end
-		local a,b = self:GetModelBounds()
-		self:PhysicsInitBox(matrix*a, matrix*b)
+		
+		self:PhysicsInitBox(self:GetWallBounds())
+		self:SetSolid(SOLID_OBB)
 	else
 		self:EnableMatrix("RenderMultiply", matrix)
 	end
@@ -61,12 +67,6 @@ function ENT:Initialize()
 end
 
 if SERVER then
-	function ENT:UpdateCollisionBounds()
-		local a,b = self:GetModelBounds()
-		local diff = matrix*(self:GetPos() - self:WorldSpaceCenter())
-		self:SetCollisionBounds(matrix*a, matrix*b)
-	end
-
 	function ENT:WeaponClassChanged(_, old, new)
 		if old ~= new then
 			local wep = weapons.GetStored(new)
@@ -74,7 +74,7 @@ if SERVER then
 
 			if model ~= self:GetModel() then
 				self:SetModel(model)
-				self:UpdateCollisionBounds()
+				self:SetCollisionBounds(self:GetWallBounds())
 			end
 
 			self:SetBought(false)
@@ -114,7 +114,7 @@ if CLIENT then
 		Vector(0, 0.5, -0.5),
 		Vector(0, -0.5, 0.5),
 	}
-	local renderplane = Angle(90,0,0)
+	local renderplane = Angle(0,90,90)
 	function ENT:Draw()
 		if halo.RenderedEntity() ~= self then
 			render.ClearStencil()
@@ -144,10 +144,12 @@ if CLIENT then
 				-- Draw the chalk texture over itself with the marked pixels
 				render.SetStencilCompareFunction(STENCIL_EQUAL)
 
-				local a,b = self:GetCollisionBounds()
-				cam.Start3D2D(self:LocalToWorld(b), self:LocalToWorldAngles(renderplane), 1)
-					surface.SetDrawColor(255,255,255) -- Change this later to a chalk-like material
-					surface.DrawRect(0,0,30,50)
+				local a,b = self:GetRenderBounds()
+				local x1,x2,y1,y2 = b.y,a.y,-a.z,-b.z
+				cam.Start3D2D(self:GetPos(), self:LocalToWorldAngles(renderplane), 1)
+					surface.SetDrawColor(255,255,255) -- TODO: Change this later to a chalk-like material
+					surface.DrawRect(x1 + 4,y1 + 4,-x1 + x2 - 8,-y1 + y2 - 8)
+					--surface.DrawRect(x1,y1,-x1 + x2,-y1 + y2)
 				cam.End3D2D()
 
 			render.SetBlend(1)
@@ -176,6 +178,13 @@ if CLIENT then
 			return self.WeaponName, TARGETID_TYPE_BUY, self:GetPrice()
 		end
 	end
+	
+	function ENT:Think()
+		if self:GetModel() ~= self.LastModel then
+			self:SetRenderBounds(self:GetWallBounds())
+			self.LastModel = self:GetModel()
+		end
+	end
 end
 scripted_ents.Register(ENT, "nzu_wallbuy")
 
@@ -184,7 +193,7 @@ if not NZU_SANDBOX then return end
 Tool for spawning wall buys, browses weapon classes through filters
 ---------------------------------------------------------------------------]]
 local TOOL = {}
-TOOL.Category = "Basic"
+TOOL.Category = "Weapons"
 TOOL.Name = "#tool.nzu_tool_wallbuy.name"
 
 TOOL.ClientConVar = {
@@ -198,7 +207,7 @@ function TOOL:LeftClick(trace)
 
 		local e = ents.Create("nzu_wallbuy")
 		e:SetPos(trace.HitPos + trace.HitNormal*0.5)
-		e:SetAngles(trace.HitNormal:Angle() + Angle(0,90,0))
+		e:SetAngles(trace.HitNormal:Angle())
 		e:Spawn()
 		e:SetWeaponClass(self:GetClientInfo("class"))
 		e:SetPrice(self:GetClientNumber("price"))

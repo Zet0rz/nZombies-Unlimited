@@ -633,7 +633,7 @@ Tool!
 ---------------------------------------------------------------------------]]
 
 local TOOL = {}
-TOOL.Category = "Basic"
+TOOL.Category = "Mapping"
 TOOL.Name = "#tool.nzu_tool_barricade.name"
 
 TOOL.ClientConVar = {

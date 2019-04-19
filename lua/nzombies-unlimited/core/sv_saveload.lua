@@ -196,7 +196,7 @@ end)
 local dontnetwork = false
 hook.Add("nzu_ConfigInfoSaved", "nzu_NetworkUpdatedConfigs", function(config)
 	if dontnetwork then return end
-	networkconfig(config, getplystonetworkto()) -- Network this updated config to all players
+	networkconfig(config, config == nzu.CurrentConfig and player.GetAll() or getplystonetworkto()) -- Network this updated config to all players
 end)
 
 
@@ -563,7 +563,6 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 			config.Path = nzu.GetConfigDir("Local")..codename
 
 			nzu.CurrentConfig = config
-			print("Changed config: ", config.Codename)
 			tonetwork = true
 		end
 
@@ -581,8 +580,6 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 			local name = net.ReadString()
 			config.RequiredAddons[id] = name
 		end
-
-		PrintTable(config)
 
 		if net.ReadBool() then
 			-- Save the map, settings, and all!

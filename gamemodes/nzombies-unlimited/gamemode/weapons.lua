@@ -11,14 +11,6 @@ local function doinitialize(ply)
 		["Primary"] = primary,
 		["Secondary"] = secondary
 	}
-
-	-- DEBUG
-	timer.Simple(1, function()
-		if SERVER then
-			ply:SetNumericalAccessToWeaponSlot("test", true)
-			ply:GiveWeaponInSlot("weapon_rpg", "test")
-		end
-	end)
 end
 if SERVER then
 	hook.Add("PlayerInitialSpawn", "nzu_WeaponSlotsInit", doinitialize)
@@ -168,6 +160,8 @@ local function doweaponslot(ply, wep, slot)
 	if wslot.Number and IsValid(wep) then
 		ply:SelectWeaponPredicted(wep)
 	end
+	
+	hook.Run("nzu_WeaponEquippedInSlot", ply, wep, slot)
 end
 
 local function doremoveweapon(ply, wep)
@@ -264,10 +258,9 @@ else
 		local wep = Entity(i)
 		local slot = net.ReadString()
 
-		doweaponslot(LocalPlayer(), wep, slot)
-
-		-- If we get networking before the entity is valid, keep an eye out for when it should be ready
-		if not IsValid(wep) then
+		if IsValid(wep) then
+			doweaponslot(LocalPlayer(), wep, slot)
+		else -- If we get networking before the entity is valid, keep an eye out for when it should be ready
 			hook.Add("HUDWeaponPickedUp", "nzu_WeaponSlot"..slot, function(wep)
 				if wep:EntIndex() == i then
 					doweaponslot(LocalPlayer(), wep, slot)
@@ -351,8 +344,8 @@ hook.Add("StartCommand", "nzu_WeaponSwitching", function(ply, cmd)
 		local m = cmd:GetMouseWheel()
 		if m ~= 0 then
 			local wep = ply:GetActiveWeapon()
-			if IsValid(wep) and wep:GetWeaponSlotNumber() then
-				local slot = wep:GetWeaponSlotNumber() + m
+			if IsValid(wep) then
+				local slot = (wep:GetWeaponSlotNumber() or 0) + m
 
 				local max = ply:GetMaxWeaponSlots()
 				if slot > max then slot = 1 elseif slot < 1 then slot = max end
@@ -438,7 +431,7 @@ if SERVER then
 else
 	-- Stripped down Client version only really needs to track old weapons
 	function GM:PlayerSwitchWeapon(ply, old, new)
-		if ply:GetWeaponLocked() and not old.nzu_CanSpecialHolster then return true end
+		if (ply:GetWeaponLocked() and not old.nzu_CanSpecialHolster) or (new.PreventDeploy and new:PreventDeploy()) then return true end
 
 		if IsValid(old) then
 			if old:GetWeaponSlotNumber() then
@@ -522,6 +515,21 @@ if true then
 		end)
 	end, true)
 end
+
+
+
+--[[-------------------------------------------------------------------------
+Instant deploying for all weapons, if the target weapon has nzu_InstantDeploy true
+We use this with knives to make them instantly attack, regardless of holster animations/functions
+---------------------------------------------------------------------------]]
+hook.Add("nzu_WeaponEquippedInSlot", "nzu_Weapons_InstantHolsterFunction", function(ply, wep, slot)
+	local old = wep.Holster
+	function wep:Holster(w2)
+		if w2.nzu_InstantDeploy then return true end
+		return old(self, w2)
+	end
+end)
+
 
 --[[-------------------------------------------------------------------------
 HUD Component for weaponry

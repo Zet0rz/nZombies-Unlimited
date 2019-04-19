@@ -42,7 +42,7 @@ The tool to do the magic
 ---------------------------------------------------------------------------]]
 
 local TOOL = {}
-TOOL.Category = "Basic"
+TOOL.Category = "Navigation"
 TOOL.Name = "#tool.nzu_tool_navlock.name"
 
 TOOL.nzu_NavEdit = true

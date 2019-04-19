@@ -58,6 +58,7 @@ end
 
 function SWEP:PrimaryAttack()
 	self.IsThrowing = true
+	self.nzu_CanSpecialHolster = false
 
 	self:DeployAnimation()
 	self.ThrowTime = CurTime() + self.DeployDelay
@@ -157,6 +158,7 @@ function SWEP:Finish()
 	self.ThrowTime = nil
 	self.HolsterTime = nil
 	self.IsThrowing = nil
+	self.nzu_CanSpecialHolster = true
 	self:OnThrowFinished()
 end
 

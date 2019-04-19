@@ -48,7 +48,7 @@ if not NZU_SANDBOX then return end
 Tool for spawning wall buys, browses weapon classes through filters
 ---------------------------------------------------------------------------]]
 local TOOL = {}
-TOOL.Category = "Basic"
+TOOL.Category = "Mapping"
 TOOL.Name = "#tool.nzu_tool_invisibleprop.name"
 
 TOOL.ClientConVar = {

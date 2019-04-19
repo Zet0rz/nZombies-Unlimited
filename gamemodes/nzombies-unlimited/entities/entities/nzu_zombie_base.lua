@@ -933,6 +933,7 @@ if SERVER then
 	end
 
 	ENT.CollisionBoxCheckInterval = 1
+	local boxcheckrange = 30
 	function ENT:OnContact(ent)
 		if not self.ActiveEvent and IsValid(ent) then
 			local ent2 = ent.nzu_InteractTarget or ent -- Bumping into a proxy interactor
@@ -958,7 +959,7 @@ if SERVER then
 
 				-- TODO: Make this if-statement say only if static entity? Is that optimized? i.e. prevent this when bumping into moving zombies
 				--if self.loco:GetVelocity():Length2D() <= 10 then
-					local targetforward = IsValid(self.Path) and self.Path:GetCurrentGoal().forward*30 or self:GetAngles():Forward()*30
+					local targetforward = IsValid(self.Path) and (self.Path:GetCurrentGoal().pos - self:GetPos()):GetNormalized()*boxcheckrange or self:GetAngles():Forward()*boxcheckrange
 					local a,b = self:GetCollisionBounds()
 
 					local p = self:GetPos() + targetforward
