@@ -63,8 +63,7 @@ function nzu.ReloadConfigMap(config)
 		loadedents = {} -- Empty and prepare for new wave (should already be empty though)
 		
 		duplicator.RemoveMapCreatedEntities() -- Keep this? Maybe look for a way to reset map-created entities (like doors)
-		local a,b = duplicator.Paste(nil, tab.Map.Entities, tab.Map.Constraints)
-		PrintTable(a)
+		duplicator.Paste(nil, tab.Map.Entities, tab.Map.Constraints)
 		
 		local postloads = {}
 		for k,v in pairs(tab.SaveExtensions) do
@@ -94,6 +93,8 @@ function nzu.ReloadConfigMap(config)
 		for k,v in pairs(postloads) do
 			v(tab.SaveExtensions[k].PostSave)
 		end
+		
+		hook.Run("nzu_PostConfigMap", config)
 	end)
 end
 

@@ -5,7 +5,7 @@ local customtype = {
 }
 
 if SERVER then
-	nzu.AddCustomExtensionSettingType("HUDComponent", customtype)
+	nzu.AddExtensionSettingType("HUDComponent", customtype)
 	return
 end
 
@@ -156,7 +156,7 @@ else
 	end
 end
 
-customtype.CustomPanel = {
+customtype.Panel = {
 	Create = function(parent, ext, setting)
 		local p = vgui.Create("DComboBox", parent)
 		function p:OnSelect(index, value)
@@ -179,7 +179,7 @@ customtype.CustomPanel = {
 		return p:GetSelected()
 	end,
 }
-nzu.AddCustomExtensionSettingType("HUDComponent", customtype)
+nzu.AddExtensionSettingType("HUDComponent", customtype)
 
 --[[-------------------------------------------------------------------------
 Target ID Component

@@ -25,6 +25,7 @@ Spawnmenu & Panels Preparation
 --loadfile("utils.lua")
 loadfile_c("cl_nzombies_skin.lua")
 loadfile_c("cl_spawnmenu.lua")
+loadfile("mismatch.lua")
 
 --[[-------------------------------------------------------------------------
 Configs & Saving
@@ -52,6 +53,7 @@ loadfile_c("spawnmenu_saveload.lua")
 --loadfile("spawnmenu_entities.lua")
 loadfile_c("spawnmenu_extensions.lua")
 loadfile("spawnmenu_tools.lua")
+loadfile_c("spawnmenu_mismatch.lua")
 
 --[[-------------------------------------------------------------------------
 Core item population
@@ -66,52 +68,3 @@ loadfile("entities_tools/invisiblewalls.lua")
 loadfile("entities_tools/naveditor.lua")
 
 --loadfile("entities_tools/thumbnail_camera.lua")
-
---[[if SERVER then
-	AddCSLuaFile("cl_nzombies_skin.lua")
-	AddCSLuaFile("cl_spawnmenu.lua")
-	AddCSLuaFile("entities.lua")
-	AddCSLuaFile("logicmap.lua")
-	AddCSLuaFile("configsettings.lua")
-	AddCSLuaFile("spawnmenu_saveload.lua")
-	AddCSLuaFile("configs.lua")
-	AddCSLuaFile("cl_vgui_configtree.lua")
-	AddCSLuaFile("logic/logic_manager.lua")
-	AddCSLuaFile("logic/cl_logicmap.lua")
-	AddCSLuaFile("spawnmenu_entities.lua")
-
-	AddCSLuaFile("extensions/extension_manager.lua")
-	AddCSLuaFile("extensions/extension_panels.lua")
-	AddCSLuaFile("spawnmenu_extensions.lua")
-	AddCSLuaFile("hudmanagement.lua")
-
-	include("configs.lua")
-	include("sv_saveload.lua")
-	include("logic/sv_logicmap.lua")
-	include("extensions/extension_manager.lua")
-else
-	include("cl_nzombies_skin.lua")
-	include("cl_spawnmenu.lua")
-	include("cl_vgui_configtree.lua")
-	include("configs.lua")
-	include("spawnmenu_saveload.lua")
-	include("logic/cl_logicmap.lua")
-
-	include("extensions/extension_panels.lua")
-	include("extensions/extension_manager.lua")
-	include("hudmanagement.lua")
-	include("spawnmenu_extensions.lua")
-end
-include("entities.lua")
-include("logicmap.lua")
-include("configsettings.lua")
-include("logic/logic_manager.lua")
-
-include("spawnmenu_entities.lua")
-
--- Test unit
-AddCSLuaFile("logic/nzu_logic_testunit.lua")
-include("logic/nzu_logic_testunit.lua")
-
-AddCSLuaFile("spawnmenu_entities_test.lua")
-include("spawnmenu_entities_test.lua")]]

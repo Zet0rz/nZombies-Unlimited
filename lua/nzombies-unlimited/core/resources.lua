@@ -13,7 +13,7 @@ local function setresourceset(p,set)
 end
 
 local customtype = {
-	CustomPanel = {
+	Panel = {
 		Create = function(parent, ext, setting)
 			local p = vgui.Create("DComboBox", parent)
 			function p:OnSelect(index, value)
@@ -104,7 +104,7 @@ if NZU_NZOMBIES then
 	end
 end
 
-nzu.AddCustomExtensionSettingType("ResourceSet", customtype)
+nzu.AddExtensionSettingType("ResourceSet", customtype)
 --[[-------------------------------------------------------------------------
 Sound play networking
 ---------------------------------------------------------------------------]]

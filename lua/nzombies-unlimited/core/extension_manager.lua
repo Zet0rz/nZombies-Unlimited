@@ -112,10 +112,13 @@ local writetypes = {
 
 -- Adding our own custom TYPEs
 local customtypes = {}
-function nzu.AddCustomExtensionSettingType(type, tbl)
+function nzu.AddExtensionSettingType(type, tbl)
 	tbl.__index = tbl
-	if SERVER then tbl.CustomPanel = nil end
+	if SERVER then tbl.Panel = nil end
 	customtypes[type] = tbl
+end
+function nzu.GetExtensionSettingType(type)
+	return customtypes[type]
 end
 
 local function netwritesetting(tbl,set,val)
@@ -136,18 +139,14 @@ local function netreadsetting(tbl)
 	return val
 end
 
+AddCSLuaFile("extension_setting_types.lua")
+include("extension_setting_types.lua")
 
 
 
 --[[-------------------------------------------------------------------------
 Generating Extensions from files
 ---------------------------------------------------------------------------]]
-local loadparse = {
-	[TYPE_COLOR] = function(t)
-		return IsColor(t) and t or Color(t.r, t.g, t.b, t.a)
-	end,
-}
-
 local loadingextension2
 function nzu.Extension()
 	return loadingextension2
@@ -156,11 +155,15 @@ end
 -- This function prepares the settings meta
 -- "loadextension" should be called with the return of this value once settings are loaded/prepared (if any)
 -- To use defaults, these can just be chained [loadextension(loadextensionprepare(name))]
-local function loadextensionprepare(name)
+local function loadextensionprepare(name, hassettings)
 	local loadingextension = loaded_extensions[name] or {ID = name}
 	local settings, panelfunc
-	local filename = extensionpath..name.."/settings.lua"
-	settings, panelfunc = include(filename)
+	
+	if hassettings then
+		local filename = extensionpath..name.."/settings.lua"
+		settings, panelfunc = include(filename)
+		loadingextension.HasSettingsFile = true
+	end
 
 	if settings then
 		-- Inherit from custom types
@@ -245,8 +248,7 @@ local function loadextension(loadingextension, st)
 				t[k] = st and st[k] or v.Default
 
 				if SERVER then
-					local parse = v.Load or loadparse[v.Type]
-					if parse then t[k] = parse(t[k]) end
+					if v.Load then t[k] = v.Load(t[k]) end
 				end
 
 				if v.Notify then notifies[k] = {v.Notify, t[k]} end
@@ -311,7 +313,12 @@ if SERVER then
 	local function networkextension(ext, update)
 		net.WriteString(ext.ID)
 		net.WriteBool(true)
-		net.WriteBool(not update)
+		if not update then
+			net.WriteBool(true)
+			net.WriteBool(ext.HasSettingsFile)
+		else
+			net.WriteBool(false)
+		end
 
 		if ext.Settings then
 			local sm = ext.GetSettingsMeta()
@@ -343,7 +350,8 @@ if SERVER then
 			end
 		end
 
-		local ext = loadextension(loadextensionprepare(name), settings)
+		local hassettings = file.Exists(prefix..extensionpath..name.."/settings.lua", searchpath)
+		local ext = loadextension(loadextensionprepare(name, hassettings), settings)
 		if NZU_SANDBOX then
 			table.insert(load_order, ext.ID)
 		end
@@ -412,7 +420,7 @@ else
 		local name = net.ReadString()
 		if net.ReadBool() then
 			local b = net.ReadBool()
-			local ext = b and loadextensionprepare(name) or loaded_extensions[name]
+			local ext = b and loadextensionprepare(name, net.ReadBool()) or loaded_extensions[name]
 
 			local sm = ext.GetSettingsMeta()
 			local settings
@@ -546,7 +554,6 @@ if SERVER then
 			for k2,v2 in pairs(files) do
 				if file.Exists(prefix..prefix2..v2..".lua", searchpath) then
 					AddCSLuaFile(prefix2..v2..".lua")
-					print("Adding", prefix2..v2..".lua")
 				end
 			end
 		end
@@ -570,43 +577,6 @@ end
 include("resources.lua")
 include("hudmanagement.lua")
 
-nzu.AddCustomExtensionSettingType("Weapon", {
-	NetWrite = net.WriteString,
-	NetRead = net.ReadString,
-	CustomPanel = {
-		Create = function(parent, ext, setting)
-			local p = vgui.Create("DSearchComboBox", parent)
 
-			p:AddChoice("  [None]", "") -- Allow the choice of none
-			for k,v in pairs(weapons.GetList()) do
-				p:AddChoice((v.PrintName or "").." ["..v.ClassName.."]", v.ClassName)
-			end
-			p:SetAllowCustomInput(true)
 
-			function p:OnSelect(index, value, data)
-				self:Send()
-			end
-
-			return p
-		end,
-		Set = function(p,v)
-			for k,class in pairs(p.Data) do
-				if class == v then
-					p:SetText(p:GetOptionText(k))
-					p.selected = k
-					return
-				end
-			end
-
-			p.Choices[0] = v
-			p.Data[0] = v
-			p.selected = 0
-		end,
-		Get = function(p)
-			local str,data = p:GetSelected()
-			return data
-		end,
-	}
-})
-
-loadextension(loadextensionprepare("Core"))
+loadextension(loadextensionprepare("Core", true))

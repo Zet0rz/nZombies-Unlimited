@@ -38,6 +38,7 @@ Core Modules shared with Sandbox
 loadfile_c("nzombies-unlimited/core/cl_nzombies_skin.lua")
 
 loadfile("nzombies-unlimited/core/configs.lua")
+loadfile("nzombies-unlimited/core/mismatch.lua")
 loadfile_c("nzombies-unlimited/core/config_panels.lua")
 loadfile_s("nzombies-unlimited/core/sv_saveload.lua")
 loadfile_s("nzombies-unlimited/core/mapflags.lua") -- Only Server outside Sandbox

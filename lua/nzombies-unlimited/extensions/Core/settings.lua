@@ -17,7 +17,7 @@ local settings = {
 	},
 
 	["StartPoints"] = {
-		Type = TYPE_NUMBER,
+		Type = "Number",
 		Default = 500,
 		Parse = function(n) return math.Round(n) end
 	},

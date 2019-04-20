@@ -188,6 +188,69 @@ if CLIENT then
 end
 scripted_ents.Register(ENT, "nzu_wallbuy")
 
+--[[-------------------------------------------------------------------------
+Mismatch module
+---------------------------------------------------------------------------]]
+nzu.RegisterMismatch("Wall Buys", {
+	Collect = function()
+		local t = {}
+		for k,v in pairs(ents.FindByClass("nzu_wallbuy")) do
+			if not weapons.GetStored(v:GetWeaponClass()) then
+				table.insert(t, v:GetWeaponClass())
+			end
+		end
+		if #t > 0 then return t end
+	end,
+	Write = function(t)
+		if SERVER then -- Servers write just the wrong classes
+			net.WriteUInt(#t, 16)
+			for k,v in ipairs(t) do
+				net.WriteString(v)
+			end
+		else -- Clients write the wrong class and the replacement class
+			net.WriteUInt(table.Count(t), 16)
+			for k,v in pairs(t) do
+				net.WriteString(k)
+				net.WriteString(v)
+			end
+		end
+	end,
+	Read = function()
+		local t = {}
+		local num = net.ReadUInt(16)
+		if CLIENT then -- Clients receive just the wrong classes, but generate the map table
+			for i = 1,num do
+				table.insert(t, net.ReadString())
+			end
+		else -- Servers read the map table
+			for i = 1,num do
+				local k = net.ReadString()
+				local v = net.ReadString()
+				t[k] = v
+			end
+		end
+		return t
+	end,
+	Apply = function(t)
+		local fixed = true
+		for k,v in pairs(ents.FindByClass("nzu_wallbuy")) do
+			if v:GetWeaponClass() == k then v:SetWeaponClass(v) end
+			if not weapons.GetStored(v:GetWeaponClass()) then
+				fixed = false
+			end
+		end
+		return fixed
+	end,
+	BuildPanel = function(parent, t)
+		local t2 = {}
+		for k,v in pairs(t) do
+			t2[v] = "Weapon" -- Make use of the Extension Setting types
+		end
+		return t2
+	end,
+	Icon = "icon16/gun.png",
+})
+
 if not NZU_SANDBOX then return end
 --[[-------------------------------------------------------------------------
 Tool for spawning wall buys, browses weapon classes through filters

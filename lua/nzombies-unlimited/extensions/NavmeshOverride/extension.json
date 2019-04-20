@@ -1,5 +1,0 @@
-{
-  "Name": "Custom Navmesh",
-  "Description": "Lets you modify the Navmesh and save a different Navmesh for the specific Config. Can be used to make Zombies able to navigate around props that didn't originate from the map.",
-  "Author": "Zet0r"
-}

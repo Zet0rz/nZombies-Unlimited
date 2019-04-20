@@ -186,7 +186,13 @@ local commands = {
 	["splice"] = {
 		Label = "Splice areas",
 		Information = "Create area between marked and targeted areas",
+		Command = "nav_splice",
 		Mark = true,
+	},
+	["subdivide"] = {
+		Label = "Subdivide Area",
+		Information = "Subdivide targeted area into 4 smaller areas",
+		Command = "nav_subdivide"
 	}
 }
 

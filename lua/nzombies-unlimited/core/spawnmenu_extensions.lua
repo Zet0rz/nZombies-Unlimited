@@ -191,8 +191,13 @@ nzu.AddSpawnmenuTab("Extension Settings", "DPanel", function(panel)
 		checkbox:SetDisabled(not nzu.IsAdmin(LocalPlayer()))
 		
 		checkbox.Extension = k
-		checkbox.SaveButton = save
-		checkbox.OnChange = checkboxchange
+		if k ~= "Core" then
+			checkbox.SaveButton = save
+			checkbox.OnChange = checkboxchange
+		else
+			checkbox:SetDisabled(true)
+		end
+		
 		
 		local p = nzu.IsExtensionLoaded(k) and generatesettingspanel(k, f) or generateinfopanel(v, f)
 		f.LoadedCheckbox = checkbox
