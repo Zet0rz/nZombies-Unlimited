@@ -52,15 +52,23 @@ if SERVER then
 		if ent.nzu_ShouldGivePoints then
 			local ply = dmg:GetAttacker()
 			if IsValid(ply) and ply:IsPlayer() then
-				if dmg:GetDamage() >= ent:Health() then
-					if knifetypes[dmg:GetDamageType()] then
-						ply:GivePoints(130, "ZombieKnifeKill", ent)
+				local points,typ
+				if ent.DamagePoints then points,typ = ent:DamagePoints(dmg, ply) else
+					if dmg:GetDamage() >= ent:Health() then
+						if knifetypes[dmg:GetDamageType()] then
+							points,typ = 130, "ZombieKnifeKill"
+						else
+							local trace = util.QuickTrace(dmg:GetDamagePosition(), dmg:GetDamagePosition())
+							points = hitboxes[trace.HitGroup] or 50
+							typ = "ZombieKill"
+						end
 					else
-						ply:GivePoints(hitboxes[util.QuickTrace(dmg:GetDamagePosition(), dmg:GetDamagePosition()).HitGroup] or 50, "ZombieKill", ent)
+						points = 10
+						typ = "ZombieHit"
 					end
-				else
-					ply:GivePoints(10, "ZombieHit", ent)
 				end
+				if dmg:GetDamage() >= ent:Health() then ply:AddFrags(1) end
+				ply:GivePoints(points,typ,ent)
 			end
 		end
 	end

@@ -142,3 +142,8 @@ else
 		hook.Run(b and "nzu_PlayerInitialSpawned" or "nzu_PlayerUnspawned", ply)
 	end)
 end
+
+-- No friendly fire!
+hook.Add("EntityTakeDamage", "nzu_Player_NoFriendlyFire", function(ent, dmg)
+	if ent:IsPlayer() and IsValid(dmg:GetAttacker()) and dmg:GetAttacker():IsPlayer() then return true end
+end)

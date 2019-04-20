@@ -16,6 +16,26 @@ This is also the spawnable entity of the main Zombie type
 ---------------------------------------------------------------------------]]
 if CLIENT then return end -- Client doesn't really need anything beyond the basics
 
+ENT.DeathRagdollForce = 1000
+ENT.DeathAnimations = {
+	"nz_death_1",
+	"nz_death_2",
+	"nz_death_3",
+	"nz_death_f_1",
+	"nz_death_f_2",
+	"nz_death_f_3",
+	"nz_death_f_4",
+	"nz_death_f_5",
+	"nz_death_f_6",
+	"nz_death_f_7",
+	"nz_death_f_8",
+	"nz_death_f_9",
+	"nz_death_f_10",
+	"nz_death_f_11",
+	"nz_death_f_12",
+	"nz_death_f_13",
+}
+
 -- Localizing tables so that we save a bit of memory instead of having multiple identical tables
 local spawnslow = {"nz_spawn_climbout_fast"}
 local spawnfast = {"nz_spawn_jump_run_1", "nz_spawn_jump_run_2", "nz_spawn_jump_run_3"}

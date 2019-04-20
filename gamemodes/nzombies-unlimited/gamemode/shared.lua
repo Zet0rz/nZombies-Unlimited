@@ -38,6 +38,7 @@ Core Modules shared with Sandbox
 loadfile_c("nzombies-unlimited/core/cl_nzombies_skin.lua")
 
 loadfile("nzombies-unlimited/core/configs.lua")
+loadfile_c("nzombies-unlimited/core/config_panels.lua")
 loadfile_s("nzombies-unlimited/core/sv_saveload.lua")
 loadfile_s("nzombies-unlimited/core/mapflags.lua") -- Only Server outside Sandbox
 
@@ -58,7 +59,10 @@ loadfile("weapons.lua")
 loadfile("health.lua")
 loadfile("stamina.lua")
 
+loadfile_c("ragdoll_cleanup.lua")
+
 loadfile("menu/menu.lua")
+loadfile("menu/menu_configload.lua")
 
 --[[-------------------------------------------------------------------------
 Gamemode modules

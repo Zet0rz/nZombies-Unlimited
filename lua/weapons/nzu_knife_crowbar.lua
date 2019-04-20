@@ -148,11 +148,22 @@ end
 
 -- This lets you change what happens when the swing is finished
 -- It is predicted and shared from the Think() above
-function SWEP:OnSwingFinished()
-	self.Owner:SetWeaponLocked(false)
-	self.Owner:SelectPreviousWeapon()
+if NZU_NZOMBIES then
+	function SWEP:OnSwingFinished()
+		self.Owner:SetWeaponLocked(false)
+		self.Owner:SelectPreviousWeapon()
+	end
+else
+	function SWEP:OnSwingFinished()
+		self.Owner:ConCommand("lastinv")
+	end
 end
 
 function SWEP:Holster(wep)
 	return not self.IsKnifing
+end
+
+-- Sandbox compatibility pretty much
+function SWEP:Deploy()
+	self:PrimaryAttack()
 end

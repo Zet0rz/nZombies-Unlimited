@@ -138,11 +138,6 @@ if SERVER then
 	end
 end
 
-function SWEP:OnThrowFinished()
-	self.Owner:SetWeaponLocked(false)
-	self.Owner:SelectPreviousWeapon()
-end
-
 function SWEP:Overcook()
 	if SERVER then
 		local e = EffectData()
@@ -166,25 +161,60 @@ end
 Internals
 ---------------------------------------------------------------------------]]
 
-function SWEP:Think()
-	if self.IsThrowing and CurTime() >= self.ThrowTime then
-		if not self.HolsterTime then
-
-			if self.GrenadeCanCook and self:IsSpecialSlotKeyStillDown() then -- Don't throw yet if we're cooking!
-				if CurTime() >= self.ThrowTime + self.GrenadeTime then
-					self:Overcook()
-				end
-			return end
-
-			self:ThrowAnimation()
-			if SERVER then self:ThrowGrenade() end
-			self.HolsterTime = CurTime() + self.HolsterDelay
-		elseif CurTime() >= self.HolsterTime then
-			self:Finish()
-		end
-	end
-end
-
 function SWEP:Holster(wep)
 	return not self.IsThrowing
+end
+
+-- Sandbox compatibility
+if NZU_NZOMBIES then
+	function SWEP:OnThrowFinished()
+		self.Owner:SetWeaponLocked(false)
+		self.Owner:SelectPreviousWeapon()
+	end
+	
+	function SWEP:Think()
+		if self.IsThrowing and CurTime() >= self.ThrowTime then
+			if not self.HolsterTime then
+
+				if self.GrenadeCanCook and self:IsSpecialSlotKeyStillDown() then -- Don't throw yet if we're cooking!
+					if CurTime() >= self.ThrowTime + self.GrenadeTime then
+						self:Overcook()
+					end
+				return end
+
+				self:ThrowAnimation()
+				if SERVER then self:ThrowGrenade() end
+				self.HolsterTime = CurTime() + self.HolsterDelay
+			elseif CurTime() >= self.HolsterTime then
+				self:Finish()
+			end
+		end
+	end
+else
+	function SWEP:Think()
+		if self.IsThrowing and CurTime() >= self.ThrowTime then
+			if not self.HolsterTime then
+
+				if self.GrenadeCanCook and self.Owner:KeyDown(IN_ATTACK) then -- Don't throw yet if we're cooking!
+					if CurTime() >= self.ThrowTime + self.GrenadeTime then
+						self:Overcook()
+					end
+				return end
+
+				self:ThrowAnimation()
+				if SERVER then self:ThrowGrenade() end
+				self.HolsterTime = CurTime() + self.HolsterDelay
+			elseif CurTime() >= self.HolsterTime then
+				self:Finish()
+			end
+		end
+	end
+
+	function SWEP:OnThrowFinished()
+		self.Owner:ConCommand("lastinv")
+	end
+	
+	function SWEP:Deploy()
+		self:PrimaryAttack()
+	end
 end

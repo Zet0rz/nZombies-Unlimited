@@ -30,6 +30,7 @@ loadfile_c("cl_spawnmenu.lua")
 Configs & Saving
 ---------------------------------------------------------------------------]]
 loadfile("configs.lua")
+loadfile_c("config_panels.lua")
 loadfile_s("sv_saveload.lua")
 loadfile("extension_manager.lua")
 loadfile_c("extension_panels.lua")
@@ -62,6 +63,7 @@ loadfile("entities_tools/wallbuys.lua")
 loadfile("entities_tools/navlocker_sandbox.lua")
 loadfile("entities_tools/barricades.lua")
 loadfile("entities_tools/invisiblewalls.lua")
+loadfile("entities_tools/naveditor.lua")
 
 --loadfile("entities_tools/thumbnail_camera.lua")
 

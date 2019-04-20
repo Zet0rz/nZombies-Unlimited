@@ -255,6 +255,7 @@ if SERVER then
 		donetwork()
 
 		-- TODO: Reload config? Respawn props and such. A map reload is not needed to replay the same config
+		nzu.ReloadConfigMap()
 	end
 
 	local gameoversequencetime = 10

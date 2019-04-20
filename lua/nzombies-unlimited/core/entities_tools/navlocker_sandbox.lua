@@ -69,7 +69,7 @@ function TOOL:Holster()
 	if SERVER then
 		if GetConVar("nav_edit"):GetBool() then
 			for k,v in pairs(player.GetAll()) do
-				if v ~= self:GetOwner() and v:Alive() then
+				if v ~= self:GetOwner() and v:Alive() and nzu.IsAdmin(v) then
 					local tool = v:GetTool()
 					if tool and tool.nzu_NavEdit then return true end
 				end

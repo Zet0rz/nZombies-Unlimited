@@ -19,30 +19,10 @@ duplicator.RegisterEntityModifier("nzu_saveid", function(ply, ent, data)
 	if loadedents then loadedents[id] = ent end -- Doesn't actually modify the entity, just registers who it used to be
 end)
 
-local function loadconfig(config)
-	hook.Run("nzu_PreLoadConfig")
-
-	-- 1) Load Extensions
-	if file.Exists(config.Path.."/settings.txt", "GAME") then
-		local tbl = util.JSONToTable(file.Read(config.Path.."/settings.txt", "GAME"))
-		local toload = {}
-		local core = {}
-		if tbl then
-			for k,v in pairs(tbl) do
-				-- Load extensions with specified settings (rather than defaults)
-				-- These are loaded in the order they were saved (unless the .txt was modified)
-
-				if nzu.GetExtension(v.ID) then
-					nzu.UpdateExtension(v.ID, v.Settings) -- Update if already loaded (Core)
-				else
-					nzu.LoadExtension(v.ID, v.Settings)
-				end
-			end
-		end
-	end
-
-	-- 2) Load Map + Save Extensions
-	-- Mostly copied from gmsave module
+function nzu.ReloadConfigMap(config)
+	local config = config or nzu.CurrentConfig
+	if not config then return end
+	
 	if not file.Exists(config.Path.."/config.dat", "GAME") then return end -- Not error, just load nothing
 	local str = file.Read(config.Path.."/config.dat", "GAME")
 	
@@ -69,6 +49,8 @@ local function loadconfig(config)
 	end
 
 	timer.Simple(0.1, function()
+		navmesh.Load()
+	
 		-- Do preloads
 		for k,v in pairs(tab.SaveExtensions) do
 			if savefuncs[k] and savefuncs[k].PreLoad then
@@ -81,7 +63,8 @@ local function loadconfig(config)
 		loadedents = {} -- Empty and prepare for new wave (should already be empty though)
 		
 		duplicator.RemoveMapCreatedEntities() -- Keep this? Maybe look for a way to reset map-created entities (like doors)
-		duplicator.Paste(nil, tab.Map.Entities, tab.Map.Constraints)
+		local a,b = duplicator.Paste(nil, tab.Map.Entities, tab.Map.Constraints)
+		PrintTable(a)
 		
 		local postloads = {}
 		for k,v in pairs(tab.SaveExtensions) do
@@ -112,13 +95,36 @@ local function loadconfig(config)
 			v(tab.SaveExtensions[k].PostSave)
 		end
 	end)
-
-	hook.Run("nzu_PostLoadConfig")
 end
 
+local function loadconfig(config)
+	hook.Run("nzu_PreLoadConfig", config)
 
+	-- 1) Load Extensions
+	if file.Exists(config.Path.."/settings.txt", "GAME") then
+		local tbl = util.JSONToTable(file.Read(config.Path.."/settings.txt", "GAME"))
+		local toload = {}
+		local core = {}
+		if tbl then
+			for k,v in pairs(tbl) do
+				-- Load extensions with specified settings (rather than defaults)
+				-- These are loaded in the order they were saved (unless the .txt was modified)
 
+				if nzu.GetExtension(v.ID) then
+					nzu.UpdateExtension(v.ID, v.Settings) -- Update if already loaded (Core)
+				else
+					nzu.LoadExtension(v.ID, v.Settings)
+				end
+			end
+		end
+	end
 
+	-- 2) Load Map + Save Extensions
+	-- Mostly copied from gmsave module
+	nzu.ReloadConfigMap(config)
+
+	hook.Run("nzu_PostLoadConfig", config)
+end
 
 local function getplystonetworkto()
 	local plys = {}
@@ -228,11 +234,6 @@ function nzu.LoadConfig(config, ctype)
 		networkconfig(config, player.GetAll(), true)
 		hook.Run("nzu_ConfigLoaded", config)
 		return
-	end
-	
-	if config.Path == nzu.CurrentConfig.Path then --and NZU_SANDBOX then -- Should this only apply in Sandbox?
-		-- Just clean up the map and refresh
-		--return
 	end
 
 	timer.Create("nzu_saveload", 0.25, 5, function()

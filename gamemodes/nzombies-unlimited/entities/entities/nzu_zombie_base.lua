@@ -275,23 +275,43 @@ if SERVER then
 	-- A damage info can be passed, otherwise a default is created
 	function ENT:AttackTarget(target, dmg, move)
 		if IsValid(target) then
-			local dmg = dmg
+		
+			local tbl = {}
 			if not dmg then
-				dmg = DamageInfo()
-				dmg:SetDamage(self.AttackDamage)
-				dmg:SetDamageType(DMG_SLASH)
-				dmg:SetAttacker(self)
-				--dmg:SetDamageForce()
+				tbl.Damage = self.AttackDamage
+				tbl.Type = DMG_SLASH
+			else
+				tbl.Damage = dmg:GetDamage()
+				tbl.Type = dmg:GetDamageType()
+				tbl.Force = dmg:GetDamageForce()
 			end
 
 			-- Perform the attack with the function of hurting the target!
 			if move then
 				self:DoMovingAttackFunction(target, function(self, target)
-					if self:GetRangeTo(target) <= self.AttackRange then target:TakeDamageInfo(dmg) end
+					if self:GetRangeTo(target) <= self.AttackRange then
+						local dmg = DamageInfo()
+						dmg:SetDamage(tbl.Damage)
+						dmg:SetDamageType(tbl.Type)
+						if tbl.Force then dmg:SetDamageForce(tbl.Force) end
+						dmg:SetAttacker(self)
+						dmg:SetInflictor(self)
+						
+						target:TakeDamageInfo(dmg)
+					end
 				end, true)
 			else
 				self:DoAttackFunction(target, function(self, target)
-					if self:GetRangeTo(target) <= self.AttackRange then target:TakeDamageInfo(dmg) end
+					if self:GetRangeTo(target) <= self.AttackRange then
+						local dmg = DamageInfo()
+						dmg:SetDamage(tbl.Damage)
+						dmg:SetDamageType(tbl.Type)
+						if tbl.Force then dmg:SetDamageForce(tbl.Force) end
+						dmg:SetAttacker(self)
+						dmg:SetInflictor(self)
+						
+						target:TakeDamageInfo(dmg)
+					end
 				end, true)
 			end
 		end
@@ -438,6 +458,14 @@ if SERVER then
 		Sound("nzu/zombie/death/death_09.wav"),
 		Sound("nzu/zombie/death/death_10.wav"),
 	}
+	
+	-- The amount of force to skip the death animation and do a ragdoll instead
+	-- Set to 0 to always ragdoll, -1 to never
+	ENT.DeathRagdollForce = 0
+	
+	-- A table of death animations. Will play if the force of the damage is below ENT.DeathRagdollForce
+	-- Default: nil (since the base always ragdolls)
+	ENT.DeathAnimations = nil
 
 	------- Overridables -------
 
@@ -452,7 +480,15 @@ if SERVER then
 	-- Default: Fling like a ragdoll based on the damage and play a death sound!
 	function ENT:PerformDeath(dmg)
 		self:PlaySound(self.DeathSounds[math.random(#self.DeathSounds)])
-		self:BecomeRagdoll(dmg)
+		print(self, self.DeathRagdollForce, dmg:GetDamageForce():Length())
+		if self.DeathRagdollForce == 0 or self.DeathRagdollForce <= dmg:GetDamageForce():Length() then
+			self:BecomeRagdoll(dmg)
+		else
+			self:TriggerEvent("Death", function(self, seq)
+				self:PlaySequenceAndWait(seq)
+				self:BecomeRagdoll(DamageInfo())
+			end, self.DeathAnimations[math.random(#self.DeathAnimations)])
+		end
 	end
 
 
@@ -689,7 +725,7 @@ if SERVER then
 	-- When a path ends. Either when the goal is reached, or when no path could be found
 	-- This is where you should trigger your attack event or idle
 	function ENT:OnPathEnd()
-		if IsValid(self.Target) and not self.PreventAttack then
+		if IsValid(self.Target) and self:AcceptTarget(self.Target) and not self.PreventAttack then
 			if self:GetRangeTo(self.Target) <= self.AttackRange then
 				self:TriggerEvent("Attack", self.Target)
 			end
@@ -728,7 +764,7 @@ if SERVER then
 	-- Note: If the player is the target, ENT:InteractTarget is called instead!
 	function ENT:InteractPlayer(ply)
 		if self:SetTarget(ply) then -- If we succeeded in targetting this player
-			--self:TriggerEvent("Attack", ply)
+			self:TriggerEvent("Attack", ply)
 		end
 	end
 
@@ -902,6 +938,7 @@ if SERVER then
 
 				if not IsValid(self.Target) or not self:AcceptTarget(self.Target) then
 					self:Retarget() -- Retarget on path end if the previous target is no longer valid
+					if not IsValid(self.Target) or not self:AcceptTarget(self.Target) then continue end
 				end
 
 				-- Recompute the path
@@ -1011,7 +1048,7 @@ Pass potential data as the third argument rather than directly in the handler
 if SERVER then
 	function ENT:TriggerEvent(id, handler, data)
 		-- Lapsing events
-		if self.ActiveEvent then
+		if self.ActiveEvent and coroutine.running() then
 			local func = self["Event_"..id] or handler
 			if func then
 				self.ActiveEvent = id
@@ -1030,7 +1067,7 @@ if SERVER then
 		end
 		return false
 	end
-	 
+	
 	function ENT:RequestTerminateEvent()
 		if self.ActiveEvent then
 			self.Event_Terminate = true

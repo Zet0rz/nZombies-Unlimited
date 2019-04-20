@@ -589,6 +589,7 @@ if CLIENT then
 			end
 		end
 
+		-- TODO: Uncomment this and apply a nice Discord promo banner texture
 		--[[self.Promo = self.LeftSide:Add("DPanel")
 		self.Promo:Dock(BOTTOM)
 		self.Promo:SetTall(75)
@@ -701,110 +702,5 @@ else
 	util.AddNetworkString("nzu_CustomizePlayerDone")
 	net.Receive("nzu_CustomizePlayerDone", function(len, ply)
 		ply:UpdateModel()
-	end)
-end
-
-
-
---[[-------------------------------------------------------------------------
-Config Loading
----------------------------------------------------------------------------]]
-if CLIENT then
-	local configpaneltall = 60
-
-	nzu.AddMenuHook("LoadConfig", function(menu)
-		local scroll = vgui.Create("DScrollPanel")
-		scroll:Dock(FILL)
-		local clist = scroll:Add("DListLayout")
-		clist:Dock(FILL)
-
-		local sub = menu:AddPanel("Load Config ...", 3, scroll)
-
-		local function doconfigclick(p)
-			if p.Config then
-				net.Start("nzu_menu_loadconfigs")
-					net.WriteString(p.Config.Codename)
-					net.WriteString(p.Config.Type)
-				net.SendToServer()
-			end
-		end
-		
-		local function addconfig(_, config)
-			local pnl = vgui.Create("nzu_ConfigPanel", clist)
-			clist:Add(pnl)
-			pnl:SetConfig(config)
-			pnl:SetTall(configpaneltall)
-			--pnl:Sort()
-			pnl:Dock(TOP)
-			pnl:DockMargin(0,0,0,1)
-			pnl.DoClick = doconfigclick
-
-			scroll:InvalidateChildren()
-			timer.Simple(0.1, function() scroll:InvalidateLayout() end)
-		end
-
-		local hasshown = false
-		function sub:OnShown()
-			if not hasshown then
-				hook.Add("nzu_ConfigInfoSaved", scroll, addconfig)
-
-				local cfgs = nzu.GetConfigs()
-				for k,v in pairs(cfgs) do
-					for k2,v2 in pairs(v) do
-						addconfig(nil, v2)
-					end
-				end
-				hasshown = true
-			end
-		end
-
-		net.Receive("nzu_menu_loadconfigs", function()
-			local c = {}
-			c.Codename = net.ReadString()
-			c.Type = net.ReadString()
-			c.Name = net.ReadString()
-			c.Map = net.ReadString()
-			c.Authors = net.ReadString()
-
-			menu:SetConfig(c)
-		end)
-
-	end)
-end
-
-if SERVER then
-	util.AddNetworkString("nzu_menu_loadconfigs")
-
-	local configtoload
-	local function writeconfigtoload()
-		net.WriteString(configtoload.Codename)
-		net.WriteString(configtoload.Type)
-		net.WriteString(configtoload.Name)
-		net.WriteString(configtoload.Map)
-		net.WriteString(configtoload.Authors)
-	end
-
-	net.Receive("nzu_menu_loadconfigs", function(len, ply)
-		if not nzu.IsAdmin(ply) then return end
-
-		local codename = net.ReadString()
-		local ctype = net.ReadString()
-
-		local config = nzu.GetConfig(codename, ctype)
-		if config then
-			configtoload = config
-			net.Start("nzu_menu_loadconfigs")
-				writeconfigtoload()
-			net.Broadcast()
-		end
-	end)
-
-	-- Players that join should see this on the menu
-	hook.Add("PlayerInitialSpawn", "nzu_MenuLoadedConfig", function(ply)
-		if configtoload then
-			net.Start("nzu_menu_loadconfigs")
-				writeconfigtoload()
-			net.Send(ply)
-		end
 	end)
 end

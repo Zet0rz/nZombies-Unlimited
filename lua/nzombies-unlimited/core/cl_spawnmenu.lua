@@ -25,7 +25,7 @@ end
 
 local function createtabs(tab)
 	for k,v in pairs(tabs) do
-		if not v.panel then
+		if not IsValid(v.panel) then
 			local p = vgui.Create(v.type, tab)
 			p:SetSkin("nZombies Unlimited")
 			v.func(p)

@@ -51,6 +51,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	loadedcfg:Dock(FILL)
 	loadedcfg:SetVisible(false)
 	loadedcfg.m_bDrawCorners = false
+	
 	local noloaded = loadedpnl:Add("DLabel")
 	noloaded:SetText("No Config currently loaded.")
 	noloaded:Dock(FILL)
@@ -86,12 +87,11 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	installed:DockMargin(10,5,5,5)
 	installed:Dock(TOP)
 
-	local configscroll = configpanel:Add("DScrollPanel")
-	configscroll:Dock(FILL)
-	configscroll:DockMargin(5,0,0,5)
-	configscroll:SetPaintBackground(true)
-	local configlist = configscroll:Add("DListLayout")
+	local configlist = configpanel:Add("nzu_ConfigList")
 	configlist:Dock(FILL)
+	configlist:DockMargin(5,0,0,5)
+	configlist:SetPaintBackground(true)
+	configlist:LoadConfigs()
 	
 	local img = infopanel:Add("DImage")
 	img:SetImage("vgui/black.png")
@@ -356,6 +356,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 			widentry:SetEnabled(false)
 		end
 	end
+	configlist.OnConfigClicked = function(s,cfg,pnl) doconfigclick(pnl) end
 
 	-- Create new config button
 	createbutton:SetEnabled(nzu.IsAdmin(LocalPlayer()))
@@ -454,52 +455,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 
 		entry:RequestFocus()
 	end
-
-	-- Populate configs
-	local configpanels = {}
-	local function addconfig(_, config)
-		if not configpanels[config] then
-			local pnl = vgui.Create("nzu_ConfigPanel", configlist)
-			--configlist:Add(pnl)
-			pnl:SetConfig(config)
-			pnl:SetTall(configpaneltall)
-			pnl:Sort()
-			pnl.DoClick = doconfigclick
-			pnl:Dock(TOP)
-
-			configpanels[config] = pnl
-			configscroll:InvalidateChildren()
-			timer.Simple(0.1, function() configscroll:InvalidateLayout() end)
-		end
-
-		-- Update the main one if it is that one
-		if editedconfig and editedconfig.Codename == config.Codename and editedconfig.Type == config.Type then
-			configname:SetText(config.Name)
-			desc:SetText(config.Description)
-			authors:SetText(config.Authors)
-			widentry:SetText(config.WorkshopID or "")
-		end
-	end
-	local configs = nzu.GetConfigs()
-	if configs then
-		for k,v in pairs(configs) do
-			for k2,v2 in pairs(v) do
-				addconfig(nil, v2, true)
-			end
-		end
-	end
-	hook.Add("nzu_ConfigInfoSaved", configpanel, addconfig)
 	loadedcfg.DoClick = doconfigclick
-
-	hook.Add("nzu_ConfigDeleted", configpanel, function(_, config)
-		if configpanels[config] then
-			configpanels[config]:Remove()
-			configpanels[config] = nil
-
-			configscroll:InvalidateChildren()
-			timer.Simple(0.1, function() configscroll:InvalidateLayout() end)
-		end
-	end)
 
 	local function applyinfo()
 		if editedconfig then
