@@ -196,7 +196,7 @@ nzu.RegisterMismatch("Wall Buys", {
 		local t = {}
 		for k,v in pairs(ents.FindByClass("nzu_wallbuy")) do
 			if not weapons.GetStored(v:GetWeaponClass()) then
-				table.insert(t, v:GetWeaponClass())
+				table.insert(t, v)
 			end
 		end
 		if #t > 0 then return t end
@@ -205,12 +205,12 @@ nzu.RegisterMismatch("Wall Buys", {
 		if SERVER then -- Servers write just the wrong classes
 			net.WriteUInt(#t, 16)
 			for k,v in ipairs(t) do
-				net.WriteString(v)
+				net.WriteEntity(v)
 			end
 		else -- Clients write the wrong class and the replacement class
 			net.WriteUInt(table.Count(t), 16)
 			for k,v in pairs(t) do
-				net.WriteString(k)
+				net.WriteEntity(k)
 				net.WriteString(v)
 			end
 		end
@@ -220,33 +220,50 @@ nzu.RegisterMismatch("Wall Buys", {
 		local num = net.ReadUInt(16)
 		if CLIENT then -- Clients receive just the wrong classes, but generate the map table
 			for i = 1,num do
-				table.insert(t, net.ReadString())
+				table.insert(t, net.ReadEntity())
 			end
-		else -- Servers read the map table
+		else -- Servers read the table of entities and their new class
 			for i = 1,num do
-				local k = net.ReadString()
-				local v = net.ReadString()
-				t[k] = v
+				local ent = net.ReadEntity()
+				local class = net.ReadString()
+				t[ent] = class
 			end
 		end
 		return t
 	end,
 	Apply = function(t)
-		local fixed = true
-		for k,v in pairs(ents.FindByClass("nzu_wallbuy")) do
-			if v:GetWeaponClass() == k then v:SetWeaponClass(v) end
-			if not weapons.GetStored(v:GetWeaponClass()) then
-				fixed = false
-			end
+		for k,v in pairs(t) do
+			if v == "" then k:Remove() else k:SetWeaponClass(v) end
 		end
-		return fixed
 	end,
 	BuildPanel = function(parent, t)
-		local t2 = {}
+		local dlist = vgui.Create("DListView", parent)
+		dlist:AddColumn("Invalid Wall Buy")
+		dlist:AddColumn("Replacement Weapon")
+
+		local weps = {}
 		for k,v in pairs(t) do
-			t2[v] = "Weapon" -- Make use of the Extension Setting types
+			if IsValid(v) then
+				local class = v:GetWeaponClass()
+
+				local pnl = nzu.ExtensionSettingTypePanel("Weapon", parent)
+				pnl:Set(class)
+				dlist:AddLine(class .. " ("..v:GetPrice()..")", pnl):SetTall(100)
+
+				weps[v] = pnl
+			end
 		end
-		return t2
+
+		-- Collect the corrected data when the Apply button is pressed
+		function dlist:GetMismatch()
+			local tbl = {}
+			for k,v in pairs(weps) do
+				tbl[k] = v:Get()
+			end
+			return tbl
+		end
+
+		return dlist
 	end,
 	Icon = "icon16/gun.png",
 })

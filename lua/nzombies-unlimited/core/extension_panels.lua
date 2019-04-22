@@ -1,4 +1,24 @@
 
+--[[-------------------------------------------------------------------------
+Generic Setting Type panel creation, for utility
+---------------------------------------------------------------------------]]
+function nzu.ExtensionSettingTypePanel(typ, parent)
+	local build = typ and nzu.GetExtensionSettingType(typ)
+	if build and build.Panel then
+		local pnl = build.Panel.Create(parent)
+		if IsValid(pnl) then
+			pnl.Set = build.Panel.Set
+			pnl.Get = build.Panel.Get
+			pnl.Send = function() end -- You can override this after receiving the panel if you want
+			return pnl
+		end
+	end
+end
+
+
+--[[-------------------------------------------------------------------------
+Networked Extension Panel
+---------------------------------------------------------------------------]]
 local function sendnetwork(p)
 	nzu.RequestExtensionSetting(p._ExtensionID, p._ExtensionSetting, p:_GetValue())
 end

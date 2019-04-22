@@ -23,6 +23,7 @@ a model that has the appropriate animations)
 ---------------------------------------------------------------------------]]
 
 --------------
+-- Fields: Values that you can set for your subclass (or on initialize for the specific entity)
 -- Callable: Functions you can call, but really shouldn't overwrite
 -- Overridables: These can be overridden to make your own implementation and are called internally by the base. They all have a default (as seen here).
 --------------
@@ -45,6 +46,7 @@ Initialization
 ---------------------------------------------------------------------------]]
 if SERVER then
 	------- Fields -------
+	-- TODO: Change the structure of this so that a subclass implementation doesn't inheret this table too
 	ENT.Models = {
 		{Model = "models/nzu/nzombie_honorguard.mdl", Skin = 0, Bodygroups = {0,0}},
 		{Model = "models/nzu/nzombie_honorguard.mdl", Skin = 0, Bodygroups = {0,1}},
@@ -480,7 +482,6 @@ if SERVER then
 	-- Default: Fling like a ragdoll based on the damage and play a death sound!
 	function ENT:PerformDeath(dmg)
 		self:PlaySound(self.DeathSounds[math.random(#self.DeathSounds)])
-		print(self, self.DeathRagdollForce, dmg:GetDamageForce():Length())
 		if self.DeathRagdollForce == 0 or self.DeathRagdollForce <= dmg:GetDamageForce():Length() then
 			self:BecomeRagdoll(dmg)
 		else

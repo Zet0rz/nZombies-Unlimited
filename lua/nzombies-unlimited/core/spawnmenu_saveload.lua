@@ -14,7 +14,6 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	configpanel:Dock(LEFT)
 
 	local infopanel = panel:Add("DPanel")
-	infopanel:SetBackgroundColor(Color(50,40,40))
 	infopanel:Dock(FILL)
 	infopanel:DockPadding(30,30,30,30)
 
@@ -146,7 +145,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	local addonscroll = addonarea:Add("DScrollPanel")
 	addonscroll:Dock(FILL)
 	addonscroll:SetPaintBackground(true)
-	addonscroll:SetBackgroundColor(Color(50,50,50))
+	--addonscroll:SetBackgroundColor(Color(50,50,50))
 	local addonlist = addonscroll:Add("DListLayout")
 	addonlist:Dock(FILL)
 	function addonlist:Refresh()
@@ -332,6 +331,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 			authors:SetEnabled(true)
 			desc:SetEnabled(true)
 			widentry:SetEnabled(true)
+			ab:SetEnabled(true)
 		else
 			addonscroll:SetVisible(false)
 			addonlist2_Scroll:SetVisible(true)
@@ -340,7 +340,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 			reload:SetText(cfg == nzu.CurrentConfig and "Reload Config" or "Load Config")
 			reload:SetEnabled(nzu.IsAdmin(LocalPlayer()))
 			savemeta:SetEnabled(false)
-			delete:SetEnabled(cfg.Type == "Local")
+			delete:SetEnabled(cfg.Type == "Local" and nzu.IsAdmin(LocalPlayer()))
 
 			addonlist2:Clear()
 			for k,v in pairs(cfg.RequiredAddons) do
@@ -354,6 +354,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 			authors:SetEnabled(false)
 			desc:SetEnabled(false)
 			widentry:SetEnabled(false)
+			ab:SetEnabled(false)
 		end
 	end
 	configlist.OnConfigClicked = function(s,cfg,pnl) doconfigclick(pnl) end

@@ -64,6 +64,7 @@ loadfile_c("ragdoll_cleanup.lua")
 
 loadfile("menu/menu.lua")
 loadfile("menu/menu_configload.lua")
+loadfile_c("menu/menu_mismatch.lua")
 
 --[[-------------------------------------------------------------------------
 Gamemode modules

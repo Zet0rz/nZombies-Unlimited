@@ -59,7 +59,7 @@ SKIN.fontCategoryHeader			= "TabLarge"
 SKIN.colNumberWangBG			= Color( 255, 240, 150, 255 )
 SKIN.colTextEntryBG				= Color( 240, 240, 240, 255 )
 SKIN.colTextEntryBorder			= Color( 20, 20, 20, 255 )
-SKIN.colTextEntryText			= Color( 20, 20, 20, 255 )
+SKIN.colTextEntryText			= Color( 200, 200, 200, 255 )
 SKIN.colTextEntryTextHighlight	= Color( 20, 200, 250, 255 )
 SKIN.colTextEntryTextCursor		= Color( 0, 0, 100, 255 )
 SKIN.colTextEntryTextPlaceholder= Color( 128, 128, 128, 255 )
@@ -307,7 +307,7 @@ SKIN.Colours.Category.LineAlt.Button_Selected	= GWEN.TextureColor( 4 + 8 * 25, 5
 SKIN.Colours.TooltipText = GWEN.TextureColor( 4 + 8 * 26, 500 )
 
 -- Background colors
-local BaseColor			= Color(0,0,0,220)
+local BaseColor			= Color(0,0,0,240)
 
 -- Corner values
 local CornerColor		= Color(255,255,255,150)
@@ -329,19 +329,6 @@ local function drawcorners(panel,w,h,cornerthickness, cornerlength)
 	surface.DrawRect(w - cornerthickness,h - cornerlength, cornerthickness, cornerlength - cornerthickness)
 end
 
-function nzu.TestWindow()
-	local f = vgui.Create("DFrame")
-	f:SetSize(400,200)
-	f:SetPos(ScrW()/2 - 200, ScrH()/2 - 100)
-	f:SetSkin("nZombies Unlimited")
-	f:MakePopup()
-	f:SetDeleteOnClose(true)
-	f:SetSizable(true)
-
-	local p = f:Add("DButton")
-	p:Dock(TOP)
-end
-
 
 --[[---------------------------------------------------------
 	Panel
@@ -349,7 +336,7 @@ end
 function SKIN:PaintPanel( panel, w, h )
 
 	if ( not panel.m_bBackground ) then return end
-	self.tex.Panels.Normal( 0, 0, w, h, panel.m_bgColor )
+	self.tex.Panels.Normal( 0, 0, w, h, panel.m_bgColor or BaseColor)
 
 	if panel.m_bDrawCorners then drawcorners(panel,w,h, CornerThickness, CornerLength) end
 
@@ -426,7 +413,7 @@ function SKIN:PaintTree( panel, w, h )
 
 	if ( not panel.m_bBackground ) then return end
 
-	self.tex.Tree( 0, 0, w, h, panel.m_bgColor )
+	self.tex.Tree( 0, 0, w, h, panel.m_bgColor or BaseColor )
 
 end
 

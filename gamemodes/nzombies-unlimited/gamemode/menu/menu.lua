@@ -34,8 +34,8 @@ if CLIENT then
 			b:ClickFunction()
 		end
 	end
-	local function generatebutton(text,admin)
-		local b = vgui.Create("DButton")
+	local function generatebutton(text,admin, parent)
+		local b = vgui.Create("DButton", parent)
 		b:SetFont("DermaLarge")
 		b:SetText(text) -- Append spaces around to free from edges
 		b:SetTextColor(textcolor)
@@ -49,16 +49,17 @@ if CLIENT then
 		--b.Paint = paintfunc
 		b:SetSkin("nZombies Unlimited")
 		b.DoClick = buttondoclick
+		b:Dock(TOP)
 
 		return b
 	end
 	function SUBMENU:AddButton(text, zpos, func, admin)
-		if IsValid(self.List) then
-			local b = generatebutton(text, admin)
+		if IsValid(self.Contents) then
+			local b = generatebutton(text, admin, self.Contents)
 			b:SetZPos(zpos)
 			b.SubMenu = self
 			b.ClickFunction = func
-			self.List:Add(b)
+			self.Contents:Add(b)
 
 			return b
 		end
@@ -77,12 +78,11 @@ if CLIENT then
 		end
 	end
 	function SUBMENU:AddSubMenu(text, zpos, admin)
-		if IsValid(self.List) then
-			local b = generatebutton(text, admin)
+		if IsValid(self.Contents) then
+			local b = generatebutton(text, admin, self.Contents)
 			b:SetZPos(zpos)
 
-			local submenu = vgui.Create("nzu_MenuPanel_SubMenu")
-			submenu:SetParent(self:GetParent())
+			local submenu = vgui.Create("nzu_MenuPanel_SubMenu", self:GetParent())
 			submenu:Dock(FILL)
 			submenu.Menu = self.Menu
 
@@ -90,18 +90,17 @@ if CLIENT then
 			b.SubPanel = submenu
 			submenu:SetPrevious(text, self)
 			b.ClickFunction = submenuclick
-			self.List:Add(b)
+			self.Contents:Add(b)
 
-			return submenu
+			return submenu, b
 		end
 	end
 	function SUBMENU:AddPanel(text, zpos, panel, admin)
-		if IsValid(self.List) then
-			local b = generatebutton(text, admin)
+		if IsValid(self.Contents) then
+			local b = generatebutton(text, admin, self.Contents)
 			b:SetZPos(zpos)
 
-			local submenu = vgui.Create("nzu_MenuPanel_SubMenu")
-			submenu:SetParent(self:GetParent())
+			local submenu = vgui.Create("nzu_MenuPanel_SubMenu", self:GetParent())
 			submenu:Dock(FILL)
 			submenu:SetContents(panel)
 			submenu.Menu = self.Menu
@@ -110,13 +109,12 @@ if CLIENT then
 			b.SubPanel = submenu
 			submenu:SetPrevious(text, self)
 			b.ClickFunction = submenuclick
-			self.List:Add(b)
+			self.Contents:Add(b)
 
-			return submenu
+			return submenu, b
 		end
 	end
 
-	--local i = 1
 	function SUBMENU:Init()
 		local topbar = self:Add("Panel")
 		topbar:Dock(TOP)
@@ -134,9 +132,6 @@ if CLIENT then
 		self.Contents = self:Add("DScrollPanel")
 		self.Contents:SetPaintBackground(false)
 		self.Contents:Dock(FILL)
-
-		self.List = self.Contents:Add("DListLayout")
-		self.List:Dock(FILL)
 
 		self:Hide()
 	end
@@ -495,7 +490,7 @@ if CLIENT then
 		self.RightSide = self:Add("DDragBase")
 		self.RightSide:Dock(RIGHT)
 		self.RightSide:SetWide(600)
-		self.RightSide:DockMargin(50,100,100,100)
+		self.RightSide:DockMargin(50,100,100,50)
 
 		self.PlayerIndicator = self.RightSide:Add("DPanel")
 		self.PlayerIndicator:SetTall(40)
@@ -589,22 +584,89 @@ if CLIENT then
 			end
 		end
 
-		-- TODO: Uncomment this and apply a nice Discord promo banner texture
-		--[[self.Promo = self.LeftSide:Add("DPanel")
+		-- TODO: Add the link and uncomment this section when the server is open
+		--[[self.Promo = self.LeftSide:Add("DImageButton")
 		self.Promo:Dock(BOTTOM)
 		self.Promo:SetTall(75)
+		self.Promo:SetImage("nzombies-unlimited/menu/discord-promo.png")
 		self.Promo:SetZPos(-1)
 		self.Promo:DockMargin(0,5,0,0)
 
-		self.PromoText = self.Promo:Add("DLabel")
-		self.PromoText:SetText("Join the official nZombies Unlimited Discord Server")
-		self.PromoText:SetFont("Trebuchet24")
-		self.PromoText:SetContentAlignment(5)
-		self.PromoText:Dock(FILL)]]
+		local link = ""
+		self.Promo.DoClick = function()
+			local frame = vgui.Create("DFrame")
+			frame:SetSkin("nZombies Unlimited")
+			frame:SetBackgroundBlur(true)
+			frame:SetTitle("Discord Link")
+			frame:SetDeleteOnClose(true)
+			frame:ShowCloseButton(true)
+			frame:SetSize(300, 120)
 
-		self:SetConfig(nzu.CurrentConfig) -- unloaded
+			local lbl = frame:Add("DLabel")
+			lbl:SetText("Click to copy to clipboard")
+			lbl:Dock(TOP)
+			lbl:SetContentAlignment(5)
+
+			local txt = frame:Add("DButton")
+			txt:SetText(link)
+			txt:Dock(TOP)
+			txt:SetContentAlignment(5)
+			txt.DoClick = function(s)
+				SetClipboardText(link)
+				lbl:SetText("Copied!")
+				lbl:SetTextColor(Color(0,255,0))
+				s:KillFocus()
+			end
+			local sk = txt:GetSkin()
+			txt.Paint = function(s,w,h) sk.tex.TextBox( 0, 0, w, h ) end
+
+			local but = frame:Add("DButton")
+			but:SetText("Open in Steam Overlay")
+			but:Dock(BOTTOM)
+			but:SetTall(25)
+			but:DockMargin(30,0,30,0)
+			but.DoClick = function()
+				gui.OpenURL(link)
+				frame:Close()
+			end
+
+			frame:MakePopup()
+			frame:Center()
+			frame:SetMouseInputEnabled(true)
+			frame:DoModal()
+		end]]
+
+		-- Music!
+		--[[local rsctr = self.RightSide:Add("DPanel")
+		rsctr:Dock(BOTTOM)
+		rsctr:SetTall(36)
+		rsctr.m_bDrawCorners = true
+
+		self.RightSideControls = rsctr:Add("DHorizontalScroller")
+		self.RightSideControls:Dock(FILL)
+		self.RightSideControls:DockPadding(10,10,10,10)
+
+		local mus = self.RightSideControls:Add("DCheckBoxLabel")
+		mus:SetText("Music")
+		mus:Dock(RIGHT)
+		mus:SetContentAlignment(5)
+		mus:SetWide(50)
+		mus.OnChange = function(s,b)
+			if not b and self.MenuMusic then
+				self.MenuMusic:Stop()
+			elseif b then
+				self.MenuMusic = CreateSound(LocalPlayer(), "") -- WHY DOES THIS GET GARBAGE COLLECTED AND STOP CONSTANTLY?! D:
+				self.MenuMusic:SetSoundLevel(0)
+				self.MenuMusic:Play()
+			end
+		end
+		mus:SetConVar("nzu_menu_music")
+		self.RightSideControls.MusicToggle = mus]]
+
+		self:SetConfig(nzu.CurrentConfig) -- Unloaded or whichever config is loaded when we first open the menu
 		self.MenuRoot:Show()
 	end
+	--if not ConVarExists("nzu_menu_music") then CreateConVar("nzu_menu_music", 1, FCVAR_ARCHIVE, "Sets whether Music should play on the main menu of nZombies Unlimited.") end
 	
 	function PANEL:Paint()
 		Derma_DrawBackgroundBlur(self, self.OpenTime)
@@ -617,9 +679,12 @@ if CLIENT then
 		self:MakePopup()
 		self:SetKeyBoardInputEnabled(false)
 		self:RequestFocus()
+
+		--if GetConVar("nzu_menu_music") then self.RightSideControls.MusicToggle:OnChange(true) end
 	end
 
 	function PANEL:Close()
+		--if self.MenuMusic then self.MenuMusic:Stop() end
 		self:Hide()
 	end
 
@@ -641,7 +706,7 @@ if CLIENT then
 	local menuhooks = {}
 	local function togglemenu()
 		local mainmenu = nzu.Menu
-		--if mainmenu then mainmenu:Remove() mainmenu = nil end
+		--if mainmenu then mainmenu:Remove() mainmenu = nil end -- DEBUG
 
 		if net.ReadBool() then
 			if net.ReadBool() then
