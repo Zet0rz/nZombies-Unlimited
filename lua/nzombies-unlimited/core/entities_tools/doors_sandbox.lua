@@ -38,10 +38,10 @@ if SERVER then
 			net.WriteBool(false)
 		end
 
-		if data.Flags then
-			local num = #data.Flags
+		if data.Rooms then
+			local num = #data.Rooms
 			net.WriteUInt(num, 8)
-			for k,v in pairs(data.Flags) do
+			for k,v in pairs(data.Rooms) do
 				net.WriteString(v)
 			end
 		end
@@ -116,9 +116,9 @@ else
 
 			local num = net.ReadUInt(8)
 			if num > 0 then
-				tbl.Flags = {}
+				tbl.Rooms = {}
 				for i = 1, num do
-					table.insert(tbl.Flags, net.ReadString())
+					table.insert(tbl.Rooms, net.ReadString())
 				end
 			end
 
@@ -158,14 +158,14 @@ TOOL.ClientConVar = {
 	["price"] = "1000",
 	["group"] = "",
 	["electricity"] = "0",
-	["flags"] = "",
+	["rooms"] = "",
 }
 
 function TOOL:LeftClick(trace)
 	if IsValid(trace.Entity) then
 		if trace.Entity:CanCreateDoor() then
 			if SERVER then
-				local flags = self:GetClientInfo("flags")
+				local flags = self:GetClientInfo("rooms")
 				local tbl
 				if flags ~= "" then
 					tbl = string.Explode(" ", string.Trim(flags))
@@ -174,7 +174,7 @@ function TOOL:LeftClick(trace)
 					Price = self:GetClientNumber("price"),
 					Group = self:GetClientInfo("group"),
 					Electricity = self:GetClientNumber("electricity") ~= 0,
-					Flags = tbl,
+					Rooms = tbl,
 				}
 				trace.Entity:CreateDoor(data)
 			end
@@ -197,13 +197,13 @@ function TOOL:RightClick(trace)
 				owner:ConCommand("nzu_tool_doorlock_electricity "..(data.Electricity and "1" or "0"))
 
 				local str = ""
-				if data.Flags then
-					for k,v in pairs(data.Flags) do
+				if data.Rooms then
+					for k,v in pairs(data.Rooms) do
 						str = str .. v .. " "
 					end
 					str = string.Trim(str)
 				end
-				owner:ConCommand("nzu_tool_doorlock_flags \""..str.."\"")
+				owner:ConCommand("nzu_tool_doorlock_rooms \""..str.."\"")
 				owner:ChatPrint("Copied door data!")
 			end
 			return true
@@ -251,20 +251,14 @@ if CLIENT then
 		
 		panel:Help("")
 
-		panel:Help("Select which Map Flags are opened by the door. This enables Spawners and other Map Flags enabled entities with one of the selected flags.")
-		panel:Help("Usually Doors want to select 2 flags (one for either side of the door).")
+		panel:ControlHelp("Select which Rooms are opened by the door. This enables Spawners and other Room enabled entities assigned to these. Usually Doors want to select 2 Rooms (one for either side of the door).")
 
-		local listbox = vgui.Create("nzu_MapFlagsPanel", panel)
-		--[[listbox:SetSelectedFlags(string.Explode(" ", GetConVar("nzu_tool_doorlock_flags"):GetString()))
-		listbox.OnSelectedFlagsChanged = function()
-			local flags = listbox:GetSelectedFlags()
-			GetConVar("nzu_tool_doorlock_flags"):SetString(table.concat(flags, " "))
-		end]]
-		listbox:SetConVar("nzu_tool_doorlock_flags")
+		local listbox = vgui.Create("nzu_RoomsPanel", panel)
+		listbox:SetConVar("nzu_tool_doorlock_rooms")
 		panel:AddItem(listbox)
-		listbox:RefreshFlags()
+		listbox:RefreshRooms()
 
-		panel:Help("Flags cannot contain spaces.")
+		panel:Help("Room names cannot contain spaces.")
 	end
 end
 
@@ -302,9 +296,9 @@ properties.Add("nzu_DoorLock", {
 
 		local num = net.ReadUInt(8)
 		if num > 0 then
-			tbl.Flags = {}
+			tbl.Rooms = {}
 			for i = 1,num do
-				table.insert(tbl.Flags, net.ReadString())
+				table.insert(tbl.Rooms, net.ReadString())
 			end
 		end
 
@@ -349,13 +343,13 @@ properties.Add("nzu_DoorLock", {
 		local lbl = frame:Add("DLabel")
 		lbl:Dock(TOP)
 		lbl:SetFont("Trebuchet18")
-		lbl:SetText("Connected Rooms (Map Flags)")
+		lbl:SetText("Connected Rooms")
 
-		local l = frame:Add("nzu_MapFlagsPanel")
+		local l = frame:Add("nzu_RoomsPanel")
 		l:Dock(FILL)
 		l:ShowRefreshButton(false)
-		l:SetSelectedFlags(data and data.Flags)
-		l:RefreshFlags()
+		l:SetSelectedRooms(data and data.Rooms)
+		l:RefreshRooms()
 
 		local bottom = frame:Add("Panel")
 		bottom:Dock(BOTTOM)
@@ -380,7 +374,7 @@ properties.Add("nzu_DoorLock", {
 					net.WriteBool(false)
 				end
 
-				local flags = l:GetSelectedFlags()
+				local flags = l:GetSelectedRooms()
 				net.WriteUInt(#flags, 8)
 				for k,v in pairs(flags) do
 					net.WriteString(v)

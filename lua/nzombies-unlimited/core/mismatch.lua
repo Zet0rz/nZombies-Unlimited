@@ -112,6 +112,105 @@ if SERVER then
 	end)
 end
 
+--[[-------------------------------------------------------------------------
+A common Mismatch module: Required Addons Check!
+It loops through all addons marked as Required in the current config
+and if any are not installed, reports them to the Mismatch
+
+It won't actually support a fix - it will prompt the owner to subscribe
+and reload the server, or play along without them at their own responsibility
+---------------------------------------------------------------------------]]
+
+nzu.RegisterMismatch("Required Addons", {
+	Collect = function()
+		if nzu.CurrentConfig and nzu.CurrentConfig.RequiredAddons then
+			local t = {}
+			
+			local addons = {}
+			for k,v in pairs(engine.GetAddons()) do
+				if v.wsid and v.mounted then
+					addons[v.wsid] = true
+				end
+			end
+
+			for k,v in pairs(nzu.CurrentConfig.RequiredAddons) do
+				if not addons[k] then
+					table.insert(t, {k,v})
+				end
+			end
+
+			if #t > 0 then return t end
+		end
+	end,
+	Write = function(t)
+		if SERVER then -- Only servers can really write - Clients don't actually do anything
+			net.WriteUInt(#t, 8) -- Again, max 255 required. I doubt you would mark more
+			for k,v in ipairs(t) do
+				net.WriteString(v[1])
+				net.WriteString(v[2])
+			end
+		end
+	end,
+	Read = function()
+		if CLIENT then
+			local t = {}
+			local num = net.ReadUInt(8)
+
+			for i = 1,num do
+				local id = net.ReadString()
+				local name = net.ReadString()
+				table.insert(t, {id, name})
+			end
+
+			return t
+		end
+	end,
+	Apply = function(t)
+		-- Do nothing!
+	end,
+	BuildPanel = function(parent, t)
+		local p = vgui.Create("Panel", parent)
+		p:Dock(FILL)
+
+		local lbl = p:Add("DLabel")
+		lbl:SetText("The Config requests these addons which are not enabled on the server.")
+		lbl:SetWrap(true)
+		lbl:Dock(TOP)
+		lbl:SetAutoStretchVertical(true)
+		lbl:DockMargin(5,0,5,10)
+
+		local scroll = p:Add("DScrollPanel")
+		scroll:Dock(FILL)
+		scroll:SetPaintBackground(true)
+
+		local altcolor = Color(20,20,20,240)
+		for k,v in pairs(t) do
+			local line = vgui.Create("DPanel", scroll)
+			line:SetTall(25)
+			line:DockPadding(5,2,5,2)
+			if k % 2 == 0 then line:SetBackgroundColor(altcolor) end
+
+			local name = line:Add("DLabel")
+			name:SetText(v[2])
+			name:Dock(FILL)
+
+			local but = line:Add("DButton")
+			but:SetText("View Workshop")
+			but:Dock(RIGHT)
+			but:SetWide(100)
+			but.DoClick = function()
+				steamworks.ViewFile(v[1])
+			end
+
+			line:Dock(TOP)
+			scroll:AddItem(line)
+		end
+
+		return p
+	end,
+	Icon = "icon16/chart_bar_error.png",
+})
+
 if SERVER then return end
 -- Below here is the client PANEL setup
 
@@ -192,7 +291,8 @@ function PANEL:Init()
 	self.Save = self:Add("DButton")
 	self.Save:Dock(BOTTOM)
 	self.Save:DockMargin(5,5,5,5)
-	self.Save:SetText("Apply")
+	self.Save:SetText("Apply not possible")
+	self.Save:SetEnabled(false)
 	
 	self.Items = {}
 	
@@ -211,6 +311,18 @@ function PANEL:Init()
 	
 	for k,v in pairs(nzu.GetAvailableMismatches()) do
 		self:AddMismatch(v,nzu.GetReceivedMismatchData(v))
+	end
+
+	self.Sheet.OnActiveTabChanged = function(s, old, new)
+		if IsValid(new) then
+			if new.CanApply then
+				self.Save:SetText("Apply")
+				self.Save:SetEnabled(true)
+			else
+				self.Save:SetText("Apply not possible")
+				self.Save:SetEnabled(false)
+			end
+		end
 	end
 	
 	hook.Add("nzu_MismatchFound", self, self.AddMismatch) -- Adds the tab without the data
@@ -296,11 +408,16 @@ function PANEL:AddMismatch(key, data)
 		pnl:Dock(FILL)
 		pnl:DockMargin(5,5,5,5)
 		tbl.Tab.Mismatch = key
+		tbl.Tab.CanApply = pnl.GetMismatch and true or false
 		self.Items[key] = tbl
 
 		if IsValid(self.DefaultTab) then
 			self.Sheet:CloseTab(self.DefaultTab, true)
 			self.DefaultTab = nil
+		end
+
+		if self.Sheet:GetActiveTab() == tbl.Tab then
+			self.Sheet:OnActiveTabChanged(tbl.Tab, tbl.Tab)
 		end
 
 		self:OnMismatchAdded(key, data, tbl)

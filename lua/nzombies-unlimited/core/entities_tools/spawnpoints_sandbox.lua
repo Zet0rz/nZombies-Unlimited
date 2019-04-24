@@ -13,7 +13,7 @@ function SPAWNPOINT_ZOMBIE:Initialize()
 		self:SetCollisionGroup(COLLISION_GROUP_WEAPON)
 		self:DrawShadow(false)
 	end
-	self:EnableMapFlags("Spawnpoints")
+	self:SetRoomHandler("Spawnpoints")
 end
 
 if CLIENT then
@@ -35,7 +35,7 @@ TOOL.Name = "#tool.nzu_tool_spawnpoint.name"
 
 TOOL.ClientConVar = {
 	["type"] = "zombie",
-	["flags"] = "",
+	["rooms"] = "",
 	["filter"] = "0",
 }
 
@@ -52,9 +52,9 @@ function TOOL:LeftClick(trace)
 			e.SpawnpointType = spawntype
 			e:Spawn()
 
-			local flags = self:GetClientInfo("flags")
+			local flags = self:GetClientInfo("rooms")
 			local tbl = flags == "" and {} or string.Explode(" ", flags)
-			e:SetMapFlags(tbl)
+			e:SetRooms(tbl)
 
 			if IsValid(ply) then
 				undo.Create(spawnpointtypes[spawntype][1])
@@ -85,9 +85,9 @@ function TOOL:Reload(trace)
 				if trace.Entity.SpawnpointType ~= self:GetClientInfo("type") then return end
 			end
 
-			local flags = self:GetClientInfo("flags")
+			local flags = self:GetClientInfo("rooms")
 			local tbl = flags == "" and {} or string.Explode(" ", flags)
-			trace.Entity:SetMapFlags(tbl)
+			trace.Entity:SetRooms(tbl)
 		end
 		return true
 	end
@@ -105,7 +105,7 @@ if CLIENT then
 
 	language.Add("tool.nzu_tool_spawnpoint.left", "Create Spawnpoint")
 	language.Add("tool.nzu_tool_spawnpoint.right", "Remove Spawnpoint")
-	language.Add("tool.nzu_tool_spawnpoint.reload", "Reapply selected Map Flags")
+	language.Add("tool.nzu_tool_spawnpoint.reload", "Reapply selected Rooms")
 
 	function TOOL.BuildCPanel(panel)
 		panel:Help("Spawnpoint Type")
@@ -134,19 +134,14 @@ if CLIENT then
 
 		panel:CheckBox("Filter Remove and Reload to selected types only", "nzu_tool_spawnpoint_filter")
 
-		panel:Help("Spawnpoints only activate when the doors belonging to at least one of the selected flags are opened. If none are selected, the Spawnpoint is always activated.")
+		panel:Help("Spawnpoints only activate when one of its Rooms is opened. If no Rooms are set, the Spawnpoint is always activated.")
 
-		local listbox = vgui.Create("nzu_MapFlagsPanel", panel)
-		--[[listbox:SetSelectedFlags(string.Explode(" ", GetConVar("nzu_tool_spawnpoint_flags"):GetString()))
-		listbox.OnSelectedFlagsChanged = function()
-			local flags = listbox:GetSelectedFlags()
-			GetConVar("nzu_tool_spawnpoint_flags"):SetString(table.concat(flags, " "))
-		end]]
-		listbox:SetConVar("nzu_tool_spawnpoint_flags")
+		local listbox = vgui.Create("nzu_RoomsPanel", panel)
+		listbox:SetConVar("nzu_tool_spawnpoint_rooms")
 		panel:AddItem(listbox)
-		listbox:RefreshFlags()
+		listbox:RefreshRooms()
 
-		panel:Help("Flags cannot contain spaces.")
+		panel:ControlHelp("Room names cannot contain spaces.")
 	end
 
 end
@@ -165,15 +160,11 @@ if SERVER then
 
 			for k,v in pairs(ents.FindByClass("nzu_spawnpoint")) do
 				nzu.IgnoreSaveEntity(v) -- Don't save these entities
-				table.insert(tbl, {Pos = v:GetPos(), Ang = v:GetAngles(), Type = v.SpawnpointType, MapFlags = v:GetMapFlags()})
+				table.insert(tbl, {Pos = v:GetPos(), Ang = v:GetAngles(), Type = v.SpawnpointType, Rooms = v:GetRooms()})
 			end
 
 			return tbl
 		end,
-		Save = function()
-			-- We do our work in PreSave just cause we already loop there anyway
-		end,
-		Load = function() end,
 		PreLoad = function(tbl)
 			for k,v in pairs(tbl) do
 				if spawnpointtypes[v.Type] then
@@ -183,7 +174,7 @@ if SERVER then
 					e:SetAngles(v.Ang)
 					e.SpawnpointType = v.Type
 					e:Spawn()
-					e:SetMapFlags(v.MapFlags)
+					e:SetRooms(v.Rooms)
 				end
 			end
 		end

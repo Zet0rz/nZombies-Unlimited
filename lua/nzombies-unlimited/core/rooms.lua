@@ -2,93 +2,93 @@ local ENTITY = FindMetaTable("Entity")
 
 
 if SERVER then
-	local flags = {}
-	function nzu.GetMapFlagsList() return table.GetKeys(flags) end	
+	local rooms = {}
+	function nzu.GetRoomList() return table.GetKeys(rooms) end	
 
-	function ENTITY:EnableMapFlags(id)
-		self.nzu_MapFlagsHandler = id
-		if not self.nzu_MapFlags then self.nzu_MapFlags = {} end
-	end
-
-	function ENTITY:DisableMapFlags()
-		if self.nzu_MapFlagsHandler and self.nzu_MapFlags then
-			for k,v in pairs(self.nzu_MapFlags) do
-				flags[k][self] = nil
+	function ENTITY:SetRoomHandler(id)
+		if id then
+			self.nzu_RoomHandler = id
+			if not self.nzu_Rooms then self.nzu_Rooms = {} end
+		else
+			if self.nzu_RoomHandler and self.nzu_Rooms then
+				for k,v in pairs(self.nzu_Rooms) do
+					rooms[k][self] = nil
+				end
+				self.nzu_RoomHandler = nil
+				self.nzu_Rooms = nil
 			end
-			self.nzu_MapFlagsHandler = nil
-			self.nzu_MapFlags = nil
 		end
 	end
 
 	local handlers = {}
-	function nzu.AddMapFlagsHandler(id, handler)
+	function nzu.AddRoomHandler(id, handler)
 		if NZU_NZOMBIES then handlers[id] = handler end -- Handlers have no use in Sandbox
 	end
 
-	function ENTITY:AddMapFlag(flag)
-		assert(self.nzu_MapFlagsHandler, "Attempted to add a Map Flag to entity without enabled Map Flags.")
+	function ENTITY:AddRoom(flag)
+		assert(self.nzu_RoomHandler, "Attempted to add a Room to entity without a Room Handler set.")
 
-		if not flags[flag] then flags[flag] = {} end
-		flags[flag][self] = true
-		self.nzu_MapFlags[flag] = true
+		if not rooms[flag] then rooms[flag] = {} end
+		rooms[flag][self] = true
+		self.nzu_Rooms[flag] = true
 	end
 
-	function ENTITY:RemoveMapFlag(flag)
-		assert(self.nzu_MapFlagsHandler, "Attempted to remove a Map Flag to entity without enabled Map Flags.")
+	function ENTITY:RemoveRoom(flag)
+		assert(self.nzu_RoomHandler, "Attempted to remove a Room to entity without a Room Handler set.")
 
-		if flags[flag] then
-			flags[flag][self] = nil
-			if next(flags[flag]) == nil then
-				flags[flag] = nil
+		if rooms[flag] then
+			rooms[flag][self] = nil
+			if next(rooms[flag]) == nil then
+				rooms[flag] = nil
 			end
 		end
-		self.nzu_MapFlags[flag] = nil
+		self.nzu_Rooms[flag] = nil
 	end
 
-	function ENTITY:SetMapFlags(flags)
-		local olds = table.Copy(self.nzu_MapFlags)
+	function ENTITY:SetRooms(flags)
+		local olds = table.Copy(self.nzu_Rooms)
 
 		for k,v in pairs(flags) do
 			if not olds[v] then
-				self:AddMapFlag(v)
+				self:AddRoom(v)
 			end
 			olds[v] = nil
 		end
 
 		for k,v in pairs(olds) do -- Now only those who were there before, but not now
-			self:RemoveMapFlag(k)
+			self:RemoveRoom(k)
 		end
 	end
 
-	function ENTITY:GetMapFlags()
-		return self.nzu_MapFlags and table.GetKeys(self.nzu_MapFlags)
+	function ENTITY:GetRooms()
+		return self.nzu_Rooms and table.GetKeys(self.nzu_Rooms)
 	end
 
 	-- Respond to net requests, but only in sandbox
 	if NZU_SANDBOX then
-		util.AddNetworkString("nzu_mapflags")
-		net.Receive("nzu_mapflags", function(len, ply)
+		util.AddNetworkString("nzu_rooms")
+		net.Receive("nzu_rooms", function(len, ply)
 			if net.ReadBool() then
 				local ent = net.ReadEntity()
 				if IsValid(ent) then
-					local flags = nzu.GetMapFlagsList()
+					local flags = nzu.GetRoomList()
 					local num = table.Count(flags)
 
-					net.Start("nzu_mapflags")
+					net.Start("nzu_rooms")
 						net.WriteBool(true)
 						net.WriteEntity(ent)
 
 						net.WriteUInt(num, 8)
 						for k,v in pairs(flags) do
 							net.WriteString(v)
-							net.WriteBool(ent.nzu_MapFlags and ent.nzu_MapFlags[v])
+							net.WriteBool(ent.nzu_Rooms and ent.nzu_Rooms[v])
 						end
 					net.Send(ply)
 				end
 			else
-				local flags = nzu.GetMapFlagsList()
+				local flags = nzu.GetRoomList()
 				local num = table.Count(flags)
-				net.Start("nzu_mapflags")
+				net.Start("nzu_rooms")
 					net.WriteBool(false)
 					net.WriteUInt(num, 8)
 					for k,v in pairs(flags) do
@@ -100,54 +100,54 @@ if SERVER then
 	end
 
 	if NZU_NZOMBIES then
-		local openedflags = {}
-		function nzu.OpenMapFlag(flag)
-			openedflags[flag] = true
-			if flags[flag] then
-				for k,v in pairs(flags[flag]) do
+		local openedrooms = {}
+		function nzu.OpenRoom(flag)
+			openedrooms[flag] = true
+			if rooms[flag] then
+				for k,v in pairs(rooms[flag]) do
 					if IsValid(k) then
-						local handler = k.nzu_MapFlagsHandler and handlers[k.nzu_MapFlagsHandler]
+						local handler = k.nzu_RoomHandler and handlers[k.nzu_RoomHandler]
 						if handler then
 							handler(k)
 						end
 
 						-- Clear this from the handler
-						k.nzu_MapFlagsHandler = nil
-						k.nzu_MapFlags = nil
+						k.nzu_RoomHandler = nil
+						k.nzu_Rooms = nil
 					end
 				end
-				flags[flag] = nil -- No longer retain these flags
+				rooms[flag] = nil -- No longer retain these flags
 			end
 		end
 
-		function nzu.IsMapFlagOpen(flag)
-			return openedflags[flag]
+		function nzu.IsRoomOpen(flag)
+			return openedrooms[flag]
 		end
 	end
 
 	-- Cleanup if entities are removed
-	hook.Add("EntityRemoved", "nzu_MapFlagsRemoval", function(ent)
-		if ent.nzu_MapFlags then
-			for k,v in pairs(ent.nzu_MapFlags) do
-				if flags[v] then
-					flags[v][ent] = nil
-					if next(flags[v]) == nil then
-						flags[v] = nil
+	hook.Add("EntityRemoved", "nzu_RoomsRemoval", function(ent)
+		if ent.nzu_Rooms then
+			for k,v in pairs(ent.nzu_Rooms) do
+				if rooms[v] then
+					rooms[v][ent] = nil
+					if next(rooms[v]) == nil then
+						rooms[v] = nil
 					end
 				end
 			end
 		end
 	end)
 else
-	function ENTITY:EnableMapFlags(id) -- Client mirror, just so clients know what type of map flags group this belongs to
-		self.nzu_MapFlagsHandler = id
+	function ENTITY:SetRoomHandler(id) -- Client mirror, just so clients know what type of room handler this belongs to
+		self.nzu_RoomHandler = id
 	end
 end
 
 --[[-------------------------------------------------------------------------
 Client editing support
-- Panels for selecting from available flags (Use in tools)
-- A property entry to edit flags of an entity (Context menu right-click)
+- Panels for selecting from available rooms (Use in tools)
+- A property entry to edit rooms of an entity (Context menu right-click)
 ---------------------------------------------------------------------------]]
 
 if CLIENT then
@@ -161,26 +161,26 @@ if CLIENT then
 		bottom:SetTall(20)
 		bottom:DockMargin(0,5,0,0)
 		bottom:Dock(BOTTOM)
-		self.NewFlagButton = bottom:Add("DButton")
-		self.NewFlagButton:SetText("Add new Flag")
-		self.NewFlagButton:Dock(RIGHT)
-		self.NewFlagButton:SetWide(100)
-		self.NewFlagButton:DockMargin(5,0,0,0)
+		self.NewRoomButton = bottom:Add("DButton")
+		self.NewRoomButton:SetText("Add new Room")
+		self.NewRoomButton:Dock(RIGHT)
+		self.NewRoomButton:SetWide(100)
+		self.NewRoomButton:DockMargin(5,0,0,0)
 
-		self.NewFlagEntry = bottom:Add("DTextEntry")
-		self.NewFlagEntry:SetPlaceholderText("Enter new flag ...")
-		self.NewFlagEntry:Dock(FILL)
-		self.NewFlagButton.DoClick = function()
-			local str = self.NewFlagEntry:GetText()
+		self.NewRoomEntry = bottom:Add("DTextEntry")
+		self.NewRoomEntry:SetPlaceholderText("Enter new room name ...")
+		self.NewRoomEntry:Dock(FILL)
+		self.NewRoomButton.DoClick = function()
+			local str = self.NewRoomEntry:GetText()
 			if str ~= "" and not string.find(str, " ") then
-				self:AddNewFlag(str, true)
-				self.NewFlagEntry:SetText("")
+				self:AddNewRoom(str, true)
+				self.NewRoomEntry:SetText("")
 			else
-				self.NewFlagEntry.ErrorHighlight = 255
+				self.NewRoomEntry.ErrorHighlight = 255
 			end
 		end
 
-		self.NewFlagEntry.PaintOver = function(s,w,h)
+		self.NewRoomEntry.PaintOver = function(s,w,h)
 			if s.ErrorHighlight then
 				surface.SetDrawColor(255,0,0,s.ErrorHighlight)
 				local x2,y2 = s:GetSize()
@@ -207,12 +207,12 @@ if CLIENT then
 		self.RefreshButton:SetWide(120)
 		self.RefreshButton:SetText("Refresh from Server")
 		self.RefreshButton.DoClick = function()
-			self:RefreshFlags()
+			self:RefreshRooms()
 		end
 
 		self.List = self:Add("DListView")
 		self.List:SetMultiSelect(true)
-		self.List:AddColumn("Flag")
+		self.List:AddColumn("Room")
 		self.List:Dock(FILL)
 		self.List.OnClickLine = self.OnClickLine
 
@@ -261,7 +261,7 @@ if CLIENT then
 
 				if anychange then
 					self:GetParent():UpdateConVar()
-					self:GetParent():OnSelectedFlagsChanged()
+					self:GetParent():OnSelectedRoomsChanged()
 				end
 
 				return
@@ -303,7 +303,7 @@ if CLIENT then
 
 		if b then self:OnRowSelected(Line:GetID(), Line) end
 		self:GetParent():UpdateConVar()
-		self:GetParent():OnSelectedFlagsChanged()
+		self:GetParent():OnSelectedRoomsChanged()
 	end
 
 	function PANEL:SetDisabled(disable)
@@ -318,12 +318,12 @@ if CLIENT then
 		end
 
 		self.List:SetDisabled(disable)
-		self.NewFlagEntry:SetDisabled(disable)
-		self.NewFlagButton:SetDisabled(disable)
+		self.NewRoomEntry:SetDisabled(disable)
+		self.NewRoomButton:SetDisabled(disable)
 		self.RefreshButton:SetDisabled(disable)
 	end
 
-	function PANEL:LoadFlagsSelected(flags)
+	function PANEL:LoadRoomsSelected(flags)
 		self.List:Clear()
 
 		for k,v in pairs(flags) do
@@ -332,12 +332,12 @@ if CLIENT then
 		end
 
 		self:UpdateConVar()
-		self:OnSelectedFlagsChanged()
+		self:OnSelectedRoomsChanged()
 
 		self.ControlHelp:SetText("Use Shift/Ctrl to select multiple.")
 		self.List:SetDisabled(self.m_bDisabled)
-		self.NewFlagEntry:SetDisabled(self.m_bDisabled)
-		self.NewFlagButton:SetDisabled(self.m_bDisabled)
+		self.NewRoomEntry:SetDisabled(self.m_bDisabled)
+		self.NewRoomButton:SetDisabled(self.m_bDisabled)
 		self.RefreshButton:SetDisabled(self.m_bDisabled)
 
 		self.RefreshGiveUp = nil
@@ -350,9 +350,9 @@ if CLIENT then
 		return line
 	end
 
-	function PANEL:LoadFlags(tbl)
+	function PANEL:LoadRooms(tbl)
 		local selectedflags = {}
-		for k,v in pairs(self:GetSelectedFlags()) do
+		for k,v in pairs(self:GetSelectedRooms()) do
 			selectedflags[v] = true
 		end
 
@@ -372,20 +372,20 @@ if CLIENT then
 
 		self.ControlHelp:SetText("Use Shift/Ctrl to select multiple.")
 		self.List:SetDisabled(self.m_bDisabled)
-		self.NewFlagEntry:SetDisabled(self.m_bDisabled)
-		self.NewFlagButton:SetDisabled(self.m_bDisabled)
+		self.NewRoomEntry:SetDisabled(self.m_bDisabled)
+		self.NewRoomButton:SetDisabled(self.m_bDisabled)
 		self.RefreshButton:SetDisabled(self.m_bDisabled)
 
 		self.RefreshGiveUp = nil
 	end
 
-	function PANEL:AddNewFlag(str, selected)
+	function PANEL:AddNewRoom(str, selected)
 		for k,v in pairs(self.List:GetLines()) do
 			if v:GetColumnText(1) == str then
 				if not v:IsSelected() and selected then
 					v:SetSelected(true)
 					self:UpdateConVar()
-					self:OnSelectedFlagsChanged()
+					self:OnSelectedRoomsChanged()
 				end
 				return
 			end
@@ -394,11 +394,11 @@ if CLIENT then
 		self:AddLine(str):SetSelected(selected)
 		if selected then
 			self:UpdateConVar()
-			self:OnSelectedFlagsChanged()
+			self:OnSelectedRoomsChanged()
 		end
 	end
 
-	function PANEL:GetSelectedFlags()
+	function PANEL:GetSelectedRooms()
 		local flags = {}
 		for k,v in pairs(self.List:GetSelected()) do
 			table.insert(flags, v:GetColumnText(1))
@@ -407,7 +407,7 @@ if CLIENT then
 		return flags
 	end
 
-	function PANEL:SetSelectedFlags(flags)
+	function PANEL:SetSelectedRooms(flags)
 		local flags = flags or {}
 		local keys = {}
 		for k,v in pairs(flags) do
@@ -431,22 +431,22 @@ if CLIENT then
 
 		-- Add all flags that aren't already in there
 		for k,v in pairs(keys) do
-			self:AddNewFlag(k, true)
+			self:AddNewRoom(k, true)
 		end
 
 		self:UpdateConVar()
-		self:OnSelectedFlagsChanged()
+		self:OnSelectedRoomsChanged()
 	end
 
 	local torefresh
-	function PANEL:RefreshFlags(ent) -- Optional ent: Select this entity's flags too
+	function PANEL:RefreshRooms(ent) -- Optional ent: Select this entity's flags too
 		local donet = false
 		if ent then
-			if not ent.nzu_MapFlagsPanelRefresh then
-				ent.nzu_MapFlagsPanelRefresh = {}
+			if not ent.nzu_RoomsPanelRefresh then
+				ent.nzu_RoomsPanelRefresh = {}
 				donet = true
 			end
-			ent.nzu_MapFlagsPanelRefresh[self] = true
+			ent.nzu_RoomsPanelRefresh[self] = true
 		else
 			if not torefresh then
 				torefresh = {}
@@ -457,7 +457,7 @@ if CLIENT then
 		
 
 		if donet then
-			net.Start("nzu_mapflags")
+			net.Start("nzu_rooms")
 				if IsValid(ent) then
 					net.WriteBool(true)
 					net.WriteEntity(ent)
@@ -467,10 +467,10 @@ if CLIENT then
 			net.SendToServer()
 		end
 
-		self.ControlHelp:SetText("Refreshing flags ...")
+		self.ControlHelp:SetText("Refreshing rooms ...")
 		self.List:SetDisabled(true)
-		self.NewFlagEntry:SetDisabled(true)
-		self.NewFlagButton:SetDisabled(true)
+		self.NewRoomEntry:SetDisabled(true)
+		self.NewRoomButton:SetDisabled(true)
 		self.RefreshButton:SetDisabled(true)
 
 		self.RefreshGiveUp = CurTime() + 5
@@ -482,10 +482,10 @@ if CLIENT then
 
 	function PANEL:Think()
 		if self.RefreshGiveUp and self.RefreshGiveUp < CurTime() then
-			self.ControlHelp:SetText("Couldn't retrieve flags")
+			self.ControlHelp:SetText("Couldn't retrieve rooms")
 			self.List:SetDisabled(self.m_bDisabled)
-			self.NewFlagEntry:SetDisabled(self.m_bDisabled)
-			self.NewFlagButton:SetDisabled(self.m_bDisabled)
+			self.NewRoomEntry:SetDisabled(self.m_bDisabled)
+			self.NewRoomButton:SetDisabled(self.m_bDisabled)
 			self.RefreshButton:SetDisabled(self.m_bDisabled)
 
 			if torefresh then torefresh[self] = nil end
@@ -501,14 +501,14 @@ if CLIENT then
 
 		self.m_bIgnoreConVar = true
 		self.m_strConVarValue = str
-		self:SetSelectedFlags(tbl)
+		self:SetSelectedRooms(tbl)
 		self.m_bIgnoreConVar = nil
 	end
 
 	function PANEL:UpdateConVar() -- Update its ConVar
 		if self.m_strConVar and not self.m_bIgnoreConVar then
 			local str = ""
-			for k,v in pairs(self:GetSelectedFlags()) do
+			for k,v in pairs(self:GetSelectedRooms()) do
 				str = str .. v .. " "
 			end
 			str = string.Trim(str)
@@ -516,11 +516,11 @@ if CLIENT then
 		end
 	end
 
-	function PANEL:OnSelectedFlagsChanged()
+	function PANEL:OnSelectedRoomsChanged()
 		-- Implement me!
 	end
 
-	net.Receive("nzu_mapflags", function()
+	net.Receive("nzu_rooms", function()
 		if net.ReadBool() then
 			local ent = net.ReadEntity()
 			if IsValid(ent) then
@@ -531,10 +531,10 @@ if CLIENT then
 					tbl[str] = net.ReadBool()
 				end
 
-				for k,v in pairs(ent.nzu_MapFlagsPanelRefresh) do
-					k:LoadFlagsSelected(tbl)
+				for k,v in pairs(ent.nzu_RoomsPanelRefresh) do
+					k:LoadRoomsSelected(tbl)
 				end
-				ent.nzu_MapFlagsPanelRefresh = nil
+				ent.nzu_RoomsPanelRefresh = nil
 			end
 		elseif torefresh then
 			local num = net.ReadUInt(8)
@@ -544,31 +544,31 @@ if CLIENT then
 			end
 
 			for k,v in pairs(torefresh) do
-				k:LoadFlags(tbl)
+				k:LoadRooms(tbl)
 			end
 
 			torefresh = nil
 		end
 	end)
-	vgui.Register("nzu_MapFlagsPanel", PANEL, "DPanel")
+	vgui.Register("nzu_RoomsPanel", PANEL, "DPanel")
 end
 
 if NZU_SANDBOX then
-	-- A property that lets you modify the flags of a selected entity
-	-- Works for any entity that has self.nzu_MapFlagsHandler field set
-	-- (i.e. Entity:EnableMapFlags())
+	-- A property that lets you modify the rooms of a selected entity
+	-- Works for any entity that has self.nzu_RoomHandler field set
+	-- (i.e. Entity:SetRoomHandler())
 
-	properties.Add("nzu_MapFlags", {
-		MenuLabel = "[NZU] Edit Map Flags",
+	properties.Add("nzu_Rooms", {
+		MenuLabel = "[NZU] Edit Room",
 		Order = 3100,
 		MenuIcon = "icon16/door_open.png",
 		--PrependSpacer = true,
 
 		Filter = function(self, ent, ply) -- A function that determines whether an entity is valid for this property
 			if not IsValid(ent) then return false end
-			if not gamemode.Call("CanProperty", ply, "nzu_MapFlags", ent) then return false end
+			if not gamemode.Call("CanProperty", ply, "nzu_Rooms", ent) then return false end
 
-			return ent.nzu_MapFlagsHandler
+			return ent.nzu_RoomHandler
 		end,
 		Receive = function(self, length, player)
 			local ent = net.ReadEntity()
@@ -580,21 +580,21 @@ if NZU_SANDBOX then
 				table.insert(tbl, net.ReadString())
 			end
 
-			ent:SetMapFlags(tbl)
+			ent:SetRooms(tbl)
 		end,
 		Action = function(self, ent) -- Chance the clientside action to request a panel update
 			local frame = vgui.Create("DFrame")
 			frame:SetSize(300,400)
-			frame:SetTitle("Edit Map Flags")
+			frame:SetTitle("Edit Room")
 			frame:SetDeleteOnClose(true)
 			frame:ShowCloseButton(false)
 			frame:SetBackgroundBlur(true)
 			frame:SetDrawOnTop(true)
 
-			local l = frame:Add("nzu_MapFlagsPanel")
+			local l = frame:Add("nzu_RoomsPanel")
 			l:Dock(FILL)
 			l:ShowRefreshButton(false)
-			l:RefreshFlags(ent)
+			l:RefreshRooms(ent)
 
 			local bottom = frame:Add("Panel")
 			bottom:Dock(BOTTOM)
@@ -607,7 +607,7 @@ if NZU_SANDBOX then
 			save:SetText("Apply")
 			save:SetWide(125)
 			save.DoClick = function()
-				local flags = l:GetSelectedFlags()
+				local flags = l:GetSelectedRooms()
 
 				self:MsgStart()
 					net.WriteEntity(ent)

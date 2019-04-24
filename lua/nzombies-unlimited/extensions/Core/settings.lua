@@ -167,7 +167,7 @@ local settings = {
 
 	["RoundSounds"] = {
 		Type = "ResourceSet",
-		Default = "Classic",
+		Default = "classic", -- classic.lua, as found in lua/nzombies-unlimited/resourcesets/RoundSounds/classic.lua. It's a lua file extension, but not actual code (it's JSON). Lua is just necessary for Workshop
 	},
 }
 

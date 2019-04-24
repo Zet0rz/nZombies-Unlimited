@@ -21,7 +21,7 @@ if SERVER then
 else
 	nzu.RegisterHUDComponentType("HUD_DamageOverlay")
 
-	local overlay = Material("materials/overlay_low_health.png", "unlitgeneric smooth")
+	local overlay = Material("materials/nzombies-unlimited/hud/overlay_low_health.png", "unlitgeneric smooth")
 	local min_threshold = 0.7
 	local max_threshold = 0.3
 	local pulse_threshold = 0.4

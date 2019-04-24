@@ -140,17 +140,17 @@ if SERVER then
 				for k,v in pairs(doorgroups[data.Group]) do
 					local data2 = k:GetDoorData()
 					if data2.Price == data.Price and data2.Electricity == data.Electricity then
-						if data2.Flags == nil and data.Flags == nil then
+						if data2.Rooms == nil and data.Rooms == nil then
 							data = data2 -- We found a clone!
 							networkclone = k
-						elseif data2.Flags and data.Flags then
+						elseif data2.Rooms and data.Rooms then
 							local clone = {}
-							for k2,v2 in pairs(data.Flags) do
+							for k2,v2 in pairs(data.Rooms) do
 								clone[v2] = true
 							end
 
 							local isclone = true
-							for k2,v2 in pairs(data2.Flags) do
+							for k2,v2 in pairs(data2.Rooms) do
 								if clone[v2] then
 									clone[v2] = nil
 								else
@@ -312,9 +312,9 @@ if SERVER then
 
 	function nzu.OpenDoor(ent, ply, t, initial)
 		local data = ent:GetDoorData()
-		if data and data.Flags then
-			for k,v in pairs(data.Flags) do
-				nzu.OpenMapFlag(v)
+		if data and data.Rooms then
+			for k,v in pairs(data.Rooms) do
+				nzu.OpenRoom(v)
 			end
 		end
 		ent:RemoveDoor()

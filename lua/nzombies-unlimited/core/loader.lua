@@ -42,7 +42,7 @@ Components & Modules
 --loadfile("resources.lua")
 --loadfile_c("hudmanagement.lua")
 --loadfile("logic/logic_manager.lua")
-loadfile("mapflags.lua")
+loadfile("rooms.lua")
 
 --[[-------------------------------------------------------------------------
 Spawnmenu & Networking

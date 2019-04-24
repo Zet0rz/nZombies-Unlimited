@@ -53,6 +53,8 @@ list.Set("DesktopWindows", "nzu_Mismatch", {
 
 			mismatch.OnMismatchAdded = updaterequest
 			mismatch.OnMismatchClosed = updaterequest
+
+			updaterequest()
 		else
 			window:Remove()
 			notification.AddLegacy("Only Admins may access Mismatch.", NOTIFY_ERROR, 5)

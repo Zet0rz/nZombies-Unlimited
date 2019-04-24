@@ -30,7 +30,7 @@ function PANEL:LoadConfigs()
 	end
 	
 	hook.Add("nzu_ConfigInfoSaved", self, self.AddConfig)
-	hook.Add("nzu_ConfigDeleted", self, self.AddConfig)
+	hook.Add("nzu_ConfigDeleted", self, self.RemoveConfig)
 end
 
 function PANEL:Clear()
@@ -75,7 +75,10 @@ function PANEL:AddConfig(cfg)
 end
 
 function PANEL:RemoveConfig(cfg)
-	if self.ConfigPanels[cfg] then self.ConfigPanels[cfg]:Remove() end	
+	if self.ConfigPanels[cfg] then
+		self.ConfigPanels[cfg]:Remove()
+	end
+	self.ConfigPanels[cfg] = nil
 end
 
 function PANEL:GetConfigs()

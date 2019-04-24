@@ -857,7 +857,7 @@ function ENT:Initialize()
 	if SERVER then
 		local m,fallback = self:SelectModel()
 
-		local models = m and nzu.GetResources(m) or fallback
+		local models = m and nzu.GetResourceSet(m) or fallback
 		local choice = models[math.random(#models)]
 		self:SetModel(choice.Model)
 		if choice.Skin then self:SetSkin(choice.Skin) end

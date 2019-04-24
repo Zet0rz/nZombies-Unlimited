@@ -373,7 +373,7 @@ if SERVER then
 		[ROUND_PREPARING] = "End",
 		[ROUND_GAMEOVER] = "GameOver",
 	}
-	local sounds = nzu.GetResources("RoundSounds")
+	local sounds = nzu.GetResourceSet("RoundSounds")
 	hook.Add("nzu_RoundStart", "nzu_Round_Sounds", function(num)
 		if num == 1 and sounds.Initial then return end
 		local s = sounds.Start and sounds.Start[math.random(#sounds.Start)]
@@ -394,37 +394,6 @@ if SERVER then
 		local s = sounds.GameOver and sounds.GameOver[math.random(#sounds.GameOver)]
 		if s then nzu.PlayClientSound(s) end
 	end)
-
-	nzu.AddResourceSet("RoundSounds", "Classic", {
-		Start = {
-			"nzu/round/round_start.mp3"
-		},
-		End = {
-			"nzu/round/round_end.mp3"
-		},
-		GameOver = {
-			"nzu/round/game_over_5.mp3"
-		},
-	})
-
-	nzu.AddResourceSet("RoundSounds", "The Giant", {
-		Start = {
-			"nzu/round/thegiant/round_start_1.wav",
-			"nzu/round/thegiant/round_start_2.wav",
-			"nzu/round/thegiant/round_start_3.wav",
-			"nzu/round/thegiant/round_start_4.wav"
-		},
-		End = {
-			"nzu/round/thegiant/round_end.wav"
-		},
-		GameOver = {
-			"nzu/round/game_over_derriese.mp3"
-		},
-		-- DEBUG
-		Initial = {
-			"nzu/round/round_-1_prepare.mp3",
-		}
-	})
 end
 
 

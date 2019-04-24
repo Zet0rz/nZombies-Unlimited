@@ -19,8 +19,10 @@ end
 --[[-------------------------------------------------------------------------
 Networked Extension Panel
 ---------------------------------------------------------------------------]]
-local function sendnetwork(p)
-	nzu.RequestExtensionSetting(p._ExtensionID, p._ExtensionSetting, p:_GetValue())
+local function sendnetwork(p, v)
+	local val = v
+	if val == nil then val = p:_GetValue() end
+	nzu.RequestExtensionSetting(p._ExtensionID, p._ExtensionSetting, val)
 end
 
 local bext, bset, bsetpnl

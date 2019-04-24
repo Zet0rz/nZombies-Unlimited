@@ -114,7 +114,12 @@ local writetypes = {
 local customtypes = {}
 function nzu.AddExtensionSettingType(type, tbl)
 	tbl.__index = tbl
-	if SERVER then tbl.Panel = nil end
+
+	-- A bit of cleanup
+	if SERVER then
+		tbl.Panel = nil
+	end
+
 	customtypes[type] = tbl
 end
 function nzu.GetExtensionSettingType(type)
@@ -177,7 +182,7 @@ local function loadextensionprepare(name, hassettings)
 			end
 
 			if SERVER or NZU_SANDBOX or v.Client then
-				if v.Create then v.Create(loadingextension, k) end
+				if v.Create then v.Create(loadingextension, k, v) end
 			else
 				settings[k] = nil
 			end

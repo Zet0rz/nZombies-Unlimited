@@ -41,7 +41,7 @@ loadfile("nzombies-unlimited/core/configs.lua")
 loadfile("nzombies-unlimited/core/mismatch.lua")
 loadfile_c("nzombies-unlimited/core/config_panels.lua")
 loadfile_s("nzombies-unlimited/core/sv_saveload.lua")
-loadfile_s("nzombies-unlimited/core/mapflags.lua") -- Only Server outside Sandbox
+loadfile_s("nzombies-unlimited/core/rooms.lua") -- Only Server outside Sandbox
 
 --[[-------------------------------------------------------------------------
 Gamemode-specific files
@@ -83,3 +83,22 @@ Misc GM hooks
 ---------------------------------------------------------------------------]]
 -- No noclipping!
 function GM:PlayerNoClip(ply,on) return false end
+
+
+
+--[[-------------------------------------------------------------------------
+Sound play networking
+---------------------------------------------------------------------------]]
+if SERVER then
+	util.AddNetworkString("nzu_sound") -- Server: Broadcast a sound filepath to play on clients
+
+	function nzu.PlayClientSound(path, recipients)
+		net.Start("nzu_sound")
+			net.WriteString(path)
+		if recipients then net.Send(recipients) else net.Broadcast() end
+	end
+else
+	net.Receive("nzu_sound", function()
+		surface.PlaySound(net.ReadString())
+	end)
+end

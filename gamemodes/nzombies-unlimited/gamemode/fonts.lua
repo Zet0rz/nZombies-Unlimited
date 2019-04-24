@@ -8,7 +8,7 @@ surface.CreateFont("nzu_Font_Points_NameLarge", {
 
 surface.CreateFont("nzu_Font_Points_NameSmall", {
 	font = "Trebuchet MS",
-	size = 14,
+	size = 18,
 	weight = 1000,
 	antialias = true,
 })
