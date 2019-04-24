@@ -183,7 +183,7 @@ if CLIENT then
 	end
 
 	-- FUNCTIONS FOR UPDATING AND CREATING CONFIGS (Requests)
-	function nzu.RequestLoadConfig(config)
+	function nzu.RequestLoadConfig(config, realm)
 		if not nzu.IsAdmin(LocalPlayer()) then return end
 		net.Start("nzu_loadconfig")
 			net.WriteBool(true)
@@ -266,7 +266,23 @@ if CLIENT then
 			hook.Run("nzu_ConfigDeleted", config)
 
 			print("Received Config deletion: " ..codename .." ("..ctype..")")
-		end)		
+		end)
+
+		-- Requesting to play in NZU
+		function nzu.RequestPlayConfig(config)
+			net.Start("nzu_loadconfig_mode")
+				net.WriteString(config.Codename)
+				net.WriteString(config.Type)
+			net.SendToServer()
+		end
+	else
+		-- Requesting to edit in Sandbox
+		function nzu.RequestEditConfig(config)
+			net.Start("nzu_loadconfig_mode")
+				net.WriteString(config.Codename)
+				net.WriteString(config.Type)
+			net.SendToServer()
+		end
 	end
 
 	-- Receive missing addons list

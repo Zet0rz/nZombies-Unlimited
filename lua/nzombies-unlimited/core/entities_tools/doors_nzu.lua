@@ -217,13 +217,20 @@ if SERVER then
 	--[[-------------------------------------------------------------------------
 	Opening doors
 	---------------------------------------------------------------------------]]
-	local effectdelay = 2
-	local function openprops(ent, ply)
+	local effectdelay = 1
+	local function openprops(ent, ply, t, initial)
+		if not initial or ent == initial then
+			sound.Play("nzu/doors/disappear.wav", ent:GetPos(), 75, 100, 1)
+		end
+
 		ent:SetCollisionGroup(COLLISION_GROUP_DEBRIS) -- No longer collide
 		local e = EffectData()
 		e:SetEntity(ent)
 		e:SetScale(effectdelay)
-		util.Effect("nzu_Effect_ClearDebris", e, nil, true)
+		e:SetMagnitude(0.5)
+		e:SetRadius(0)
+		util.Effect("nzu_debris_clear", e, true, true)
+
 		SafeRemoveEntityDelayed(ent, effectdelay)
 	end
 

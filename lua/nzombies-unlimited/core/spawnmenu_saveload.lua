@@ -253,6 +253,14 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	desc:SetPlaceholderText("Config Description...")
 	desc:SetPlaceholderColor(Color(75,75,75))
 	desc:Dock(FILL)
+
+	local playbutton = infopanel:Add("DButton")
+	playbutton:Dock(BOTTOM)
+	playbutton:SetText("Save and Play")
+	playbutton:DockMargin(100,10,100,-20)
+	playbutton:SetTall(40)
+	playbutton:SetFont("Trebuchet24")
+	playbutton:SetEnabled(nzu.IsAdmin(LocalPlayer()))
 	
 	local saveload = infopanel:Add("Panel")
 	saveload:DockMargin(0,5,0,0)
@@ -268,6 +276,15 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	reload:SetText("Reload last saved version")
 	local save = saveload:Add("DButton")
 	save:SetText("Save Config")
+
+	playbutton.DoClick = function(s)
+		if selectedconfig.Config then
+			if selectedconfig.Config == editedconfig then save:DoClick() end
+			Derma_Query("Do you wish to change gamemode to NZOMBIES UNLIMITED?", "Mode change confirmation", "Change gamemode", function()
+				nzu.RequestPlayConfig(selectedconfig.Config)
+			end, "Cancel"):SetSkin("nZombies Unlimited")
+		end
+	end
 	
 	function saveload:PerformLayout()
 		local w = self:GetWide()/2 + 15
@@ -332,6 +349,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 			desc:SetEnabled(true)
 			widentry:SetEnabled(true)
 			ab:SetEnabled(true)
+			playbutton:SetText("Save and Play")
 		else
 			addonscroll:SetVisible(false)
 			addonlist2_Scroll:SetVisible(true)
@@ -355,6 +373,8 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 			desc:SetEnabled(false)
 			widentry:SetEnabled(false)
 			ab:SetEnabled(false)
+
+			playbutton:SetText("Load and Play")
 		end
 	end
 	configlist.OnConfigClicked = function(s,cfg,pnl) doconfigclick(pnl) end

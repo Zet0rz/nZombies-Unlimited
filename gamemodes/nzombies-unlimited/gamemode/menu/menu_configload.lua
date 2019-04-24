@@ -17,8 +17,26 @@ if CLIENT then
 		local l = vgui.Create("nzu_ConfigList")
 		local sub = menu:AddPanel("Load Config ...", 3, l)
 		l:Dock(FILL)
+		l:SetPaintBackground(true)
+
+		-- Access the config in Sandbox!
+		local sand = sub:GetTopBar():Add("DButton")
+		sand:Dock(RIGHT)
+		sand:SetText("Edit selected in Sandbox")
+		sand:SetWide(200)
+		sand:DockMargin(0,10,0,0)
+		sand:SetEnabled(menu.Config and true or false)
+		sand.DoClick = function()
+			Derma_Query("Are you sure you want to change to SANDBOX?", "Mode change confirmation", "Change gamemode", function()
+				if menu.Config then
+					nzu.RequestEditConfig(menu.Config)
+				end
+			end, "Cancel"):SetSkin("nZombies Unlimited")
+		end
+
 		l.OnConfigClicked = function(s,cfg,pnl)
 			doconfigclick(cfg)
+			if cfg then sand:SetEnabled(true) else sand:SetEnabled(false) end
 		end
 		
 		function sub:OnShown()

@@ -220,7 +220,7 @@ Loading a Config
 ---------------------------------------------------------------------------]]
 util.AddNetworkString("nzu_loadconfig") -- SERVER: Load a config || CLIENT: Receive list of missing addons
 
-function nzu.LoadConfig(config, ctype)
+function nzu.LoadConfig(config, ctype, mode)
 	if type(config) == "string" then config = nzu.GetConfig(config, ctype) end -- Compatibility with string arguments (codenames)
 
 	if not config or not config.Codename or not config.Path or not config.Map then
@@ -228,7 +228,7 @@ function nzu.LoadConfig(config, ctype)
 		return
 	end
 
-	if not nzu.CurrentConfig and config.Map == game.GetMap() then
+	if not nzu.CurrentConfig and config.Map == game.GetMap() and mode ~= false then
 		-- Allow immediate loading if no config has previously been loaded (default gamemode state)
 		nzu.CurrentConfig = config
 		loadconfig(config)
@@ -243,6 +243,11 @@ function nzu.LoadConfig(config, ctype)
 
 			print("nzu_saveload: Changing map and loading config '"..config.Codename.."'...")
 			timer.Destroy("nzu_saveload")
+
+			if mode == false then -- Pass the mode you want to play in - i.e. nzu.LoadConfig(config, nil, NZU_NZOMBIES) to load in nZombies (it'll be false in Sandbox, thus changing mode here)
+				RunConsoleCommand("nzu_sandbox_enable", "1")
+				RunConsoleCommand("gamemode", NZU_NZOMBIES and "sandbox" or "nzombies-unlimited")
+			end
 			RunConsoleCommand("changelevel", config.Map)
 		end
 	end)
@@ -313,6 +318,25 @@ net.Receive("nzu_loadconfig", function(len, ply)
 	end
 end)
 
+
+
+
+--[[-------------------------------------------------------------------------
+Edit/Play loading by switching modes
+---------------------------------------------------------------------------]]
+util.AddNetworkString("nzu_loadconfig_mode")
+net.Receive("nzu_loadconfig_mode", function(len, ply)
+	if not nzu.IsAdmin(ply) then return end -- Still only admins!
+
+	local codename = net.ReadString()
+	local ctype = net.ReadString()
+	local config = nzu.GetConfig(codename, ctype)
+	if not config then
+		print("nzu_saveload: Client attempted to load to a non-existing config.", ply, codename, type)
+	return end
+
+	nzu.LoadConfig(config, nil, false) -- When it's false, it will think it's always the opposite mode
+end)
 
 
 

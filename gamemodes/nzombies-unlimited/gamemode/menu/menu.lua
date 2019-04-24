@@ -116,12 +116,12 @@ if CLIENT then
 	end
 
 	function SUBMENU:Init()
-		local topbar = self:Add("Panel")
-		topbar:Dock(TOP)
-		topbar:SetTall(40)
+		self.TopBar = self:Add("Panel")
+		self.TopBar:Dock(TOP)
+		self.TopBar:SetTall(40)
 
 		self.BackButton = generatebutton(" < Back")
-		self.BackButton:SetParent(topbar)
+		self.BackButton:SetParent(self.TopBar)
 		self.BackButton:SizeToContents()
 		self.BackButton:Dock(LEFT)
 		self.BackButton:SetContentAlignment(4)
@@ -155,6 +155,8 @@ if CLIENT then
 	function SUBMENU:GetContents()
 		return self.Contents
 	end
+	function SUBMENU:GetTopBar() return self.TopBar end
+
 	function SUBMENU:OnShown() end
 	function SUBMENU:OnHid() end
 	vgui.Register("nzu_MenuPanel_SubMenu", SUBMENU, "Panel")
@@ -162,6 +164,8 @@ if CLIENT then
 	local PLAYER_AVATAR = {}
 	function PLAYER_AVATAR:Init()
 		self.Icon = vgui.Create("ModelImage", self)
+		self.Icon:SetMouseInputEnabled(false)
+		self.Icon:SetKeyboardInputEnabled(false)
 		self.Icon:Dock(FILL)
 
 		self.R = 0
@@ -171,6 +175,7 @@ if CLIENT then
 	function PLAYER_AVATAR:SetPlayer(ply)
 		self.Player = ply
 		self.Model = ply:GetModel()
+
 		self.Icon:SetModel(self.Model)
 	end
 	function PLAYER_AVATAR:Think()
@@ -214,7 +219,7 @@ if CLIENT then
 		self:DockMargin(0,0,0,1)
 
 		self.Character = self:Add("nzu_PlayerAvatar")
-		self.Character:SetWide(54)
+		self.Character:SetSize(54,54)
 		self.Character:DockMargin(5,5,15,5)
 		self.Character:Dock(LEFT)
 
@@ -441,6 +446,14 @@ if CLIENT then
 		end
 	end
 
+	--[[sound.Add({
+		name = "nzu_menu_music",
+		channel = CHAN_STATIC,
+		pitch = 100,
+		level = 0, -- global
+		sound = "",
+	})]]
+
 	function PANEL:Init()
 		self:ParentToHUD()
 		self:Dock(FILL)
@@ -652,12 +665,13 @@ if CLIENT then
 		mus:SetContentAlignment(5)
 		mus:SetWide(50)
 		mus.OnChange = function(s,b)
-			if not b and self.MenuMusic then
-				self.MenuMusic:Stop()
-			elseif b then
-				self.MenuMusic = CreateSound(LocalPlayer(), "") -- WHY DOES THIS GET GARBAGE COLLECTED AND STOP CONSTANTLY?! D:
-				self.MenuMusic:SetSoundLevel(0)
-				self.MenuMusic:Play()
+			local lp = LocalPlayer()
+			if not b and lp.nzu_MenuMusicPlaying then
+				lp:StopSound("nzu_menu_music")
+				lp.nzu_MenuMusicPlaying = nil
+			elseif b and not lp.nzu_MenuMusicPlaying then
+				lp:EmitSound("nzu_menu_music")
+				lp.nzu_MenuMusicPlaying = true
 			end
 		end
 		mus:SetConVar("nzu_menu_music")
@@ -684,15 +698,17 @@ if CLIENT then
 	end
 
 	function PANEL:Close()
-		--if self.MenuMusic then self.MenuMusic:Stop() end
+		--[[local lp = LocalPlayer()
+		if lp.nzu_MenuMusicPlaying then
+			lp:StopSound("nzu_menu_music")
+			lp.nzu_MenuMusicPlaying = nil
+		end]]
 		self:Hide()
 	end
 
 	function PANEL:ParentPanelToCenter(panel)
 		panel:SetParent(self.MiddleCanvas)
 	end
-
-	--function PANEL:DoClick() print("hfiua") end
 
 	function PANEL:Toggle()
 		if self:IsVisible() then
