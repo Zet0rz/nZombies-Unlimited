@@ -187,6 +187,11 @@ if SERVER then
 			net.Broadcast()
 		end
 
+		if data.FlagOpen and data.Rooms then
+			self:SetRoomHandler("DoorAutoOpen")
+			self:SetRooms(data.Rooms)
+		end
+
 		hook.Run("nzu_DoorLockCreated", self, data)
 	end
 
@@ -319,12 +324,12 @@ if SERVER then
 
 	function nzu.OpenDoor(ent, ply, t, initial)
 		local data = ent:GetDoorData()
+		ent:RemoveDoor()
 		if data and data.Rooms then
 			for k,v in pairs(data.Rooms) do
 				nzu.OpenRoom(v)
 			end
 		end
-		ent:RemoveDoor()
 		local b = dooropeneffect(ent, ply, t, initial)
 		hook.Run("nzu_DoorOpened", ent, ply)
 		return b
@@ -386,6 +391,24 @@ if SERVER then
 			if data.Price == 0 and data.Electricity then
 				nzu.OpenDoor(ent)
 			end
+		end
+	end)
+
+	--[[-------------------------------------------------------------------------
+	Auto-opening doors if all connected rooms are opened
+	---------------------------------------------------------------------------]]
+	nzu.AddRoomHandler("DoorAutoOpen", function(door, room)
+		local data = door:GetDoorData()
+		if not data then return end
+
+		for k,v in pairs(door.nzu_Rooms) do
+			if not nzu.IsRoomOpen(k) then return true end -- Don't remove the handler/rooms from us yet
+		end
+
+		if data.Group then
+			nzu.OpenDoorGroup(data.Group, nil, nil, door)
+		else
+			nzu.OpenDoor(door, nil, nil, door)
 		end
 	end)
 end

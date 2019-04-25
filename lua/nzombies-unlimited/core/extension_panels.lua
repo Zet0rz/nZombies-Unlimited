@@ -31,7 +31,7 @@ local function nwpanel(id, parent)
 	if setting then
 		local build = setting.Panel
 		if build then
-			local p = build.Create(parent, bext, id)
+			local p = build.Create(parent, bext, id, setting)
 			p._SetValue = build.Set
 			p._GetValue = build.Get
 

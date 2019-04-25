@@ -104,19 +104,19 @@ if SERVER then
 		function nzu.OpenRoom(flag)
 			openedrooms[flag] = true
 			if rooms[flag] then
-				for k,v in pairs(rooms[flag]) do
+				local ent = rooms[flag]
+				rooms[flag] = nil -- No longer retain these flags
+
+				for k,v in pairs(ent) do
 					if IsValid(k) then
 						local handler = k.nzu_RoomHandler and handlers[k.nzu_RoomHandler]
-						if handler then
-							handler(k)
-						end
-
-						-- Clear this from the handler
-						k.nzu_RoomHandler = nil
-						k.nzu_Rooms = nil
+						if not handler or not handler(k, flag) then
+							-- Clear this from the handler
+							k.nzu_RoomHandler = nil
+							k.nzu_Rooms = nil
+						end						
 					end
 				end
-				rooms[flag] = nil -- No longer retain these flags
 			end
 		end
 

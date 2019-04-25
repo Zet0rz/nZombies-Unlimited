@@ -138,7 +138,6 @@ end
 
 -- Option available files so that clients can display them in the dropdown
 if SERVER then
-	local options = {}
 	util.AddNetworkString("nzu_resourceset_options")
 
 	local function networkoptions(id, ply)

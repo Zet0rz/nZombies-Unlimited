@@ -57,6 +57,11 @@ function SWEP:SpecialDeployKnife()
 	self:PrimaryAttack()
 end
 
+function SWEP:SpecialSlotKnife()
+	self.OldDeploy = self.Deploy
+	self.Deploy = self.SpecialDeployKnife
+end
+
 function SWEP:PrimaryAttack()
 	self.IsKnifing = true
 	self.nzu_CanSpecialHolster = false

@@ -211,3 +211,142 @@ nzu.AddExtensionSettingType("Weapon", {
 		end,
 	}
 })
+
+-- Option Set: A dropdown containing a selection of options networked from the Server.
+-- Note: This setting requires implementing GetOptions which should return a table of pairs: {Option = data, Display = pretty}
+-- where 'data' is the value networked, and 'pretty' is a pretty display name for the dropdown. If pretty doesn't exist, data is used in its place.
+local optionset = {
+	NetWrite = net.WriteString,
+	NetRead = net.ReadString,
+	GetOptions = function()
+		return {} -- Nothing by default! You must implement this if you want any options!
+	end,
+}
+if SERVER then
+	util.AddNetworkString("nzu_optionset")
+	local function networkoptions(ext, s, ply)
+		if type(ext) == "string" then ext = nzu.GetExtension(ext) end
+		if ext then
+			local setting = ext:GetSettingsMeta()[s]
+			if setting and setting.GetOptions then
+				local tbl = setting.GetOptions()
+				local num = #tbl
+
+				if num > 0 then
+					net.Start("nzu_optionset")
+						net.WriteString(k)
+						net.WriteUInt(num, 16)
+						for i = 1,num do
+							net.WriteString(tbl[i].Option)
+							net.WriteString(tbl[i].Display)
+						end
+					net.Send(ply)
+				end
+			end
+		end
+	end
+
+	-- In Sandbox, cache all option sets created and network them to any player joining
+	if NZU_SANDBOX then
+		local sets = {}
+		optionset.Create = function(ext, setting)
+			sets[setting] = ext
+		end
+
+		hook.Add("PlayerInitialSpawn", "nzu_Extensions_OptionSetNetwork", function(ply)
+			for k,v in pairs(sets) do
+				networkoptions(v, k, ply)
+			end
+		end)
+	else
+		-- In nZombies, only respond to admin requests
+		net.Receive("nzu_optionset", function(len, ply)
+			if nzu.IsAdmin(ply) then
+				local ext = net.ReadString()
+				local id = net.ReadString()
+
+				networkoptions(ext, id, ply)
+			end
+		end)
+	end
+else
+	local function readoptions()
+		local id = net.ReadString()
+		local num = net.ReadUInt(16)
+
+		local tbl = {}
+		for i = 1,num do
+			local t = {}
+			t.Option = net.ReadString()
+			t.Display = net.ReadString()
+
+			table.insert(tbl, t)
+		end
+
+		return id, tbl
+	end
+
+	local sets
+	if NZU_SANDBOX then
+		sets = {}
+	end
+
+	net.Receive("nzu_optionset", function()
+		local id,tbl = readoptions()
+		if sets then sets[id] = tbl end -- Only do this in Sandbox pretty much
+
+		hook.Run("nzu_OptionSetUpdated", id, tbl)
+	end)
+
+	optionset.Panel = {
+		Create = function(parent, ext, setting)
+			local p = vgui.Create("DComboBox", parent)
+
+			function p:Populate(id, tbl)
+				if id == setting then
+					self:Clear()
+					for k,v in pairs(tbl) do
+						self:AddChoice(v.Display, v.Option)
+					end
+				end
+			end
+
+			if NZU_SANDBOX then
+				if sets and sets[setting] then
+					p:Populate(setting, sets[setting])
+				end
+			else
+				-- Request options
+				net.Start("nzu_optionset")
+					net.WriteString(ext.ID)
+					net.WriteString(setting)
+				net.SendToServer()
+			end
+			hook.Add("nzu_OptionSetUpdated", p, p.Populate)
+
+			function p:OnSelect(index, value, data)
+				self:Send()
+			end
+			return p
+		end,
+		Set = function(p,v)
+			for k,data in pairs(p.Data) do
+				if data == v then
+					p:SetText(p:GetOptionText(k))
+					p.selected = k
+					return
+				end
+			end
+
+			p.Choices[0] = v
+			p.Data[0] = v
+			p.selected = 0
+			p:SetText(v)
+		end,
+		Get = function(p)
+			local str,data = p:GetSelected()
+			return data
+		end,
+	}
+end
+nzu.AddExtensionSettingType("OptionSet", optionset)

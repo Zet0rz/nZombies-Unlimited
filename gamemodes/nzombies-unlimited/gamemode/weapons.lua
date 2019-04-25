@@ -11,6 +11,10 @@ local function doinitialize(ply)
 		["Primary"] = primary,
 		["Secondary"] = secondary
 	}
+
+	if CLIENT then
+		ply.nzu_HUDWeapons = {}
+	end
 end
 if SERVER then
 	hook.Add("PlayerInitialSpawn", "nzu_WeaponSlotsInit", doinitialize)
@@ -152,8 +156,8 @@ local function doweaponslot(ply, wep, slot)
 	wep.nzu_WeaponSlot_Number = wslot.Number
 
 	if specialslots[wslot.ID] then
-		wep.OldDeploy = wep.Deploy
-		wep.Deploy = wep["SpecialDeploy"..wslot.ID] or specialslots[wslot.ID]
+		local func = wep["SpecialSlot"..wslot.ID] or specialslots[wslot.ID]
+		if func then func(wep, ply) end
 	end
 
 	-- If the slot can be numerically accessed, auto-switch to it
@@ -165,9 +169,12 @@ local function doweaponslot(ply, wep, slot)
 end
 
 local function doremoveweapon(ply, wep)
-	if wep:GetWeaponSlot() then
-		local slot = ply.nzu_WeaponSlots[wep:GetWeaponSlot()]
-		slot.Weapon = nil
+	local slot = wep:GetWeaponSlot()
+	if slot then
+		local wslot = ply.nzu_WeaponSlots[slot]
+		wslot.Weapon = nil
+
+		hook.Run("nzu_WeaponRemovedFromSlot", ply, wep, slot)
 	end
 end
 
@@ -283,11 +290,8 @@ end
 Weapon Switching + Ammo management
 ---------------------------------------------------------------------------]]
 local keybinds = {}
-local binds
-if CLIENT then binds = {} end
 function nzu.AddKeybindToWeaponSlot(slot, key)
 	keybinds[key] = slot
-	if CLIENT then binds[slot] = input.GetKeyName(key) end
 end
 
 local maxswitchtime = 3
@@ -376,15 +380,12 @@ end)
 --[[-------------------------------------------------------------------------
 Special weapon slot behavior
 ---------------------------------------------------------------------------]]
-
 nzu.AddPlayerNetworkVar("Bool", "WeaponLocked") -- When true you can't switch weapons
 
-local specialslothud = {}
-function nzu.SpecialWeaponSlot(id, func, hud)
+function nzu.SpecialWeaponSlot(id, func)
 	if hud and not specialslots[id] then
 		table.insert(specialslothud, id)
 	end
-	specialslots[id] = func
 end
 
 function PLAYER:SelectPreviousWeapon()
@@ -442,6 +443,29 @@ else
 	end
 end
 
+-- HUD registration
+if CLIENT then
+	hook.Add("nzu_WeaponEquippedInSlot", "nzu_Weapons_HUDWeapon", function(ply, wep, slot)
+		local bind
+		for k,v in pairs(keybinds) do
+			if v == slot then
+				bind = input.GetKeyName(k)
+				break
+			end
+		end
+
+		if wep.DrawHUDIcon then table.insert(ply.nzu_HUDWeapons, {Weapon = wep, Bind = bind}) end
+	end)
+
+	hook.Add("nzu_WeaponRemovedFromSlot", "nzu_Weapons_HUDWeapon", function(ply, wep, slot)
+		for k,v in pairs(ply.nzu_HUDWeapons) do
+			if v.Weapon == wep then
+				table.remove(ply.nzu_HUDWeapons, k)
+				return
+			end
+		end
+	end)
+end
 
 --[[-------------------------------------------------------------------------
 Populate base weapon slots
@@ -449,70 +473,82 @@ Populate base weapon slots
 
 nzu.AddKeybindToWeaponSlot("Knife", KEY_V)
 if true then
-	nzu.SpecialWeaponSlot("Knife", function(self)
-		self.Owner:SetWeaponLocked(true)
-		self:SetNextPrimaryFire(0)
-		self:PrimaryFire()
-		timer.Simple(0.5, function()
-			if IsValid(self) then
-				local vm = self.Owner:GetViewModel()
-				local seq = vm:GetSequence()
-				local dur = vm:SequenceDuration(seq)
-				local remaining = dur - dur*vm:GetCycle()
-				timer.Simple(remaining, function()
-					if IsValid(self) then
-						self.Owner:SetWeaponLocked(false)
-						self.Owner:SelectPreviousWeapon()
-					end
-				end)
-			end
-		end)
+	nzu.SpecialWeaponSlot("Knife", function(wep)
+		wep.OldDeploy = wep.Deploy
+
+		wep.Deploy = function(self)
+			self.Owner:SetWeaponLocked(true)
+			self:SetNextPrimaryFire(0)
+			self:PrimaryFire()
+			timer.Simple(0.5, function()
+				if IsValid(self) then
+					local vm = self.Owner:GetViewModel()
+					local seq = vm:GetSequence()
+					local dur = vm:SequenceDuration(seq)
+					local remaining = dur - dur*vm:GetCycle()
+					timer.Simple(remaining, function()
+						if IsValid(self) then
+							self.Owner:SetWeaponLocked(false)
+							self.Owner:SelectPreviousWeapon()
+						end
+					end)
+				end
+			end)
+		end
 	end)
 end
 
 nzu.AddKeybindToWeaponSlot("Grenade", KEY_G)
 if true then
-	nzu.SpecialWeaponSlot("Grenade", function(self)
-		self.Owner:SetWeaponLocked(true)
-		self:SetNextPrimaryFire(0)
-		self:PrimaryFire()
-		timer.Simple(0.5, function()
-			if IsValid(self) then
-				local vm = self.Owner:GetViewModel()
-				local seq = vm:GetSequence()
-				local dur = vm:SequenceDuration(seq)
-				local remaining = dur - dur*vm:GetCycle()
-				timer.Simple(remaining, function()
-					if IsValid(self) then
-						self.Owner:SetWeaponLocked(false)
-						self.Owner:SelectPreviousWeapon()
-					end
-				end)
-			end
-		end)
+	nzu.SpecialWeaponSlot("Grenade", function(wep)
+		wep.OldDeploy = wep.Deploy
+
+		wep.Deploy = function(self)
+			self.Owner:SetWeaponLocked(true)
+			self:SetNextPrimaryFire(0)
+			self:PrimaryFire()
+			timer.Simple(0.5, function()
+				if IsValid(self) then
+					local vm = self.Owner:GetViewModel()
+					local seq = vm:GetSequence()
+					local dur = vm:SequenceDuration(seq)
+					local remaining = dur - dur*vm:GetCycle()
+					timer.Simple(remaining, function()
+						if IsValid(self) then
+							self.Owner:SetWeaponLocked(false)
+							self.Owner:SelectPreviousWeapon()
+						end
+					end)
+				end
+			end)
+		end
 	end, true)
 end
 
 nzu.AddKeybindToWeaponSlot("SpecialGrenade", KEY_B)
 if true then
-	nzu.SpecialWeaponSlot("SpecialGrenade", function(self)
-		self.Owner:SetWeaponLocked(true)
-		self:SetNextPrimaryFire(0)
-		self:PrimaryFire()
-		timer.Simple(0.5, function()
-			if IsValid(self) then
-				local vm = self.Owner:GetViewModel()
-				local seq = vm:GetSequence()
-				local dur = vm:SequenceDuration(seq)
-				local remaining = dur - dur*vm:GetCycle()
-				timer.Simple(remaining, function()
-					if IsValid(self) then
-						self.Owner:SetWeaponLocked(false)
-						self.Owner:SelectPreviousWeapon()
-					end
-				end)
-			end
-		end)
+	nzu.SpecialWeaponSlot("SpecialGrenade", function(wep)
+		wep.OldDeploy = wep.Deploy
+
+		wep.Deploy = function(self)
+			self.Owner:SetWeaponLocked(true)
+			self:SetNextPrimaryFire(0)
+			self:PrimaryFire()
+			timer.Simple(0.5, function()
+				if IsValid(self) then
+					local vm = self.Owner:GetViewModel()
+					local seq = vm:GetSequence()
+					local dur = vm:SequenceDuration(seq)
+					local remaining = dur - dur*vm:GetCycle()
+					timer.Simple(remaining, function()
+						if IsValid(self) then
+							self.Owner:SetWeaponLocked(false)
+							self.Owner:SelectPreviousWeapon()
+						end
+					end)
+				end
+			end)
+		end
 	end, true)
 end
 
@@ -529,127 +565,3 @@ hook.Add("nzu_WeaponEquippedInSlot", "nzu_Weapons_InstantHolsterFunction", funct
 		return old(self, w2)
 	end
 end)
-
-
---[[-------------------------------------------------------------------------
-HUD Component for weaponry
----------------------------------------------------------------------------]]
-if CLIENT then
-	local mat = Material("nzombies-unlimited/hud/points_shadow.png")
-	local mat2 = Material("nzombies-unlimited/hud/points_glow.vmt")
-
-	local defaultmat = Material("grenade-256.png", "unlitgeneric smooth")
-	local col_keybind = Color(255,255,100)
-	local col_noammo = Color(255,100,100)
-	local color_white = color_white
-
-	nzu.RegisterHUDComponentType("HUD_Weapons")
-	nzu.RegisterHUDComponent("HUD_Weapons", "Unlimited", {
-		Paint = function()
-			local ply = LocalPlayer() -- TODO: Update to spectator when implemented
-
-			local w,h = ScrW(),ScrH()
-
-			local nameposh = h - 185
-			local nameh = 100
-
-			surface.SetMaterial(mat)
-			surface.SetDrawColor(0,0,0,255)
-
-			for i = 1,2 do
-				surface.DrawTexturedRect(w - 190, nameposh, 85, nameh)
-				surface.DrawTexturedRectUV(w - 375, nameposh, 110, nameh, 1,0,0,1)
-			end
-
-			surface.DrawTexturedRectUV(w - 800, h - 130, 600, 45, 1,0,0,1)
-
-			surface.SetMaterial(mat2)
-
-			--surface.SetDrawColor(255,255,255,255)
-			-- Set to player's color instead?
-			local v = ply:GetPlayerColor()
-			surface.SetDrawColor(v.x*200 + 55, v.y*200 + 55, v.z*200 + 55,255)
-
-			surface.DrawTexturedRect(w - 190, nameposh, 75, nameh)
-			surface.DrawTexturedRectUV(w - 365, nameposh, 100, nameh, 1,0,0,1)
-
-			surface.SetMaterial(mat)
-			surface.SetDrawColor(0,0,0,255)
-			surface.DrawRect(w-250, nameposh, 40, nameh)
-			for i = 1,2 do
-				surface.DrawTexturedRect(w - 210, nameposh, 75, nameh)
-				surface.DrawTexturedRectUV(w - 325, nameposh, 75, nameh, 1,0,0,1)
-			end
-
-			surface.DrawTexturedRectUV(w - 375, h - 130, 110, 45, 1,0,0,1)
-
-			-- Draw the ammo for the weapon
-			local wep = ply:GetActiveWeapon()
-			if IsValid(wep) then
-				local primary = wep:GetPrimaryAmmoType()
-				local secondary = wep:GetSecondaryAmmoType()
-
-				local y1 = nameposh + nameh/2 + 20
-				local x = w - 235
-				local y = y1
-
-				if secondary >= 0 then
-					y = y - 12
-
-					local clip2 = wep:Clip2()
-					if clip2 >= 0 then
-						local y2 = y - 5
-						draw.SimpleText(clip2,"nzu_Font_Bloody_Medium",x,y2,color_white,TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP)
-						draw.SimpleText("/"..ply:GetAmmoCount(secondary),"nzu_Font_Bloody_Small",x,y2,color_white,TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-					else
-						draw.SimpleText(ply:GetAmmoCount(secondary),"nzu_Font_Bloody_Medium",x,y - 5,color_white,TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
-					end
-				end
-
-				if primary >= 0 then
-					local clip = wep:Clip1()
-					if clip >= 0 then
-						draw.SimpleText(clip,"nzu_Font_Bloody_Huge",x,y,color_white,TEXT_ALIGN_RIGHT, TEXT_ALIGN_BOTTOM)
-						draw.SimpleText("/"..ply:GetAmmoCount(primary),"nzu_Font_Bloody_Medium",x,y,color_white,TEXT_ALIGN_LEFT, TEXT_ALIGN_BOTTOM)
-					else
-						draw.SimpleText(ply:GetAmmoCount(primary),"nzu_Font_Bloody_Huge",x,y,color_white,TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
-					end					
-				end
-
-				draw.SimpleTextOutlined(wep:GetPrintName(),"nzu_Font_Bloody_Medium",w - 320,y1 - 12,color_white,TEXT_ALIGN_RIGHT, TEXT_ALIGN_BOTTOM,2,color_black)
-			end
-
-			local x = w - 390
-			local y = h - 122
-			local iconsize = 30
-			for k,v in pairs(specialslothud) do
-				local wep = ply:GetWeaponInSlot(v)
-				if IsValid(wep) then
-					local todrawammo = true
-					local shift = 0
-					if wep.DrawHUDIcon then
-						shift,todrawammo = wep:DrawHUDIcon(x,y,iconsize)
-					else --elseif wep.HUDIcon then DEBUG
-						surface.SetMaterial(wep.HUDIcon or defaultmat)
-						surface.SetDrawColor(255,255,255,255)
-						surface.DrawTexturedRect(x - iconsize,y,iconsize,iconsize)
-
-						shift = iconsize
-					end
-
-					if todrawammo then
-						local count = ply:GetAmmoCount(wep:GetPrimaryAmmoType())
-						draw.SimpleTextOutlined("x"..count,"nzu_Font_Bloody_Small",x - 5,y + iconsize,count > 0 and color_white or col_noammo,TEXT_ALIGN_LEFT, TEXT_ALIGN_BOTTOM, 2, color_black)
-					end
-
-					x = x - shift
-					local key = binds[v]
-					if key then
-						draw.SimpleText(key,"nzu_Font_Bloody_Small",x + 5,y + iconsize - 5,col_keybind,TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
-					end
-					x = x - 50
-				end
-			end
-		end
-	})
-end

@@ -31,6 +31,7 @@ if SERVER then
 		net.WriteBool(true)
 		net.WriteUInt(data.Price, 32)
 		net.WriteBool(data.Electricity)
+		net.WriteBool(data.FlagOpen)
 		if data.Group then
 			net.WriteBool(true)
 			net.WriteString(data.Group)
@@ -111,6 +112,9 @@ else
 				tbl.Electricity = true
 			end
 			if net.ReadBool() then
+				tbl.FlagOpen = true
+			end
+			if net.ReadBool() then
 				tbl.Group = net.ReadString()
 			end
 
@@ -159,6 +163,7 @@ TOOL.ClientConVar = {
 	["group"] = "",
 	["electricity"] = "0",
 	["rooms"] = "",
+	["flagopen"] = "0",
 }
 
 function TOOL:LeftClick(trace)
@@ -175,6 +180,7 @@ function TOOL:LeftClick(trace)
 					Group = self:GetClientInfo("group"),
 					Electricity = self:GetClientNumber("electricity") ~= 0,
 					Rooms = tbl,
+					FlagOpen = self:GetClientNumber("flagopen") ~= 0,
 				}
 				trace.Entity:CreateDoor(data)
 			end
@@ -195,6 +201,7 @@ function TOOL:RightClick(trace)
 				owner:ConCommand("nzu_tool_doorlock_price "..data.Price)
 				owner:ConCommand("nzu_tool_doorlock_group \""..(data.Group or "\""))
 				owner:ConCommand("nzu_tool_doorlock_electricity "..(data.Electricity and "1" or "0"))
+				owner:ConCommand("nzu_tool_doorlock_flagopen "..(data.FlagOpen and "1" or "0"))
 
 				local str = ""
 				if data.Rooms then
@@ -258,7 +265,10 @@ if CLIENT then
 		panel:AddItem(listbox)
 		listbox:RefreshRooms()
 
-		panel:Help("Room names cannot contain spaces.")
+		panel:ControlHelp("Room names cannot contain spaces.")
+
+		panel:CheckBox("Open if all Rooms are open?", "nzu_tool_doorlock_flagopen")
+		panel:ControlHelp("Opens the door for free if all connected Rooms are opened through other doors.")
 	end
 end
 
@@ -290,9 +300,12 @@ properties.Add("nzu_DoorLock", {
 			tbl.Electricity = true
 		end
 		if net.ReadBool() then
-			tbl.Group = net.ReadString()
+			tbl.FlagOpen = true
 		end
 
+		if net.ReadBool() then
+			tbl.Group = net.ReadString()
+		end
 
 		local num = net.ReadUInt(8)
 		if num > 0 then
@@ -351,6 +364,12 @@ properties.Add("nzu_DoorLock", {
 		l:SetSelectedRooms(data and data.Rooms)
 		l:RefreshRooms()
 
+		local val_flagopen = data and data.FlagOpen
+		local roomopen = top:CreateRow("Lock Properties", "Open if all Rooms are open?")
+		roomopen:Setup("Boolean")
+		roomopen:SetValue(val_flagopen)
+		function roomopen:DataChanged(v) val_flagopen = v end
+
 		local bottom = frame:Add("Panel")
 		bottom:Dock(BOTTOM)
 		bottom:SetTall(30)
@@ -366,6 +385,7 @@ properties.Add("nzu_DoorLock", {
 				net.WriteEntity(ent)
 				net.WriteUInt(val_price, 32)
 				net.WriteBool(val_elec)
+				net.WriteBool(val_flagopen)
 
 				if val_group and val_group ~= "" then
 					net.WriteBool(true)

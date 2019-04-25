@@ -56,6 +56,12 @@ function SWEP:SpecialDeployGrenade()
 	self:PrimaryAttack()
 end
 
+-- When the weapon is equipped in the Grenade slot
+function SWEP:SpecialSlotGrenade()
+	self.OldDeploy = self.Deploy
+	self.Deploy = self.SpecialDeployGrenade
+end
+
 function SWEP:PrimaryAttack()
 	self.IsThrowing = true
 	self.nzu_CanSpecialHolster = false
