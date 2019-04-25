@@ -151,7 +151,7 @@ nzu.AddSpawnmenuTab("Extension Settings", "DPanel", function(panel)
 	alert:Dock(FILL)
 	alert:SetContentAlignment(5)
 	alert:SetTextColor(Color(255,0,0))
-	block:SetVisible(false) -- DEBUG
+	
 	hook.Add("nzu_ConfigLoaded", curconfig, function(s,config)
 		if config then
 			print("We're here")

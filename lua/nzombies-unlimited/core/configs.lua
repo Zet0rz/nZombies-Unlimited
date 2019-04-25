@@ -152,16 +152,12 @@ if CLIENT then
 			end
 		end
 
-		-- DEBUG
-		print("Running here")
 		hook.Run("nzu_ConfigInfoSaved", config, new) -- Call the same hook
 
 		if net.ReadBool() then -- Currently loaded
 			nzu.CurrentConfig = config
 			hook.Run("nzu_ConfigLoaded", config)
 		end
-
-		print("Received Config networking: " ..config.Codename .." ("..config.Type..") New: "..(new and "true" or "false"))
 	end)
 
 	local function requestconfigs()
@@ -239,8 +235,6 @@ if CLIENT then
 
 				net.WriteBool(false) -- Only save settings and info
 			net.SendToServer()
-			print("Networked to server")
-			PrintTable(config)
 		end
 
 		function nzu.RequestSaveConfigSettings()
@@ -264,8 +258,6 @@ if CLIENT then
 			local config = configs[ctype][codename]
 			configs[ctype][codename] = nil
 			hook.Run("nzu_ConfigDeleted", config)
-
-			print("Received Config deletion: " ..codename .." ("..ctype..")")
 		end)
 
 		-- Requesting to play in NZU
@@ -377,7 +369,5 @@ if CLIENT then
 		f:Center()
 		f:MakePopup()
 		f:DoModal()
-
-		print("Received Config deletion: " ..codename .." ("..ctype..")")
 	end)
 end

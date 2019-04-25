@@ -253,8 +253,6 @@ if SERVER then
 		ROUND.Round = 0
 		
 		donetwork()
-
-		-- TODO: Reload config? Respawn props and such. A map reload is not needed to replay the same config
 		nzu.ReloadConfigMap()
 	end
 
@@ -357,7 +355,6 @@ if SERVER then
 	end
 
 	hook.Add("nzu_PlayerDowned", "nzu_Round_PlayerDowned", function(ply)
-		print("Player downed", ply)
 		timer.Simple(1, dogameovercheck) -- Delay a bit so other code can potentially set promised revives
 	end)
 	hook.Add("PostPlayerDeath", "nzu_Round_PlayerDeath", dogameovercheck)
@@ -595,13 +592,8 @@ if SERVER then
 		-- It doesn't seem to kill if not with the timer (probably cause it's before the spawn?)
 		timer.Simple(0, function()
 			if IsValid(ply) then
-				--nzu.Unspawn(ply)
-				--hook.Run("ShowHelp", ply) -- Open their F1 menu
-				-- DEBUG
-				timer.Simple(1, function()
-					ply:Give("weapon_pistol")
-					ply:Give("weapon_ar2")
-				end)
+				nzu.Unspawn(ply)
+				hook.Run("ShowHelp", ply) -- Open their F1 menu
 			end
 		end)
 	end

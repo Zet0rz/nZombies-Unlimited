@@ -384,7 +384,7 @@ function ENT:Event_BarricadeTear(barricade)
 	-- We got a barricade position, move towards it
 	self:SolidMaskDuringEvent(MASK_NPCSOLID_BRUSHONLY)
 	self.loco:ClearStuck()
-	local result = self:MoveToPos(pos, {lookahead = 10, tolerance = 5, maxage = 3, draw = true}) -- DEBUG (draw = true)
+	local result = self:MoveToPos(pos, {lookahead = 10, tolerance = 5, maxage = 3}) -- DEBUG (draw = true)
 	if result == "ok" and not self:ShouldEventTerminate() then
 		-- We're in position
 		self:SetPos(pos) -- Just because the animations are very precise here
@@ -444,6 +444,3 @@ function ENT:Event_BarricadeTear(barricade)
 	end
 	if barricade.m_tReservedSpots[pos] == self then barricade.m_tReservedSpots[pos] = NULL end
 end
-
--- DEBUG
-function ENT:Event_Spawn() end

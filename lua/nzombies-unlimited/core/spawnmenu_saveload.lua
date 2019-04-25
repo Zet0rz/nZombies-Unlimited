@@ -129,7 +129,9 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 		local t = self:GetTall()
 		self:SetWide(t)
 	end
-	--widinfo:SetTooltip("Hi") -- TODO: Get this to work and fill in with proper tooltip
+	widinfo:SetTooltip("Fill this field with the numeric ID of this Config's Workshop addon after it has been uploaded.\nThis will allow users to view your Config's Workshop page from in-game.")
+	widinfo:SetMouseInputEnabled(true)
+
 	local widentry = addonarea:Add("DTextEntry")
 	widentry:SetPlaceholderText("123456789")
 	widentry:SetPlaceholderColor(Color(75,75,75))

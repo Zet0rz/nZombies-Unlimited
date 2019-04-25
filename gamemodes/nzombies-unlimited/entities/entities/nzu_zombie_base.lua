@@ -385,7 +385,7 @@ if SERVER then
 				if goal < CurTime() then return end
 				if IsValid(path) then
 					path:Update(self)
-					path:Draw()
+					--path:Draw() -- DEBUG
 				end
 				if path:GetAge() > repath then path:Compute(self, target:GetPos(), compute) end
 				coroutine.yield()
@@ -957,7 +957,7 @@ if SERVER then
 				self:SetNextRepath(self:CalculateNextRepath(path))
 			end
 			-- DEBUG
-			path:Draw()
+			--path:Draw()
 			path:Update(self)
 			if self.loco:IsStuck() then self:HandleStuck() end
 
@@ -1002,7 +1002,6 @@ if SERVER then
 
 					local p = self:GetPos() + targetforward
 					local tbl = ents.FindInBox(p+a,p+b)
-					--debugoverlay.Box(p, a, b, 1, Color(255,255,255,10))
 
 					for k,v in pairs(tbl) do
 						if v.ZombieInteract then -- This only works for entities with ZombieInteract

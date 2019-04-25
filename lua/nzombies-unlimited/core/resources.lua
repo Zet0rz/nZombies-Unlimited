@@ -193,10 +193,6 @@ if SERVER then
 			local f,dirs = file.Find(dir, "DATA")
 			local _,d2 = file.Find(dir, "LUA")
 
-			PrintTable(dirs)
-			PrintTable(f)
-			PrintTable(d2)
-
 			local done = {}
 			for k,v in pairs(dirs) do
 				networkoptions(v, ply)
@@ -204,7 +200,7 @@ if SERVER then
 			end
 
 			for k,v in pairs(d2) do
-				if not done[v] then networkoptions(k, v) end
+				if not done[v] then networkoptions(v, ply) end
 			end
 		end)
 	end
@@ -239,8 +235,6 @@ else
 		resourceoptions[id] = tbl
 		hook.Run("nzu_ResourceSetOptionsUpdated", id, tbl)
 	end)
-
-	function DoTest() return resourceoptions end
 
 	local function populateoptions(p,id)
 		if p.Setting ~= id then return end
@@ -335,7 +329,6 @@ else
 		Create = function(parent, ext, setting)
 			local p = vgui.Create("DComboBox", parent)
 			function p:OnSelect(index, value, data)
-				print(value)
 				if value == "Create new set ..." then
 					--setcreator(setting, ext)
 				else
@@ -358,7 +351,18 @@ else
 			return p
 		end,
 		Set = function(p,v)
-			p:SetValue(v)
+			for k,data in pairs(p.Data) do
+				if data == v then
+					p:SetText(p:GetOptionText(k))
+					p.selected = k
+					return
+				end
+			end
+
+			p.Choices[0] = v
+			p.Data[0] = v
+			p.selected = 0
+			p:SetText(v)
 		end,
 		Get = function(p)
 			return p:GetSelected()
