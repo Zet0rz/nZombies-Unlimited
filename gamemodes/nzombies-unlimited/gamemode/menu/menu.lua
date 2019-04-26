@@ -394,9 +394,9 @@ if CLIENT then
 	end
 
 	local countdowntextstates = {
-		[ROUND_PREPARING] = "Prepare",
-		[ROUND_ONGOING] = "Ongoing",
-		[ROUND_GAMEOVER] = "GAME OVER"
+		[ROUND_PREPARING] = translate.Get("prepare"),
+		[ROUND_ONGOING] = translate.Get("ongoing"),
+		[ROUND_GAMEOVER] = translate.Get("game_over")
 	}
 	local countdownsound = Sound("nzu/menu/countdown.wav")
 	local function countdownthink(s)

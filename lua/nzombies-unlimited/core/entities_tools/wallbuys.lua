@@ -191,7 +191,7 @@ scripted_ents.Register(ENT, "nzu_wallbuy")
 --[[-------------------------------------------------------------------------
 Mismatch module
 ---------------------------------------------------------------------------]]
-nzu.RegisterMismatch("Wall Buys", {
+nzu.RegisterMismatch(translate.Get("wall_buys"), {
 	Collect = function()
 		local t = {}
 		for k,v in pairs(ents.FindByClass("nzu_wallbuy")) do
@@ -238,8 +238,8 @@ nzu.RegisterMismatch("Wall Buys", {
 	end,
 	BuildPanel = function(parent, t)
 		local dlist = vgui.Create("DListView", parent)
-		dlist:AddColumn("Invalid Wall Buy")
-		dlist:AddColumn("Replacement Weapon")
+		dlist:AddColumn(translate.Get("invalid_wall_buy"))
+		dlist:AddColumn(translate.Get("replacement_wall_buy"))
 
 		local weps = {}
 		for k,v in pairs(t) do

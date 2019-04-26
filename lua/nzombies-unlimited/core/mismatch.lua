@@ -121,7 +121,7 @@ It won't actually support a fix - it will prompt the owner to subscribe
 and reload the server, or play along without them at their own responsibility
 ---------------------------------------------------------------------------]]
 
-nzu.RegisterMismatch("Required Addons", {
+nzu.RegisterMismatch(translate.Get("required_addons"), {
 	Collect = function()
 		if nzu.CurrentConfig and nzu.CurrentConfig.RequiredAddons then
 			local t = {}
@@ -173,7 +173,7 @@ nzu.RegisterMismatch("Required Addons", {
 		p:Dock(FILL)
 
 		local lbl = p:Add("DLabel")
-		lbl:SetText("The Config requests these addons which are not enabled on the server.")
+		lbl:SetText(translate.Get("config_requires_workshop"))
 		lbl:SetWrap(true)
 		lbl:Dock(TOP)
 		lbl:SetAutoStretchVertical(true)
@@ -195,7 +195,7 @@ nzu.RegisterMismatch("Required Addons", {
 			name:Dock(FILL)
 
 			local but = line:Add("DButton")
-			but:SetText("View Workshop")
+			but:SetText(translate.Get("viev_workshop"))
 			but:Dock(RIGHT)
 			but:SetWide(100)
 			but.DoClick = function()
@@ -291,7 +291,7 @@ function PANEL:Init()
 	self.Save = self:Add("DButton")
 	self.Save:Dock(BOTTOM)
 	self.Save:DockMargin(5,5,5,5)
-	self.Save:SetText("Apply not possible")
+	self.Save:SetText(translate.Get("apply_not_possible"))
 	self.Save:SetEnabled(false)
 	
 	self.Items = {}
@@ -316,10 +316,10 @@ function PANEL:Init()
 	self.Sheet.OnActiveTabChanged = function(s, old, new)
 		if IsValid(new) then
 			if new.CanApply then
-				self.Save:SetText("Apply")
+				self.Save:SetText(translate.Get("apply"))
 				self.Save:SetEnabled(true)
 			else
-				self.Save:SetText("Apply not possible")
+				self.Save:SetText(translate.Get("apply_not_possible"))
 				self.Save:SetEnabled(false)
 			end
 		end
@@ -333,7 +333,7 @@ end
 function PANEL:AddDefaultTab()
 	if not IsValid(self.DefaultTab) then
 		local pnl = vgui.Create("DLabel", self.Sheet)
-		pnl:SetText("No Mismatches found.")
+		pnl:SetText(translate.Get("no_mismatch"))
 		pnl:SetContentAlignment(8)
 
 		local tbl = self.Sheet:AddSheet("No Mismatches", pnl)

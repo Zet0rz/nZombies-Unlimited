@@ -1,10 +1,10 @@
 local columns = {
-	{Text = "Ping", Get = function(ply) return ply:Ping() end, Order = 0},
-	--{Text = "Headshots", Get = function(ply) return ply:Ping() end, Order = 10},
-	{Text = "Revives", Get = function(ply) return ply:GetNumRevives() end, Order = 20},
-	{Text = "Downs", Get = function(ply) return ply:GetNumDowns() end, Order = 30},
-	{Text = "Kills", Get = function(ply) return ply:Frags() end, Order = 40},
-	{Text = "Score", Get = function(ply) return ply:GetPoints() end, Width = 200, Order = 50},
+	{Text = translate.Get("ping"), Get = function(ply) return ply:Ping() end, Order = 0},
+	--{Text = translate.Get("headshots"), Get = function(ply) return ply:Ping() end, Order = 10},
+	{Text = translate.Get("revives"), Get = function(ply) return ply:GetNumRevives() end, Order = 20},
+	{Text = translate.Get("downs"), Get = function(ply) return ply:GetNumDowns() end, Order = 30},
+	{Text = translate.Get("kills"), Get = function(ply) return ply:Frags() end, Order = 40},
+	{Text = translate.Get("score"), Get = function(ply) return ply:GetPoints() end, Width = 200, Order = 50},
 }
 
 --[[

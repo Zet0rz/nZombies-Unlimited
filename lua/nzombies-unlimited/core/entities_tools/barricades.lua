@@ -404,7 +404,7 @@ else
 
 	function ENT:GetTargetIDText()
 		if self:GetCanBeRepaired() then
-			return " Repair Barricade ", TARGETID_TYPE_USE
+			return " "..translate.Get("repair_barricade").." ", TARGETID_TYPE_USE
 		end
 	end
 end

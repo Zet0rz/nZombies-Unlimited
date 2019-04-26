@@ -295,31 +295,31 @@ if CLIENT then
 		-- Make the popup
 		local f = vgui.Create("DFrame")
 		f:SetSkin("nZombies Unlimited")
-		f:SetTitle("Missing Addons ["..num.."]")
+		f:SetTitle(translate.Get("missing_addons").." ["..num.."]")
 		f:SetSize(400, 180 + math.Min(listentryheight * num, maxheight))
 		f:ShowCloseButton(true)
 		f:SetBackgroundBlur(true)
 
 		local l = f:Add("DLabel")
-		l:SetText("This Config requires Addons that the server does not have installed or enabled.")
+		l:SetText(translate.Get("missing_addons_server"))
 		l:Dock(TOP)
 		l:SetTextColor(Color(255,100,100))
 		l:SetContentAlignment(5)
 		l:DockMargin(0,0,0,5)
 
 		local l2 = f:Add("DLabel")
-		l2:SetText("Go through the list and ensure they are enabled.")
+		l2:SetText(translate.Get("missing_addons_enable"))
 		l2:Dock(TOP)
 		l2:SetContentAlignment(5)
 		l2:DockMargin(0,0,0,-5)
 
 		local l3 = f:Add("DLabel")
-		l3:SetText("Click 'Load anyway' to continue loading the Config.")
+		l3:SetText(translate.Get("missing_addons_click_load"))
 		l3:Dock(TOP)
 		l3:SetContentAlignment(5)
 
 		local l4 = f:Add("DLabel")
-		l4:SetText("Click an entry to open it on Steam Workshop.")
+		l4:SetText(translate.Get("missing_addons_click_workshop"))
 		l4:Dock(TOP)
 		l4:SetContentAlignment(5)
 		l4:DockMargin(0,10,0,0)
@@ -332,7 +332,7 @@ if CLIENT then
 		local load = buttonarea:Add("DButton")
 		load:Dock(LEFT)
 		load:SetWide(175)
-		load:SetText("Load anyway")
+		load:SetText(translate.Get("load_anyway"))
 		load.DoClick = function()
 			net.Start("nzu_loadconfig")
 				net.WriteBool(true)
@@ -346,7 +346,7 @@ if CLIENT then
 		local cancel = buttonarea:Add("DButton")
 		cancel:Dock(RIGHT)
 		cancel:SetWide(175)
-		cancel:SetText("Cancel")
+		cancel:SetText(translate.Get("cancel"))
 		cancel.DoClick = function() f:Close() end
 
 		-- Fill the addon list

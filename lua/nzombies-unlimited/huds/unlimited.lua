@@ -128,9 +128,9 @@ function HUD:RoundIndicator()
 			end
 
 			surface.SetFont(roundfont)
-			local x,y = surface.GetTextSize("Round")
+			local x,y = surface.GetTextSize(translate.Get("round"))
 			surface.SetTextPos(ScrW()/2 - x/2, ScrH()/2 - y)
-			surface.DrawText("Round")
+			surface.DrawText(translate.Get("round"))
 
 			surface.SetMaterial(tallymats[1])
 			surface.DrawTexturedRectUV(75, ScrH() - 175, tallysize, invpct2*tallysize, 0,0,1, invpct2)
@@ -590,7 +590,7 @@ Downed Indicator
 local REVIVEfont = "nzu_Font_Revive"
 local downedindicator = Vector(0,0,25)
 local point = Material("gui/point.png")
-local revivetext = "REVIVE"
+local revivetext = translate.Get("revive")
 local revivebarheight = 10
 local outlines = 5
 local waveheight = 40
@@ -658,9 +658,9 @@ function HUD:Draw_ReviveProgress(ply, isbeingrevived)
 	surface.DrawRect(w - 145, h - 295, 290*pct, 10)
 
 	if isbeingrevived then
-		draw.SimpleTextOutlined("Being revived by "..ply:Nick(), "DermaLarge", w, h - 310, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM, 2, color_black)
+		draw.SimpleTextOutlined(translate.Get("being_revived_by").." "..ply:Nick(), "DermaLarge", w, h - 310, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM, 2, color_black)
 	else
-		draw.SimpleTextOutlined("Reviving "..ply:Nick(), "DermaLarge", w, h - 310, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM, 2, color_black)
+		draw.SimpleTextOutlined(translate.Get("reviving").." "..ply:Nick(), "DermaLarge", w, h - 310, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM, 2, color_black)
 	end
 end
 
@@ -670,8 +670,8 @@ Target ID
 local targetidfont = "nzu_Font_TargetID"
 
 local typeformats = {
-	[TARGETID_TYPE_USE] = function(text, data, ent) return "Press E to"..text end,
-	[TARGETID_TYPE_BUY] = function(text, data, ent) return "Press E to buy"..text.."for "..data end,
+	[TARGETID_TYPE_USE] = function(text, data, ent) return translate.Get("press_e_to")..text end,
+	[TARGETID_TYPE_BUY] = function(text, data, ent) return translate.Get("press_e_to_buy")..text..translate.Get("for").." "..data end,
 	[TARGETID_TYPE_USECOST] = function(text, data, ent)
 		return "Press E to"..text.."for "..data
 	end,
