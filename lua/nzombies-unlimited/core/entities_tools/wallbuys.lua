@@ -240,7 +240,6 @@ nzu.RegisterMismatch(translate.Get("wall_buys"), {
 		local dlist = vgui.Create("DListView", parent)
 		dlist:AddColumn(translate.Get("invalid_wall_buy"))
 		dlist:AddColumn(translate.Get("replacement_wall_buy"))
-
 		local weps = {}
 		for k,v in pairs(t) do
 			if IsValid(v) then

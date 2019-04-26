@@ -671,7 +671,7 @@ local targetidfont = "nzu_Font_TargetID"
 
 local typeformats = {
 	[TARGETID_TYPE_USE] = function(text, data, ent) return translate.Get("press_e_to")..text end,
-	[TARGETID_TYPE_BUY] = function(text, data, ent) return translate.Get("press_e_to_buy")..""..text..translate.Get("fo").." "..data end,
+	[TARGETID_TYPE_BUY] = function(text, data, ent) return translate.Get("press_e_to_buy")..""..text..translate.Get("fo").." "..data end
 	[TARGETID_TYPE_USECOST] = function(text, data, ent)
 		return "Press E to"..text.."for "..data
 	end,
