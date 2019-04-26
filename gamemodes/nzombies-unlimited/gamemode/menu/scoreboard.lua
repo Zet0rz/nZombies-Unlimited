@@ -180,6 +180,11 @@ local SCOREBOARD = {
 			self.GameOverPanel:Remove()
 			self:Hide()
 		end
+
+		if IsValid(self.GameOverPanel) and nzu.Round:GetState() ~= ROUND_GAMEOVER then
+			self.GameOverPanel:Remove()
+			self:Hide()
+		end
 	end,
 }
 SCOREBOARD = vgui.RegisterTable(SCOREBOARD, "EditablePanel")

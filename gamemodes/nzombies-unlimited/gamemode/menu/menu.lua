@@ -120,7 +120,7 @@ if CLIENT then
 		self.TopBar:Dock(TOP)
 		self.TopBar:SetTall(40)
 
-		self.BackButton = generatebutton(" < "..translate.Get("back"))
+		self.BackButton = generatebutton(" < "..translate.Get("back")
 		self.BackButton:SetParent(self.TopBar)
 		self.BackButton:SizeToContents()
 		self.BackButton:Dock(LEFT)
@@ -327,6 +327,7 @@ if CLIENT then
 				local state = nzu.Round:GetState()
 				if state ~= ROUND_GAMEOVER then
 					if LocalPlayer():Alive() then
+
 						local totext = translate.Get("unspawn")
 						if self:GetText() ~= totext then
 							self:SetText(totext)
