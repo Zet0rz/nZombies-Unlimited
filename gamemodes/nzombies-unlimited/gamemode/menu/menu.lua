@@ -120,7 +120,7 @@ if CLIENT then
 		self.TopBar:Dock(TOP)
 		self.TopBar:SetTall(40)
 
-		self.BackButton = generatebutton(" < Back")
+		self.BackButton = generatebutton(" < "..translate.Get("back"))
 		self.BackButton:SetParent(self.TopBar)
 		self.BackButton:SizeToContents()
 		self.BackButton:Dock(LEFT)
@@ -327,7 +327,7 @@ if CLIENT then
 				local state = nzu.Round:GetState()
 				if state ~= ROUND_GAMEOVER then
 					if LocalPlayer():Alive() then
-						local totext = "Unspawn"
+						local totext = translate.Get("unspawn")
 						if self:GetText() ~= totext then
 							self:SetText(totext)
 							self.ClickFunction = nzu.Unready
@@ -336,7 +336,7 @@ if CLIENT then
 							self:SetDisabled(false)
 						end
 					elseif not LocalPlayer():IsReady() then
-						local totext = state == ROUND_WAITING and "Ready" or "Spawn in"
+						local totext = state == ROUND_WAITING and translate.Get("ready") or translate.Get("spawn_in")
 						if self:GetText() ~= totext then
 							self:SetText(totext)
 							self.ClickFunction = nzu.Ready
@@ -345,7 +345,7 @@ if CLIENT then
 							self:SetDisabled(false)
 						end
 					else
-						local totext = "Unready"
+						local totext = translate.Get("unready")
 						if self:GetText() ~= totext then
 							self:SetText(totext)
 							self.ClickFunction = nzu.Unready
@@ -359,7 +359,7 @@ if CLIENT then
 			else
 				if self:GetText() ~= "Load selected Config" then
 					-- Different config, only admins can trigger a load
-					self:SetText("Load selected Config")
+					self:SetText(translate.Get("load_celected_config"))
 					self.ClickFunction = readybuttonload
 					self.AdminOnly = true
 					self:SetDisabled(false)
@@ -368,7 +368,7 @@ if CLIENT then
 			end
 		end
 
-		self:SetText("[No valid action]")
+		self:SetText(translate.Get("no_action"))
 		self:SetDisabled(true)
 	end
 
@@ -386,9 +386,9 @@ if CLIENT then
 			self.ConfigPanel:SetImage("vgui/black")
 			self.ConfigPanel.Map:SetText("")
 			self.ConfigPanel.Map:SizeToContents()
-			self.ConfigPanel.Name:SetText("No Config selected")
+			self.ConfigPanel.Name:SetText(translate.Get("no_config_selected"))
 			self.ConfigPanel.Name:SizeToContents()
-			self.ConfigPanel.Authors:SetText("Use the Load Configs menu to select a Config to load.")
+			self.ConfigPanel.Authors:SetText(translate.Get("use_config_load"))
 			self.ConfigPanel.Authors:SizeToContents()
 		end
 	end
@@ -403,7 +403,7 @@ if CLIENT then
 		local state = nzu.Round:GetState()
 		if s.State ~= state then
 			if countdowntextstates[state] then
-				s:SetText("GAME ACTIVE - ["..countdowntextstates[state].."]")
+				s:SetText(translate.Get("game_active").." - ["..countdowntextstates[state].."]")
 			end
 
 			local old = s.State
@@ -422,7 +422,7 @@ if CLIENT then
 				local diff = math.ceil(nzu.Round.GameStart - CurTime())
 				if diff >= 0 then
 					if diff ~= s.LastCountdown then
-						s:SetText("GAME STARTING - [Spawn in "..(diff > 0 and diff or 0).."...]")
+						s:SetText(translate.Get("game_starting").." "..(diff > 0 and diff or 0).."...]")
 						s.LastCountdown = diff
 
 						-- Play UI sound
@@ -440,7 +440,7 @@ if CLIENT then
 				for i = 1,10 do
 					str = str .. string.char(math.random(32,126))
 				end
-				s:SetText("GAME ACTIVE - ["..str.."]")
+				s:SetText(translate.Get("game_active").." - ["..str.."]")
 				s.NextRandomize = CurTime() + 0.025
 			end
 		end
@@ -510,23 +510,23 @@ if CLIENT then
 		self.PlayerIndicator:DockMargin(0,0,0,5)
 
 		self.PlayerIndicator.Model = self.PlayerIndicator:Add("DLabel")
-		self.PlayerIndicator.Model:SetText("Character")
+		self.PlayerIndicator.Model:SetText(translate.Get("character"))
 		self.PlayerIndicator.Model:DockMargin(0,0,0,0)
 		self.PlayerIndicator.Model:SetContentAlignment(5)
 		self.PlayerIndicator.Model:Dock(LEFT)
 
 		self.PlayerIndicator.Name = self.PlayerIndicator:Add("DLabel")
-		self.PlayerIndicator.Name:SetText("Name")
+		self.PlayerIndicator.Name:SetText(translate.Get("name"))
 		self.PlayerIndicator.Name:SetContentAlignment(5)
 		self.PlayerIndicator.Name:Dock(FILL)
 
 		self.PlayerIndicator.Ping = self.PlayerIndicator:Add("DLabel")
-		self.PlayerIndicator.Ping:SetText("Ping")
+		self.PlayerIndicator.Ping:SetText(translate.Get("ping"))
 		self.PlayerIndicator.Ping:SetContentAlignment(5)
 		self.PlayerIndicator.Ping:Dock(RIGHT)
 
 		self.PlayerIndicator.Mute = self.PlayerIndicator:Add("DLabel")
-		self.PlayerIndicator.Mute:SetText("Mute")
+		self.PlayerIndicator.Mute:SetText(translate.Get("mute"))
 		self.PlayerIndicator.Mute:SetContentAlignment(5)
 		self.PlayerIndicator.Mute:Dock(RIGHT)
 
@@ -555,7 +555,7 @@ if CLIENT then
 
 		-- Now populate!
 		local canready = true
-		self.ReadyButton = self:AddButton("Ready", 1)
+		self.ReadyButton = self:AddButton(translate.Get("ready"), 1)
 		self.ReadyButton.Menu = self
 		self.ReadyButton.Think = thinkreadybutton
 
@@ -610,13 +610,13 @@ if CLIENT then
 			local frame = vgui.Create("DFrame")
 			frame:SetSkin("nZombies Unlimited")
 			frame:SetBackgroundBlur(true)
-			frame:SetTitle("Discord Link")
+			frame:SetTitle(translate.Get("discord_link"))
 			frame:SetDeleteOnClose(true)
 			frame:ShowCloseButton(true)
 			frame:SetSize(300, 120)
 
 			local lbl = frame:Add("DLabel")
-			lbl:SetText("Click to copy to clipboard")
+			lbl:SetText(translate.Get("click_to_copy"))
 			lbl:Dock(TOP)
 			lbl:SetContentAlignment(5)
 
@@ -626,7 +626,7 @@ if CLIENT then
 			txt:SetContentAlignment(5)
 			txt.DoClick = function(s)
 				SetClipboardText(link)
-				lbl:SetText("Copied!")
+				lbl:SetText(translate.Get("copied"))
 				lbl:SetTextColor(Color(0,255,0))
 				s:KillFocus()
 			end
@@ -634,7 +634,7 @@ if CLIENT then
 			txt.Paint = function(s,w,h) sk.tex.TextBox( 0, 0, w, h ) end
 
 			local but = frame:Add("DButton")
-			but:SetText("Open in Steam Overlay")
+			but:SetText(translate.Get("steam_overlay"))
 			but:Dock(BOTTOM)
 			but:SetTall(25)
 			but:DockMargin(30,0,30,0)
@@ -660,7 +660,7 @@ if CLIENT then
 		self.RightSideControls:DockPadding(10,10,10,10)
 
 		local mus = self.RightSideControls:Add("DCheckBoxLabel")
-		mus:SetText("Music")
+		mus:SetText(translate.Get("music"))
 		mus:Dock(RIGHT)
 		mus:SetContentAlignment(5)
 		mus:SetWide(50)

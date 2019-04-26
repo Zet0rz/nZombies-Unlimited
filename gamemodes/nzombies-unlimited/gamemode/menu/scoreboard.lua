@@ -151,7 +151,7 @@ local SCOREBOARD = {
 		self.ConfigName:Dock(FILL)
 		self.ConfigName:DockMargin(5,5,5,5)
 		self.ConfigName:SetFont(font)
-		self.ConfigName:SetText("No Config Loaded")
+		self.ConfigName:SetText(translate.Get("no_config"))
 
 		self.Lines = self:Add("DScrollPanel")
 		self.Lines:Dock(FILL)
@@ -173,7 +173,7 @@ local SCOREBOARD = {
 
 		if self.LoadedConfig ~= nzu.CurrentConfig then
 			self.LoadedConfig = nzu.CurrentConfig
-			self.ConfigName:SetText(nzu.CurrentConfig and nzu.CurrentConfig.Name or "No Config Loaded")
+			self.ConfigName:SetText(nzu.CurrentConfig and nzu.CurrentConfig.Name or translate.Get("no_config"))
 		end
 
 		if IsValid(self.GameOverPanel) and nzu.Round:GetState() ~= ROUND_GAMEOVER then
@@ -217,14 +217,14 @@ nzu.GameOverPanel = function()
 	local txt = p:Add("DLabel")
 	txt:SetFont("nzu_Font_Bloody_Biggest")
 	txt:SetTextColor(Color(150,0,0))
-	txt:SetText("GAME OVER")
+	txt:SetText(translate.Get("game_over"))
 	txt:SetContentAlignment(5)
 	txt:Dock(FILL)
 	txt:DockMargin(0,0,0,-50)
 
 	local r = p:Add("DLabel")
 	r:SetFont("nzu_Font_Bloody_Large")
-	r:SetText(nzu.Round:GetRound() == 1 and "You survived 1 round." or "You survived "..(nzu.Round:GetRound() or 0).." rounds.")
+	r:SetText(nzu.Round:GetRound() == 1 and translate.Get("round_survived_1") or translate.Get("you_survived").." "..(nzu.Round:GetRound() or 0).." "..translate.Get("rounds"))
 	r:SetTextColor(Color(150,0,0))
 	r:SetContentAlignment(5)
 	r:Dock(BOTTOM)

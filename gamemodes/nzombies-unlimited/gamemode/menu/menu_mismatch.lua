@@ -10,7 +10,7 @@ nzu.AddMenuHook("Mismatch", function(menu)
 	local function updaterequest()
 		local num = #nzu.GetAvailableMismatches()
 		if num > 0 then
-			but:SetText("Config Mismatch! ("..num..")")
+			but:SetText(translate.Get("config_mismatch").." ("..num..")")
 			but:SetVisible(true)
 		else
 			but:SetVisible(false)

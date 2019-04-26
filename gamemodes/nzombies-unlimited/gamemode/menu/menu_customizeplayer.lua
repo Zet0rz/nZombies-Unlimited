@@ -8,7 +8,7 @@ nzu.AddMenuHook("CustomizePlayer", function(menu)
 	sheet:Dock(FILL)
 	sheet:SetSkin("nZombies Unlimited")
 
-	local sub = menu:AddPanel("Customize Player ...", 2, sheet)
+	local sub = menu:AddPanel(translate.Get("customize_player").." ...", 2, sheet)
 	local mdl = vgui.Create("DModelPanel")
 	mdl:Dock( FILL )
 	mdl:SetFOV( 36 )
@@ -43,11 +43,11 @@ nzu.AddMenuHook("CustomizePlayer", function(menu)
 
 		models:AddPanel(icon, {cl_playermodel = name})
 	end
-	sheet:AddSheet("Player Model", models, "icon16/user.png")
+	sheet:AddSheet(translate.Get("player_models"), models, "icon16/user.png")
 
 	--local bgcat = sheet:Add("Bodygroups")
 	local bglist = vgui.Create("DListLayout", sheet)
-	sheet:AddSheet("Bodygroups", bglist, "icon16/wrench.png")
+	sheet:AddSheet(translate.Get("bodygroups"), bglist, "icon16/wrench.png")
 
 	-- Helper functions
 
@@ -106,7 +106,7 @@ nzu.AddMenuHook("CustomizePlayer", function(menu)
 		if ( nskins > 0 ) then
 			local skins = vgui.Create( "DNumSlider" )
 			skins:Dock( TOP )
-			skins:SetText( "Skin" )
+			skins:SetText( translate.Get("skin") )
 			skins:SetDark( true )
 			skins:SetTall( 50 )
 			skins:SetDecimals( 0 )
@@ -140,7 +140,7 @@ nzu.AddMenuHook("CustomizePlayer", function(menu)
 			mdl.Entity:SetBodygroup(k, groups[k + 1] or 0)
 		end
 		if groupnum == 0 then
-			bglist:Add(Label("There are no bodygroups for this model."))
+			bglist:Add(Label(translate.Get("no_bodygroups")))
 		end
 	end
 
@@ -151,7 +151,7 @@ nzu.AddMenuHook("CustomizePlayer", function(menu)
 	plycol:SetPalette(false)
 	plycol:Dock(FILL)
 	plycol:SetSize(200, 260)
-	sheet:AddSheet("Player Color", plycolp, "icon16/palette.png")
+	sheet:AddSheet(translate.Get("player_color"), plycolp, "icon16/palette.png")
 
 	--local wepcolcat = sheet:Add("Weapon Color")
 	local wepcolp = vgui.Create("Panel", sheet)
@@ -161,7 +161,7 @@ nzu.AddMenuHook("CustomizePlayer", function(menu)
 	wepcol:Dock(FILL)
 	wepcol:SetSize(200, 260)
 	wepcol:SetVector(Vector(GetConVarString("cl_weaponcolor")))
-	sheet:AddSheet("Weapon Color", wepcolp, "icon16/joystick.png")
+	sheet:AddSheet(translate.Get("weapon_color"), wepcolp, "icon16/joystick.png")
 
 	local function UpdateFromConvars()
 		local model = LocalPlayer():GetInfo( "cl_playermodel" )

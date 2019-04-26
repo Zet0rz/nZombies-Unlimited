@@ -163,7 +163,7 @@ if SERVER then
 			end)
 		end]]
 
-		PrintMessage(HUD_PRINTTALK, "Round starting!")
+		PrintMessage(HUD_PRINTTALK, translate.Get("round_starting"))
 		hook.Run("nzu_RoundStart", ROUND.Round)
 	end
 
@@ -189,7 +189,7 @@ if SERVER then
 		timer.Remove("nzu_Round_Prepare")
 		--timer.Stop("nzu_Round_Spawning")
 		self.Round = num
-		PrintMessage(HUD_PRINTTALK, "Round is now: "..num)
+		PrintMessage(HUD_PRINTTALK, translate.Get("round_starting")..": "..num)
 		self:SpawnPlayers()
 		self:Prepare(time) -- This networks
 
@@ -277,7 +277,7 @@ if SERVER then
 		hook.Remove("Think", "nzu_Round_Spawning")
 		self.State = ROUND_GAMEOVER
 
-		PrintMessage(HUD_PRINTTALK, "GAME OVER! You survived "..self.Round.." rounds.")
+		PrintMessage(HUD_PRINTTALK, translate.Get("you_survived_over").." "..self.Round.." "..translate.Get("rounds"))
 
 		--donetwork()
 
