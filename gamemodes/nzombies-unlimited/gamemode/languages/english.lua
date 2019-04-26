@@ -98,7 +98,7 @@ LANGUAGE.reviving                    = "Reviving"
 -- Wall Buy
 LANGUAGE.press_e_to                  = "Press E to"
 LANGUAGE.press_e_to_buy              = "Press E to buy"
-LANGUAGE.for                         = "for"
+LANGUAGE.fo                          = "for"
 
 -- Barricade
 LANGUAGE.repair_barricade            = "Repair Barricade"
