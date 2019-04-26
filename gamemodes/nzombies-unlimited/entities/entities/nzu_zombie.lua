@@ -16,6 +16,26 @@ This is also the spawnable entity of the main Zombie type
 ---------------------------------------------------------------------------]]
 if CLIENT then return end -- Client doesn't really need anything beyond the basics
 
+ENT.DeathRagdollForce = 1000
+ENT.DeathAnimations = {
+	"nz_death_1",
+	"nz_death_2",
+	"nz_death_3",
+	"nz_death_f_1",
+	"nz_death_f_2",
+	"nz_death_f_3",
+	"nz_death_f_4",
+	"nz_death_f_5",
+	"nz_death_f_6",
+	"nz_death_f_7",
+	"nz_death_f_8",
+	"nz_death_f_9",
+	"nz_death_f_10",
+	"nz_death_f_11",
+	"nz_death_f_12",
+	"nz_death_f_13",
+}
+
 -- Localizing tables so that we save a bit of memory instead of having multiple identical tables
 local spawnslow = {"nz_spawn_climbout_fast"}
 local spawnfast = {"nz_spawn_jump_run_1", "nz_spawn_jump_run_2", "nz_spawn_jump_run_3"}
@@ -47,6 +67,26 @@ local attack_run_au = {
 	{Sequence = "nz_attack_run_au_4", Impacts = {0.5}},
 }
 
+local walksounds = {
+	Sound("nzu/zombie/amb/amb_00.wav"),
+	Sound("nzu/zombie/amb/amb_01.wav"),
+	Sound("nzu/zombie/amb/amb_02.wav"),
+	Sound("nzu/zombie/amb/amb_03.wav"),
+	Sound("nzu/zombie/amb/amb_04.wav"),
+	Sound("nzu/zombie/amb/amb_05.wav"),
+}
+local runsounds = {
+	Sound("nzu/zombie/sprint/sprint_00.wav"),
+	Sound("nzu/zombie/sprint/sprint_01.wav"),
+	Sound("nzu/zombie/sprint/sprint_02.wav"),
+	Sound("nzu/zombie/sprint/sprint_03.wav"),
+	Sound("nzu/zombie/sprint/sprint_04.wav"),
+	Sound("nzu/zombie/sprint/sprint_05.wav"),
+	Sound("nzu/zombie/sprint/sprint_06.wav"),
+	Sound("nzu/zombie/sprint/sprint_07.wav"),
+	Sound("nzu/zombie/sprint/sprint_08.wav"),
+}
+
 ENT.MaxSpeed = 600
 ENT.AnimTables = {
 	-- 1: Arms Down
@@ -72,10 +112,11 @@ ENT.AnimTables = {
 			},
 			AttackSequences = attack_walk_ad,
 			VaultSequence = vault_walk,
+			PassiveSounds = walksounds,
 		},
 
 		-- Slower running, arms down (ad)
-		{Threshold = 60,
+		{Threshold = 100,
 			SpawnSequence = spawnslow,
 			MovementSequence = {
 				"nz_run_ad7",
@@ -87,10 +128,11 @@ ENT.AnimTables = {
 			},
 			AttackSequences = attack_walk_ad,
 			VaultSequence = vault_walk,
+			PassiveSounds = walksounds,
 		},
 
 		-- Faster running, arms down (ad)
-		{Threshold = 100,
+		{Threshold = 160,
 			SpawnSequence = spawnslow,
 			MovementSequence = {
 				"nz_run_ad1",
@@ -102,10 +144,11 @@ ENT.AnimTables = {
 			},
 			AttackSequences = attack_run_ad,
 			VaultSequence = vault_run,
+			PassiveSounds = runsounds,
 		},
 
 		-- Sprinting, arms down (ad)
-		{Threshold = 140,
+		{Threshold = 200,
 			SpawnSequence = spawnfast,
 			MovementSequence = {
 				"nz_sprint_ad1",
@@ -118,10 +161,11 @@ ENT.AnimTables = {
 			},
 			AttackSequences = attack_run_ad,
 			VaultSequence = vault_sprint,
+			PassiveSounds = runsounds,
 		},
 
 		-- Super Sprint, arms down (ad)
-		{Threshold = 180,
+		{Threshold = 250,
 			SpawnSequence = spawnfast,
 			MovementSequence = {
 				"nz_supersprint_ad1",
@@ -129,6 +173,7 @@ ENT.AnimTables = {
 			},
 			AttackSequences = attack_run_ad,
 			VaultSequence = vault_sprint,
+			PassiveSounds = runsounds,
 		},
 	},
 
@@ -157,10 +202,11 @@ ENT.AnimTables = {
 			},
 			AttackSequences = attack_walk_au,
 			VaultSequence = vault_walk,
+			PassiveSounds = walksounds,
 		},
 
 		-- Slower running, arms up (au)
-		{Threshold = 60,
+		{Threshold = 100,
 			SpawnSequence = spawnfast,
 			MovementSequence = {
 				"nz_run_au4",
@@ -172,10 +218,11 @@ ENT.AnimTables = {
 			},
 			AttackSequences = attack_walk_au,
 			VaultSequence = vault_walk,
+			PassiveSounds = walksounds,
 		},
 
 		-- Faster running, arms up (au)
-		{Threshold = 100,
+		{Threshold = 160,
 			SpawnSequence = spawnfast,
 			MovementSequence = {
 				"nz_run_au1",
@@ -187,10 +234,11 @@ ENT.AnimTables = {
 			},
 			AttackSequences = attack_run_au,
 			VaultSequence = vault_run,
+			PassiveSounds = runsounds,
 		},
 
 		-- Sprinting, arms up (au)
-		{Threshold = 140,
+		{Threshold = 200,
 			SpawnSequence = spawnfast,
 			MovementSequence = {
 				"nz_sprint_au1",
@@ -202,10 +250,11 @@ ENT.AnimTables = {
 			},
 			AttackSequences = attack_run_au,
 			VaultSequence = vault_sprint,
+			PassiveSounds = runsounds,
 		},
 
 		-- Super Sprint, arms up (au)
-		{Threshold = 180,
+		{Threshold = 250,
 			SpawnSequence = spawnfast,
 			MovementSequence = {
 				"nz_supersprint_au1",
@@ -213,6 +262,7 @@ ENT.AnimTables = {
 			},
 			AttackSequences = attack_run_au,
 			VaultSequence = vault_sprint,
+			PassiveSounds = runsounds,
 		},
 	}
 }
@@ -226,21 +276,22 @@ function ENT:SpeedChanged(speed)
 	local n = #tbl
 	local t
 	for i = 1,n do
-		if tbl[i].Threshold <= speed then
-			t = tbl[i]
+		if tbl[i].Threshold > speed then
 			break
+		else
+			t = tbl[i]
 		end
 	end
 
 	-- Movement sequence we pick a single random of! This makes the zombie always use the same one for its lifespan (until speed change)
 	if t.MovementSequence then
 		self.MovementSequence = t.MovementSequence[math.random(#t.MovementSequence)]
-		t.MovementSequence = nil
+		self:ResetMovementSequence()
 	end
 
 	-- Apply all the remaining data from the AnimTable directly
 	for k,v in pairs(t) do
-		self[k] = v
+		if k ~= "MovementSequence" then self[k] = v end
 	end
 end
 
@@ -248,7 +299,7 @@ end
 
 -- Vault: Select from table
 function ENT:SelectVaultSequence(pos)
-	return self.VaultSequence[math.random(#self.VaultSequence)], 50
+	return self.VaultSequence[math.random(#self.VaultSequence)], self.VaultSpeed
 end
 
 -- Spawn: Select from table
@@ -332,58 +383,64 @@ function ENT:Event_BarricadeTear(barricade)
 
 	-- We got a barricade position, move towards it
 	self:SolidMaskDuringEvent(MASK_NPCSOLID_BRUSHONLY)
-	local result = self:MoveToPos(pos, {lookahead = 20, tolerance = 10, maxage = 3, draw = true})
+	self.loco:ClearStuck()
+	local result = self:MoveToPos(pos, {lookahead = 10, tolerance = 5, maxage = 3}) -- DEBUG (draw = true)
 	if result == "ok" and not self:ShouldEventTerminate() then
 		-- We're in position
 		self:SetPos(pos) -- Just because the animations are very precise here
 		self:FaceTowards(barricade:LocalToWorld(Vector(0,barricade:WorldToLocal(pos).y,0))) -- Just face fowards, not towards the center of the barricade
 
-		local planktotear = barricade:StartTear(self)
-		while IsValid(planktotear) do
-			local pos = planktotear:GetGrabPos()
-			local ang = planktotear:GetGrabAngles()
+		
+		while not self:ShouldEventTerminate() and not barricade:GetIsClear() do
+			local planktotear = barricade:StartTear(self)
+			if IsValid(planktotear) then
+				local pos = planktotear:GetGrabPos()
+				local ang = planktotear:GetGrabAngles()
 
-			local a,b,c = self:CalculateBarricadeAnims(pos, ang)
+				local a,b,c = self:CalculateBarricadeAnims(pos, ang)
 
-			-- Get times and sequences
-			local grab,gdur = self:LookupSequence(a)
-			local hold,hdur = self:LookupSequence(b)
-			local pull,pdur = self:LookupSequence(c)
+				-- Get times and sequences
+				local grab,gdur = self:LookupSequence(a)
+				local hold,hdur = self:LookupSequence(b)
+				local pull,pdur = self:LookupSequence(c)
 
-			-- Perform grab and wait its duration
-			self:SetCycle(0)
-			self:ResetSequence(grab)
-			coroutine.wait(gdur)
+				-- Perform grab and wait its duration
+				self:SetCycle(0)
+				self:ResetSequence(grab)
+				coroutine.wait(gdur)
 
-			-- Determine hold duration and play that loop for that long
-			local time = planktotear:GetPlankTearTime() - gdur - pdur
-			if time > 0 then
-				self:ResetSequence(hold)
-				coroutine.wait(time)
+				-- Determine hold duration and play that loop for that long
+				local time = planktotear:GetPlankTearTime() - gdur - pdur
+				if time > 0 then
+					self:ResetSequence(hold)
+					coroutine.wait(time)
+				end
+
+				-- Pull the plank!
+				self:ResetSequence(pull)
+				self:SetCycle(0)
+				coroutine.wait(pulldelay)
+
+				barricade:TearPlank(self, planktotear)
+				local phys = planktotear:GetPhysicsObject()
+				if IsValid(phys) then
+					local vec = self:GetPos() - planktotear:GetPos()
+					vec.z = 0
+					phys:SetVelocity(vec*3)
+				end
+				coroutine.wait(pdur - pulldelay)
+			else
+				self:Timeout(2)
 			end
+		end
 
-			-- Pull the plank!
-			self:ResetSequence(pull)
-			self:SetCycle(0)
-			coroutine.wait(pulldelay)
-
-			barricade:TearPlank(self, planktotear)
-			local phys = planktotear:GetPhysicsObject()
-			if IsValid(phys) then
-				local vec = self:GetPos() - planktotear:GetPos()
-				vec.z = 0
-				phys:SetVelocity(vec*3)
-			end
-			coroutine.wait(pdur - pulldelay)
-
-			if self:ShouldEventTerminate() then break end
-			planktotear = barricade:StartTear(self)
+		if not self:ShouldEventTerminate() then
+			if barricade.m_tReservedSpots[pos] == self then barricade.m_tReservedSpots[pos] = NULL end
+			self:TriggerEvent("BarricadeVault", barricade.VaultHandler, barricade)
+			return
 		end
 	else
 		self:Timeout(2)
 	end
-	if barricade.m_tReservedSpots[pos] == self then barricade.m_tReservedSpots[pos] = nil end
+	if barricade.m_tReservedSpots[pos] == self then barricade.m_tReservedSpots[pos] = NULL end
 end
-
--- DEBUG
-function ENT:Event_Spawn() end

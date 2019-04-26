@@ -14,7 +14,6 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	configpanel:Dock(LEFT)
 
 	local infopanel = panel:Add("DPanel")
-	infopanel:SetBackgroundColor(Color(50,40,40))
 	infopanel:Dock(FILL)
 	infopanel:DockPadding(30,30,30,30)
 
@@ -51,6 +50,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	loadedcfg:Dock(FILL)
 	loadedcfg:SetVisible(false)
 	loadedcfg.m_bDrawCorners = false
+	
 	local noloaded = loadedpnl:Add("DLabel")
 	noloaded:SetText("No Config currently loaded.")
 	noloaded:Dock(FILL)
@@ -62,19 +62,14 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	createbutton:SetText("Create new Config ...")
 	createbutton:DockMargin(10,7,10,7)
 
-	local function updateloadedconfig(s,config, unsaved)
-		loadedcfg:SetConfig(config)
+	local function updateloadedconfig(s,config)
 		editedconfig = config
 		if config then
+			loadedcfg:SetConfig(config)
 			loadedcfg:SetVisible(true)
 			noloaded:SetVisible(false)
 			createbutton:SetText("Create new editable copy ...")
 			unload:SetVisible(true)
-
-			if unsaved then
-				loadedcfg.Type:SetText("Unsaved")
-				loadedcfg.Type:SetTextColor(Color(255,200,100))
-			end
 		else
 			loadedcfg:SetVisible(false)
 			noloaded:SetVisible(true)
@@ -91,21 +86,25 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	installed:DockMargin(10,5,5,5)
 	installed:Dock(TOP)
 
-	local configscroll = configpanel:Add("DScrollPanel")
-	configscroll:Dock(FILL)
-	configscroll:DockMargin(5,0,0,5)
-	configscroll:SetPaintBackground(true)
-	local configlist = configscroll:Add("DListLayout")
+	local configlist = configpanel:Add("nzu_ConfigList")
 	configlist:Dock(FILL)
+	configlist:DockMargin(5,0,0,5)
+	configlist:SetPaintBackground(true)
+	configlist:LoadConfigs()
 	
 	local img = infopanel:Add("DImage")
-	img:SetImage("maps/thumb/gm_construct.png")
+	img:SetImage("vgui/black.png")
 	img:Dock(TOP)
 	img:DockMargin(0,0,0,15)
 	function img:PerformLayout()
 		local w = self:GetWide()
 		self:SetTall(w/16 * 9)
 	end
+
+	local img_but = img:Add("DButton")
+	img_but:Dock(FILL)
+	img_but:SetText("")
+	img_but:SetVisible(false)
 	
 	local editpanel = infopanel:Add("Panel")
 	editpanel:Dock(FILL)
@@ -130,7 +129,9 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 		local t = self:GetTall()
 		self:SetWide(t)
 	end
-	widinfo:SetTooltip("Hi")
+	widinfo:SetTooltip("Fill this field with the numeric ID of this Config's Workshop addon after it has been uploaded.\nThis will allow users to view your Config's Workshop page from in-game.")
+	widinfo:SetMouseInputEnabled(true)
+
 	local widentry = addonarea:Add("DTextEntry")
 	widentry:SetPlaceholderText("123456789")
 	widentry:SetPlaceholderColor(Color(75,75,75))
@@ -146,7 +147,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	local addonscroll = addonarea:Add("DScrollPanel")
 	addonscroll:Dock(FILL)
 	addonscroll:SetPaintBackground(true)
-	addonscroll:SetBackgroundColor(Color(50,50,50))
+	--addonscroll:SetBackgroundColor(Color(50,50,50))
 	local addonlist = addonscroll:Add("DListLayout")
 	addonlist:Dock(FILL)
 	function addonlist:Refresh()
@@ -254,6 +255,14 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	desc:SetPlaceholderText("Config Description...")
 	desc:SetPlaceholderColor(Color(75,75,75))
 	desc:Dock(FILL)
+
+	local playbutton = infopanel:Add("DButton")
+	playbutton:Dock(BOTTOM)
+	playbutton:SetText("Save and Play")
+	playbutton:DockMargin(100,10,100,-20)
+	playbutton:SetTall(40)
+	playbutton:SetFont("Trebuchet24")
+	playbutton:SetEnabled(nzu.IsAdmin(LocalPlayer()))
 	
 	local saveload = infopanel:Add("Panel")
 	saveload:DockMargin(0,5,0,0)
@@ -269,6 +278,15 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	reload:SetText("Reload last saved version")
 	local save = saveload:Add("DButton")
 	save:SetText("Save Config")
+
+	playbutton.DoClick = function(s)
+		if selectedconfig.Config then
+			if selectedconfig.Config == editedconfig then save:DoClick() end
+			Derma_Query("Do you wish to change gamemode to NZOMBIES UNLIMITED?", "Mode change confirmation", "Change gamemode", function()
+				nzu.RequestPlayConfig(selectedconfig.Config)
+			end, "Cancel"):SetSkin("nZombies Unlimited")
+		end
+	end
 	
 	function saveload:PerformLayout()
 		local w = self:GetWide()/2 + 15
@@ -301,6 +319,8 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 
 	-- Control selecting configs
 	local function doconfigclick(pnl)
+		if not IsValid(pnl) or not pnl.Config then selectedconfig = nil infopanel:SetVisible(false) return end
+	
 		if IsValid(selectedconfig) then selectedconfig:SetBackgroundColor(Color(0,0,0)) end
 		selectedconfig = pnl
 		selectedconfig:SetBackgroundColor(Color(0,150,255))
@@ -313,13 +333,16 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 		mapname:SetText("File: " .. cfg.Codename .. " || Map: "..cfg.Map)
 		widentry:SetText(cfg.WorkshopID or "")
 
+		img:SetImage(nzu.GetConfigThumbnail(cfg) or "vgui/black.png")
+
 		-- Edits and stuff
-		if cfg == editedconfig and cfg.Type == "Local" then
+		if nzu.IsAdmin(LocalPlayer()) and cfg == editedconfig and (cfg.Type == "Local" or cfg.Type == "Unsaved") then
 			addonscroll:SetVisible(true)
 			addonlist2_Scroll:SetVisible(false)
 
 			save:SetEnabled(true)
 			reload:SetText("Reload last saved version")
+			reload:SetEnabled(true)
 			savemeta:SetEnabled(true)
 			delete:SetEnabled(true)
 
@@ -327,14 +350,17 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 			authors:SetEnabled(true)
 			desc:SetEnabled(true)
 			widentry:SetEnabled(true)
+			ab:SetEnabled(true)
+			playbutton:SetText("Save and Play")
 		else
 			addonscroll:SetVisible(false)
 			addonlist2_Scroll:SetVisible(true)
 
 			save:SetEnabled(false)
 			reload:SetText(cfg == nzu.CurrentConfig and "Reload Config" or "Load Config")
+			reload:SetEnabled(nzu.IsAdmin(LocalPlayer()))
 			savemeta:SetEnabled(false)
-			delete:SetEnabled(cfg.Type == "Local")
+			delete:SetEnabled(cfg.Type == "Local" and nzu.IsAdmin(LocalPlayer()))
 
 			addonlist2:Clear()
 			for k,v in pairs(cfg.RequiredAddons) do
@@ -348,10 +374,15 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 			authors:SetEnabled(false)
 			desc:SetEnabled(false)
 			widentry:SetEnabled(false)
+			ab:SetEnabled(false)
+
+			playbutton:SetText("Load and Play")
 		end
 	end
+	configlist.OnConfigClicked = function(s,cfg,pnl) doconfigclick(pnl) end
 
 	-- Create new config button
+	createbutton:SetEnabled(nzu.IsAdmin(LocalPlayer()))
 	function createbutton:DoClick()
 		local frame = vgui.Create("DFrame", panel)
 		--frame:SetSkin("nZombies Unlimited")
@@ -420,14 +451,14 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 
 			editedconfig = nzu.CurrentConfig and table.Copy(nzu.CurrentConfig) or {}
 			editedconfig.Codename = val
-			editedconfig.Type = "Local"
+			editedconfig.Type = "Unsaved"
 			editedconfig.Name = editedconfig.Name or val
 			editedconfig.Map = game.GetMap()
 			editedconfig.Authors = editedconfig.Authors or ""
 			editedconfig.Description = editedconfig.Description or ""
 			editedconfig.RequiredAddons = editedconfig.RequiredAddons or {}
 
-			updateloadedconfig(nil, editedconfig, true)
+			updateloadedconfig(nil, editedconfig)
 			loadedcfg:DoClick()
 
 			frame:Close()
@@ -447,53 +478,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 
 		entry:RequestFocus()
 	end
-
-	-- Populate configs
-	local configpanels = {}
-	local function addconfig(_, config)
-		if not configpanels[config] then
-			local pnl = vgui.Create("nzu_ConfigPanel", configlist)
-			--configlist:Add(pnl)
-			pnl:SetConfig(config)
-			pnl:SetTall(configpaneltall)
-			pnl:Sort()
-			pnl.DoClick = doconfigclick
-			pnl:Dock(TOP)
-
-			configpanels[config] = pnl
-			configscroll:InvalidateChildren()
-			timer.Simple(0.1, function() configscroll:InvalidateLayout() end)
-		end
-
-		-- Update the main one if it is that one
-		if editedconfig and editedconfig.Codename == config.Codename and editedconfig.Type == config.Type then
-			configname:SetText(config.Name)
-			desc:SetText(config.Description)
-			authors:SetText(config.Authors)
-			widentry:SetText(config.WorkshopID or "")
-		end
-	end
-	local configs = nzu.GetConfigs()
-	if configs then
-		PrintTable(configs)
-		for k,v in pairs(configs) do
-			for k2,v2 in pairs(v) do
-				addconfig(nil, v2, true)
-			end
-		end
-	end
-	hook.Add("nzu_ConfigInfoSaved", configpanel, addconfig)
 	loadedcfg.DoClick = doconfigclick
-
-	hook.Add("nzu_ConfigDeleted", configpanel, function(_, config)
-		if configpanels[config] then
-			configpanels[config]:Remove()
-			configpanels[config] = nil
-
-			configscroll:InvalidateChildren()
-			timer.Simple(0.1, function() configscroll:InvalidateLayout() end)
-		end
-	end)
 
 	local function applyinfo()
 		if editedconfig then
@@ -512,7 +497,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	end
 
 	save.DoClick = function()
-		if editedconfig and editedconfig.Type == "Local" then applyinfo() nzu.RequestSaveConfig(editedconfig) end
+		if editedconfig and (editedconfig.Type == "Local" or editedconfig.Type == "Unsaved") then applyinfo() nzu.RequestSaveConfig(editedconfig) end
 	end
 	reload.DoClick = function()
 		if selectedconfig.Config then
@@ -542,7 +527,13 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 
 	unload.DoClick = function()
 		Derma_Query("Are you sure you want to unload?\nThis will reload the server.", "Config load confirmation",
-			"Unload", function() nzu.RequestUnloadConfig() end,
+			"Unload", function()
+				if editedconfig and editedconfig.Type == "Unsaved" then
+					if editedconfig == selectedconfig.Config then doconfigclick() end -- Reset info if it is the one shown
+					updateloadedconfig() -- Reset
+				return end
+				nzu.RequestUnloadConfig()
+			end,
 			"Cancel"
 		):SetSkin("nZombies Unlimited")
 	end

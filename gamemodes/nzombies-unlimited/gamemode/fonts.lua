@@ -8,7 +8,7 @@ surface.CreateFont("nzu_Font_Points_NameLarge", {
 
 surface.CreateFont("nzu_Font_Points_NameSmall", {
 	font = "Trebuchet MS",
-	size = 14,
+	size = 18,
 	weight = 1000,
 	antialias = true,
 })
@@ -67,6 +67,13 @@ surface.CreateFont("nzu_Font_Bloody_Medium", {
 surface.CreateFont("nzu_Font_Bloody_Small", {
 	font = "DK Umbilical Noose",
 	size = 24,
+	weight = 500,
+	antialias = true,
+})
+
+surface.CreateFont("nzu_Font_Bloody_Biggest", {
+	font = "DK Umbilical Noose",
+	size = 128,
 	weight = 500,
 	antialias = true,
 })

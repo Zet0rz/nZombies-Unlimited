@@ -35,6 +35,62 @@ end
 
 
 
+--[[-------------------------------------------------------------------------
+Networking Extension availability
+---------------------------------------------------------------------------]]
+if NZU_SANDBOX then
+	if SERVER then
+		util.AddNetworkString("nzu_extensions")
+		local function networkextensionavailability(name, ply)
+			local data = nzu.GetExtensionDetails(name)
+			net.Start("nzu_extensions")
+				net.WriteString(name)
+				net.WriteString(data.Name)
+				net.WriteString(data.Description)
+				net.WriteString(data.Author)
+				
+				local num = data.Prerequisites and #data.Prerequisites or 0
+				net.WriteUInt(num, 8)
+				for i = 1,num do
+					net.WriteString(data.Prerequisites[i])
+				end
+			if ply then net.Send(ply) else net.Broadcast() end
+		end
+		
+		hook.Add("PlayerInitialSpawn", "nzu_Extensions_NetworkList", function(ply)
+			for k,v in pairs(nzu.GetExtensionList()) do
+				networkextensionavailability(v, ply)
+			end
+		end)
+	else
+		local availableextensions = {}
+		net.Receive("nzu_extensions", function()
+			local id = net.ReadString()
+			local ext = {ID = id}
+			ext.Name = net.ReadString()
+			ext.Description = net.ReadString()
+			ext.Author = net.ReadString()
+			
+			local num = net.ReadUInt(8)
+			if num > 0 then
+				ext.Prerequisites = {}
+				for i = 1,num do
+					table.insert(ext.Prerequisites, net.ReadString())
+				end
+			end
+			
+			availableextensions[id] = ext
+		end)
+		
+		function nzu.GetAvailableExtensions()
+			return availableextensions
+		end
+		
+		function nzu.GetExtensionDetails(id)
+			return availableextensions[id]
+		end
+	end
+end
 
 
 
@@ -56,10 +112,18 @@ local writetypes = {
 
 -- Adding our own custom TYPEs
 local customtypes = {}
-function nzu.AddCustomExtensionSettingType(type, tbl)
+function nzu.AddExtensionSettingType(type, tbl)
 	tbl.__index = tbl
-	if SERVER then tbl.CustomPanel = nil end
+
+	-- A bit of cleanup
+	if SERVER then
+		tbl.Panel = nil
+	end
+
 	customtypes[type] = tbl
+end
+function nzu.GetExtensionSettingType(type)
+	return customtypes[type]
 end
 
 local function netwritesetting(tbl,set,val)
@@ -80,18 +144,14 @@ local function netreadsetting(tbl)
 	return val
 end
 
+AddCSLuaFile("extension_setting_types.lua")
+include("extension_setting_types.lua")
 
 
 
 --[[-------------------------------------------------------------------------
 Generating Extensions from files
 ---------------------------------------------------------------------------]]
-local loadparse = {
-	[TYPE_COLOR] = function(t)
-		return IsColor(t) and t or Color(t.r, t.g, t.b, t.a)
-	end,
-}
-
 local loadingextension2
 function nzu.Extension()
 	return loadingextension2
@@ -100,73 +160,74 @@ end
 -- This function prepares the settings meta
 -- "loadextension" should be called with the return of this value once settings are loaded/prepared (if any)
 -- To use defaults, these can just be chained [loadextension(loadextensionprepare(name))]
-local function loadextensionprepare(name)
+local function loadextensionprepare(name, hassettings)
 	local loadingextension = loaded_extensions[name] or {ID = name}
 	local settings, panelfunc
-	local filename = extensionpath..name.."/settings.lua"
-	if file.Exists(prefix..filename, searchpath) then
-		AddCSLuaFile(filename)
+	
+	if hassettings then
+		local filename = extensionpath..name.."/settings.lua"
 		settings, panelfunc = include(filename)
+		loadingextension.HasSettingsFile = true
+	end
 
-		if settings then
-			-- Inherit from custom types
-			for k,v in pairs(settings) do
-				if v.Type and customtypes[v.Type] then
-					-- Inherit all data from the table that Settings didn't define itself
-					setmetatable(v, customtypes[v.Type])
-					--for k2,v2 in pairs(customtypes[v.Type]) do
-						--if v[k2] == nil then v[k2] = v2 end
-					--end
-				end
-
-				if SERVER or NZU_SANDBOX or v.Client then
-					if v.Create then v.Create(loadingextension, k) end
-				else
-					settings[k] = nil
-				end
+	if settings then
+		-- Inherit from custom types
+		for k,v in pairs(settings) do
+			if v.Type and customtypes[v.Type] then
+				-- Inherit all data from the table that Settings didn't define itself
+				setmetatable(v, customtypes[v.Type])
+				--for k2,v2 in pairs(customtypes[v.Type]) do
+					--if v[k2] == nil then v[k2] = v2 end
+				--end
 			end
 
-			if SERVER then
-				local t = {}
-				if NZU_SANDBOX then
-					-- Calling the settings table with a field as first argument and value as second will set it and network it
-					-- In Sandbox, it always does this with all settings
-					setmetatable(t, {__call = function(tbl,k,v)
-						local s = settings[k]
-						if s.Parse then v = s.Parse(v) end
-						tbl[k] = v -- Actually set the value of course
-						if s.ServerNotify then loadingextension[s.ServerNotify](v,k) end -- Call the notify if it exists
+			if SERVER or NZU_SANDBOX or v.Client then
+				if v.Create then v.Create(loadingextension, k, v) end
+			else
+				settings[k] = nil
+			end
+		end
 
+		if SERVER then
+			local t = {}
+			if NZU_SANDBOX then
+				-- Calling the settings table with a field as first argument and value as second will set it and network it
+				-- In Sandbox, it always does this with all settings
+				setmetatable(t, {__call = function(tbl,k,v)
+					local s = settings[k]
+					if s.Parse then v = s.Parse(v) end
+					tbl[k] = v -- Actually set the value of course
+					if s.Notify then s.Notify(k,v) end
+
+					net.Start("nzu_extension_setting")
+						net.WriteString(loadingextension.ID)
+						netwritesetting(settings[k],k,v)
+					net.Broadcast()
+
+					hook.Run("nzu_ExtensionSettingChanged", loadingextension.ID, k, v)
+				end})
+			else
+				-- In nZombies, only network settings that are marked as Client = true
+				setmetatable(t, {__call = function(tbl,k,v)
+					local s = settings[k]
+					if s.Parse then v = s.Parse(v) end
+					tbl[k] = v
+					if s.Notify then s.Notify(k,v) end
+
+					if s.Client then
 						net.Start("nzu_extension_setting")
 							net.WriteString(loadingextension.ID)
 							netwritesetting(settings[k],k,v)
 						net.Broadcast()
+					end
 
-						hook.Run("nzu_ExtensionSettingChanged", loadingextension.ID, k, v)
-					end})
-				else
-					-- In nZombies, only network settings that are marked as Client = true
-					setmetatable(t, {__call = function(tbl,k,v)
-						local s = settings[k]
-						if s.Parse then v = s.Parse(v) end
-						tbl[k] = v
-						if s.ServerNotify then loadingextension[s.ServerNotify](v,k) end -- Call the notify if it exists
-
-						if s.Client then
-							net.Start("nzu_extension_setting")
-								net.WriteString(loadingextension.ID)
-								netwritesetting(settings[k],k,v)
-							net.Broadcast()
-						end
-
-						hook.Run("nzu_ExtensionSettingChanged", loadingextension.ID, k, v)
-					end})
-				end
-
-				loadingextension.Settings = t
-			else
-				loadingextension.Settings = {} -- Empty for clients by default; we wait expected networking here
+					hook.Run("nzu_ExtensionSettingChanged", loadingextension.ID, k, v)
+				end})
 			end
+
+			loadingextension.Settings = t
+		else
+			loadingextension.Settings = {} -- Empty for clients by default; we wait expected networking here
 		end
 	end
 	loadingextension.GetSettingsMeta = function() return settings end
@@ -192,17 +253,16 @@ local function loadextension(loadingextension, st)
 				t[k] = st and st[k] or v.Default
 
 				if SERVER then
-					local parse = v.Load or loadparse[v.Type]
-					if parse then t[k] = parse(t[k]) end
+					if v.Load then t[k] = v.Load(t[k]) end
 				end
 
-				if v.ServerNotify then notifies[k] = {v.ServerNotify, t[k]} end
+				if v.Notify then notifies[k] = {v.Notify, t[k]} end
 			end
 		elseif CLIENT and st then -- On Client and not in Sandbox: Only read settings in the 'st' table
 			for k,v in pairs(st) do
 				t[k] = st[k]
 
-				local notify = loadingextension.GetSettingsMeta()[k].ClientNotify
+				local notify = loadingextension.GetSettingsMeta()[k].Notify
 				if notify then notifies[k] = {notify, t[k]} end
 			end
 		end
@@ -228,7 +288,7 @@ local function loadextension(loadingextension, st)
 
 	if notifies then
 		for k,v in pairs(notifies) do
-			loadingextension[v[1]](v[2],k)
+			v[1](v[2],k)
 		end
 	end
 
@@ -258,7 +318,12 @@ if SERVER then
 	local function networkextension(ext, update)
 		net.WriteString(ext.ID)
 		net.WriteBool(true)
-		net.WriteBool(not update)
+		if not update then
+			net.WriteBool(true)
+			net.WriteBool(ext.HasSettingsFile)
+		else
+			net.WriteBool(false)
+		end
 
 		if ext.Settings then
 			local sm = ext.GetSettingsMeta()
@@ -290,7 +355,8 @@ if SERVER then
 			end
 		end
 
-		local ext = loadextension(loadextensionprepare(name), settings)
+		local hassettings = file.Exists(prefix..extensionpath..name.."/settings.lua", searchpath)
+		local ext = loadextension(loadextensionprepare(name, hassettings), settings)
 		if NZU_SANDBOX then
 			table.insert(load_order, ext.ID)
 		end
@@ -359,7 +425,7 @@ else
 		local name = net.ReadString()
 		if net.ReadBool() then
 			local b = net.ReadBool()
-			local ext = b and loadextensionprepare(name) or loaded_extensions[name]
+			local ext = b and loadextensionprepare(name, net.ReadBool()) or loaded_extensions[name]
 
 			local sm = ext.GetSettingsMeta()
 			local settings
@@ -422,7 +488,7 @@ else
 			local v = netreadsetting(s)
 			ext.Settings[k] = v
 
-			if s.ClientNotify then ext[s.ClientNotify](v,k) end
+			if s.Notify then s.Notify(v,k) end
 
 			hook.Run("nzu_ExtensionSettingChanged", ext.ID, k, v)
 		end
@@ -510,49 +576,12 @@ settings used by the main gamemode.
 ---------------------------------------------------------------------------]]
 -- This is needed here cause Core uses some of these for its settings
 if SERVER then
-	AddCSLuaFile("../hudmanagement.lua")
-	AddCSLuaFile("../resources.lua")
+	AddCSLuaFile("hudmanagement.lua")
+	AddCSLuaFile("resources.lua")
 end
-include("../resources.lua")
-include("../hudmanagement.lua")
+include("resources.lua")
+include("hudmanagement.lua")
 
-nzu.AddCustomExtensionSettingType("Weapon", {
-	NetWrite = net.WriteString,
-	NetRead = net.ReadString,
-	CustomPanel = {
-		Create = function(parent, ext, setting)
-			local p = vgui.Create("DSearchComboBox", parent)
 
-			p:AddChoice("  [None]", "") -- Allow the choice of none
-			for k,v in pairs(weapons.GetList()) do
-				p:AddChoice((v.PrintName or "").." ["..v.ClassName.."]", v.ClassName)
-			end
-			p:SetAllowCustomInput(true)
 
-			function p:OnSelect(index, value, data)
-				self:Send()
-			end
-
-			return p
-		end,
-		Set = function(p,v)
-			for k,class in pairs(p.Data) do
-				if class == v then
-					p:SetText(p:GetOptionText(k))
-					p.selected = k
-					return
-				end
-			end
-
-			p.Choices[0] = v
-			p.Data[0] = v
-			p.selected = 0
-		end,
-		Get = function(p)
-			local str,data = p:GetSelected()
-			return data
-		end,
-	}
-})
-
-loadextension(loadextensionprepare("Core"))
+loadextension(loadextensionprepare("Core", true))

@@ -34,8 +34,8 @@ if CLIENT then
 			b:ClickFunction()
 		end
 	end
-	local function generatebutton(text,admin)
-		local b = vgui.Create("DButton")
+	local function generatebutton(text,admin, parent)
+		local b = vgui.Create("DButton", parent)
 		b:SetFont("DermaLarge")
 		b:SetText(text) -- Append spaces around to free from edges
 		b:SetTextColor(textcolor)
@@ -49,16 +49,17 @@ if CLIENT then
 		--b.Paint = paintfunc
 		b:SetSkin("nZombies Unlimited")
 		b.DoClick = buttondoclick
+		b:Dock(TOP)
 
 		return b
 	end
 	function SUBMENU:AddButton(text, zpos, func, admin)
-		if IsValid(self.List) then
-			local b = generatebutton(text, admin)
+		if IsValid(self.Contents) then
+			local b = generatebutton(text, admin, self.Contents)
 			b:SetZPos(zpos)
 			b.SubMenu = self
 			b.ClickFunction = func
-			self.List:Add(b)
+			self.Contents:Add(b)
 
 			return b
 		end
@@ -77,12 +78,11 @@ if CLIENT then
 		end
 	end
 	function SUBMENU:AddSubMenu(text, zpos, admin)
-		if IsValid(self.List) then
-			local b = generatebutton(text, admin)
+		if IsValid(self.Contents) then
+			local b = generatebutton(text, admin, self.Contents)
 			b:SetZPos(zpos)
 
-			local submenu = vgui.Create("nzu_MenuPanel_SubMenu")
-			submenu:SetParent(self:GetParent())
+			local submenu = vgui.Create("nzu_MenuPanel_SubMenu", self:GetParent())
 			submenu:Dock(FILL)
 			submenu.Menu = self.Menu
 
@@ -90,18 +90,17 @@ if CLIENT then
 			b.SubPanel = submenu
 			submenu:SetPrevious(text, self)
 			b.ClickFunction = submenuclick
-			self.List:Add(b)
+			self.Contents:Add(b)
 
-			return submenu
+			return submenu, b
 		end
 	end
 	function SUBMENU:AddPanel(text, zpos, panel, admin)
-		if IsValid(self.List) then
-			local b = generatebutton(text, admin)
+		if IsValid(self.Contents) then
+			local b = generatebutton(text, admin, self.Contents)
 			b:SetZPos(zpos)
 
-			local submenu = vgui.Create("nzu_MenuPanel_SubMenu")
-			submenu:SetParent(self:GetParent())
+			local submenu = vgui.Create("nzu_MenuPanel_SubMenu", self:GetParent())
 			submenu:Dock(FILL)
 			submenu:SetContents(panel)
 			submenu.Menu = self.Menu
@@ -110,20 +109,19 @@ if CLIENT then
 			b.SubPanel = submenu
 			submenu:SetPrevious(text, self)
 			b.ClickFunction = submenuclick
-			self.List:Add(b)
+			self.Contents:Add(b)
 
-			return submenu
+			return submenu, b
 		end
 	end
 
-	--local i = 1
 	function SUBMENU:Init()
-		local topbar = self:Add("Panel")
-		topbar:Dock(TOP)
-		topbar:SetTall(40)
+		self.TopBar = self:Add("Panel")
+		self.TopBar:Dock(TOP)
+		self.TopBar:SetTall(40)
 
 		self.BackButton = generatebutton(" < Back")
-		self.BackButton:SetParent(topbar)
+		self.BackButton:SetParent(self.TopBar)
 		self.BackButton:SizeToContents()
 		self.BackButton:Dock(LEFT)
 		self.BackButton:SetContentAlignment(4)
@@ -134,9 +132,6 @@ if CLIENT then
 		self.Contents = self:Add("DScrollPanel")
 		self.Contents:SetPaintBackground(false)
 		self.Contents:Dock(FILL)
-
-		self.List = self.Contents:Add("DListLayout")
-		self.List:Dock(FILL)
 
 		self:Hide()
 	end
@@ -160,6 +155,8 @@ if CLIENT then
 	function SUBMENU:GetContents()
 		return self.Contents
 	end
+	function SUBMENU:GetTopBar() return self.TopBar end
+
 	function SUBMENU:OnShown() end
 	function SUBMENU:OnHid() end
 	vgui.Register("nzu_MenuPanel_SubMenu", SUBMENU, "Panel")
@@ -167,6 +164,8 @@ if CLIENT then
 	local PLAYER_AVATAR = {}
 	function PLAYER_AVATAR:Init()
 		self.Icon = vgui.Create("ModelImage", self)
+		self.Icon:SetMouseInputEnabled(false)
+		self.Icon:SetKeyboardInputEnabled(false)
 		self.Icon:Dock(FILL)
 
 		self.R = 0
@@ -176,6 +175,7 @@ if CLIENT then
 	function PLAYER_AVATAR:SetPlayer(ply)
 		self.Player = ply
 		self.Model = ply:GetModel()
+
 		self.Icon:SetModel(self.Model)
 	end
 	function PLAYER_AVATAR:Think()
@@ -219,7 +219,7 @@ if CLIENT then
 		self:DockMargin(0,0,0,1)
 
 		self.Character = self:Add("nzu_PlayerAvatar")
-		self.Character:SetWide(54)
+		self.Character:SetSize(54,54)
 		self.Character:DockMargin(5,5,15,5)
 		self.Character:Dock(LEFT)
 
@@ -326,8 +326,17 @@ if CLIENT then
 				-- Same config
 				local state = nzu.Round:GetState()
 				if state ~= ROUND_GAMEOVER then
-					if LocalPlayer():IsUnspawned() then
-						local totext = state == ROUND_WAITING and translate.Get("ready") or translate.Get("spawn_in")
+					if LocalPlayer():Alive() then
+						local totext = "Unspawn"
+						if self:GetText() ~= totext then
+							self:SetText(totext)
+							self.ClickFunction = nzu.Unready
+
+							self.AdminOnly = false
+							self:SetDisabled(false)
+						end
+					elseif not LocalPlayer():IsReady() then
+						local totext = state == ROUND_WAITING and "Ready" or "Spawn in"
 						if self:GetText() ~= totext then
 							self:SetText(totext)
 							self.ClickFunction = nzu.Ready
@@ -336,7 +345,7 @@ if CLIENT then
 							self:SetDisabled(false)
 						end
 					else
-						local totext = state == ROUND_WAITING and translate.Get("unready") or translate.Get("unspawn")
+						local totext = "Unready"
 						if self:GetText() ~= totext then
 							self:SetText(totext)
 							self.ClickFunction = nzu.Unready
@@ -350,7 +359,7 @@ if CLIENT then
 			else
 				if self:GetText() ~= "Load selected Config" then
 					-- Different config, only admins can trigger a load
-					self:SetText(translate.Get("load_celected_config"))
+					self:SetText("Load selected Config")
 					self.ClickFunction = readybuttonload
 					self.AdminOnly = true
 					self:SetDisabled(false)
@@ -359,7 +368,7 @@ if CLIENT then
 			end
 		end
 
-		self:SetText(translate.Get("no_action"))
+		self:SetText("[No valid action]")
 		self:SetDisabled(true)
 	end
 
@@ -377,9 +386,9 @@ if CLIENT then
 			self.ConfigPanel:SetImage("vgui/black")
 			self.ConfigPanel.Map:SetText("")
 			self.ConfigPanel.Map:SizeToContents()
-			self.ConfigPanel.Name:SetText(translate.Get("no_config_selected"))
+			self.ConfigPanel.Name:SetText("No Config selected")
 			self.ConfigPanel.Name:SizeToContents()
-			self.ConfigPanel.Authors:SetText(translate.Get("use_config_load"))
+			self.ConfigPanel.Authors:SetText("Use the Load Configs menu to select a Config to load.")
 			self.ConfigPanel.Authors:SizeToContents()
 		end
 	end
@@ -394,7 +403,7 @@ if CLIENT then
 		local state = nzu.Round:GetState()
 		if s.State ~= state then
 			if countdowntextstates[state] then
-				s:SetText(translate.Get("game_active").." - ["..countdowntextstates[state].."]")
+				s:SetText("GAME ACTIVE - ["..countdowntextstates[state].."]")
 			end
 
 			local old = s.State
@@ -402,7 +411,7 @@ if CLIENT then
 			s.LastCountdown = nil
 			s:SetVisible(state ~= ROUND_WAITING)
 
-			if old == ROUND_WAITING and not LocalPlayer():IsUnspawned() then
+			if old == ROUND_WAITING and LocalPlayer():IsReady() then
 				s.Menu:Close() -- Close menu on game start
 			end
 		end
@@ -413,7 +422,7 @@ if CLIENT then
 				local diff = math.ceil(nzu.Round.GameStart - CurTime())
 				if diff >= 0 then
 					if diff ~= s.LastCountdown then
-						s:SetText(translate.Get("game_starting").." "..(diff > 0 and diff or 0).."...]")
+						s:SetText("GAME STARTING - [Spawn in "..(diff > 0 and diff or 0).."...]")
 						s.LastCountdown = diff
 
 						-- Play UI sound
@@ -431,11 +440,19 @@ if CLIENT then
 				for i = 1,10 do
 					str = str .. string.char(math.random(32,126))
 				end
-				s:SetText(translate.Get("game_active").." - ["..str.."]")
+				s:SetText("GAME ACTIVE - ["..str.."]")
 				s.NextRandomize = CurTime() + 0.025
 			end
 		end
 	end
+
+	--[[sound.Add({
+		name = "nzu_menu_music",
+		channel = CHAN_STATIC,
+		pitch = 100,
+		level = 0, -- global
+		sound = "",
+	})]]
 
 	function PANEL:Init()
 		self:ParentToHUD()
@@ -486,30 +503,30 @@ if CLIENT then
 		self.RightSide = self:Add("DDragBase")
 		self.RightSide:Dock(RIGHT)
 		self.RightSide:SetWide(600)
-		self.RightSide:DockMargin(50,100,100,100)
+		self.RightSide:DockMargin(50,100,100,50)
 
 		self.PlayerIndicator = self.RightSide:Add("DPanel")
 		self.PlayerIndicator:SetTall(40)
 		self.PlayerIndicator:DockMargin(0,0,0,5)
 
 		self.PlayerIndicator.Model = self.PlayerIndicator:Add("DLabel")
-		self.PlayerIndicator.Model:SetText(translate.Get("character"))
+		self.PlayerIndicator.Model:SetText("Character")
 		self.PlayerIndicator.Model:DockMargin(0,0,0,0)
 		self.PlayerIndicator.Model:SetContentAlignment(5)
 		self.PlayerIndicator.Model:Dock(LEFT)
 
 		self.PlayerIndicator.Name = self.PlayerIndicator:Add("DLabel")
-		self.PlayerIndicator.Name:SetText(translate.Get("name"))
+		self.PlayerIndicator.Name:SetText("Name")
 		self.PlayerIndicator.Name:SetContentAlignment(5)
 		self.PlayerIndicator.Name:Dock(FILL)
 
 		self.PlayerIndicator.Ping = self.PlayerIndicator:Add("DLabel")
-		self.PlayerIndicator.Ping:SetText(translate.Get("ping"))
+		self.PlayerIndicator.Ping:SetText("Ping")
 		self.PlayerIndicator.Ping:SetContentAlignment(5)
 		self.PlayerIndicator.Ping:Dock(RIGHT)
 
 		self.PlayerIndicator.Mute = self.PlayerIndicator:Add("DLabel")
-		self.PlayerIndicator.Mute:SetText(translate.Get("mute"))
+		self.PlayerIndicator.Mute:SetText("Mute")
 		self.PlayerIndicator.Mute:SetContentAlignment(5)
 		self.PlayerIndicator.Mute:Dock(RIGHT)
 
@@ -580,21 +597,90 @@ if CLIENT then
 			end
 		end
 
-		--[[self.Promo = self.LeftSide:Add("DPanel")
+		-- TODO: Add the link and uncomment this section when the server is open
+		--[[self.Promo = self.LeftSide:Add("DImageButton")
 		self.Promo:Dock(BOTTOM)
 		self.Promo:SetTall(75)
+		self.Promo:SetImage("nzombies-unlimited/menu/discord-promo.png")
 		self.Promo:SetZPos(-1)
 		self.Promo:DockMargin(0,5,0,0)
 
-		self.PromoText = self.Promo:Add("DLabel")
-		self.PromoText:SetText("Join the official nZombies Unlimited Discord Server")
-		self.PromoText:SetFont("Trebuchet24")
-		self.PromoText:SetContentAlignment(5)
-		self.PromoText:Dock(FILL)]]
+		local link = ""
+		self.Promo.DoClick = function()
+			local frame = vgui.Create("DFrame")
+			frame:SetSkin("nZombies Unlimited")
+			frame:SetBackgroundBlur(true)
+			frame:SetTitle("Discord Link")
+			frame:SetDeleteOnClose(true)
+			frame:ShowCloseButton(true)
+			frame:SetSize(300, 120)
 
-		self:SetConfig(nzu.CurrentConfig) -- unloaded
+			local lbl = frame:Add("DLabel")
+			lbl:SetText("Click to copy to clipboard")
+			lbl:Dock(TOP)
+			lbl:SetContentAlignment(5)
+
+			local txt = frame:Add("DButton")
+			txt:SetText(link)
+			txt:Dock(TOP)
+			txt:SetContentAlignment(5)
+			txt.DoClick = function(s)
+				SetClipboardText(link)
+				lbl:SetText("Copied!")
+				lbl:SetTextColor(Color(0,255,0))
+				s:KillFocus()
+			end
+			local sk = txt:GetSkin()
+			txt.Paint = function(s,w,h) sk.tex.TextBox( 0, 0, w, h ) end
+
+			local but = frame:Add("DButton")
+			but:SetText("Open in Steam Overlay")
+			but:Dock(BOTTOM)
+			but:SetTall(25)
+			but:DockMargin(30,0,30,0)
+			but.DoClick = function()
+				gui.OpenURL(link)
+				frame:Close()
+			end
+
+			frame:MakePopup()
+			frame:Center()
+			frame:SetMouseInputEnabled(true)
+			frame:DoModal()
+		end]]
+
+		-- Music!
+		--[[local rsctr = self.RightSide:Add("DPanel")
+		rsctr:Dock(BOTTOM)
+		rsctr:SetTall(36)
+		rsctr.m_bDrawCorners = true
+
+		self.RightSideControls = rsctr:Add("DHorizontalScroller")
+		self.RightSideControls:Dock(FILL)
+		self.RightSideControls:DockPadding(10,10,10,10)
+
+		local mus = self.RightSideControls:Add("DCheckBoxLabel")
+		mus:SetText("Music")
+		mus:Dock(RIGHT)
+		mus:SetContentAlignment(5)
+		mus:SetWide(50)
+		mus.OnChange = function(s,b)
+			local lp = LocalPlayer()
+			if not b and lp.nzu_MenuMusicPlaying then
+				lp:StopSound("nzu_menu_music")
+				lp.nzu_MenuMusicPlaying = nil
+			elseif b and not lp.nzu_MenuMusicPlaying then
+				lp:EmitSound("nzu_menu_music")
+				lp.nzu_MenuMusicPlaying = true
+			end
+		end
+		mus:SetConVar("nzu_menu_music")
+		self.RightSideControls.MusicToggle = mus]]
+
+		self:SetConfig(nzu.CurrentConfig) -- Unloaded or whichever config is loaded when we first open the menu
 		self.MenuRoot:Show()
 	end
+	--if not ConVarExists("nzu_menu_music") then CreateConVar("nzu_menu_music", 1, FCVAR_ARCHIVE, "Sets whether Music should play on the main menu of nZombies Unlimited.") end
 	
 	function PANEL:Paint()
 		Derma_DrawBackgroundBlur(self, self.OpenTime)
@@ -607,17 +693,22 @@ if CLIENT then
 		self:MakePopup()
 		self:SetKeyBoardInputEnabled(false)
 		self:RequestFocus()
+
+		--if GetConVar("nzu_menu_music") then self.RightSideControls.MusicToggle:OnChange(true) end
 	end
 
 	function PANEL:Close()
+		--[[local lp = LocalPlayer()
+		if lp.nzu_MenuMusicPlaying then
+			lp:StopSound("nzu_menu_music")
+			lp.nzu_MenuMusicPlaying = nil
+		end]]
 		self:Hide()
 	end
 
 	function PANEL:ParentPanelToCenter(panel)
 		panel:SetParent(self.MiddleCanvas)
 	end
-
-	--function PANEL:DoClick() print("hfiua") end
 
 	function PANEL:Toggle()
 		if self:IsVisible() then
@@ -631,7 +722,7 @@ if CLIENT then
 	local menuhooks = {}
 	local function togglemenu()
 		local mainmenu = nzu.Menu
-		--if mainmenu then mainmenu:Remove() mainmenu = nil end
+		--if mainmenu then mainmenu:Remove() mainmenu = nil end -- DEBUG
 
 		if net.ReadBool() then
 			if net.ReadBool() then
@@ -692,110 +783,5 @@ else
 	util.AddNetworkString("nzu_CustomizePlayerDone")
 	net.Receive("nzu_CustomizePlayerDone", function(len, ply)
 		ply:UpdateModel()
-	end)
-end
-
-
-
---[[-------------------------------------------------------------------------
-Config Loading
----------------------------------------------------------------------------]]
-if CLIENT then
-	local configpaneltall = 60
-
-	nzu.AddMenuHook("LoadConfig", function(menu)
-		local scroll = vgui.Create("DScrollPanel")
-		scroll:Dock(FILL)
-		local clist = scroll:Add("DListLayout")
-		clist:Dock(FILL)
-
-		local sub = menu:AddPanel(translate.Get("load_config").." ...", 3, scroll)
-
-		local function doconfigclick(p)
-			if p.Config then
-				net.Start("nzu_menu_loadconfigs")
-					net.WriteString(p.Config.Codename)
-					net.WriteString(p.Config.Type)
-				net.SendToServer()
-			end
-		end
-		
-		local function addconfig(_, config)
-			local pnl = vgui.Create("nzu_ConfigPanel", clist)
-			clist:Add(pnl)
-			pnl:SetConfig(config)
-			pnl:SetTall(configpaneltall)
-			--pnl:Sort()
-			pnl:Dock(TOP)
-			pnl:DockMargin(0,0,0,1)
-			pnl.DoClick = doconfigclick
-
-			scroll:InvalidateChildren()
-			timer.Simple(0.1, function() scroll:InvalidateLayout() end)
-		end
-
-		local hasshown = false
-		function sub:OnShown()
-			if not hasshown then
-				hook.Add("nzu_ConfigInfoSaved", scroll, addconfig)
-
-				local cfgs = nzu.GetConfigs()
-				for k,v in pairs(cfgs) do
-					for k2,v2 in pairs(v) do
-						addconfig(nil, v2)
-					end
-				end
-				hasshown = true
-			end
-		end
-
-		net.Receive("nzu_menu_loadconfigs", function()
-			local c = {}
-			c.Codename = net.ReadString()
-			c.Type = net.ReadString()
-			c.Name = net.ReadString()
-			c.Map = net.ReadString()
-			c.Authors = net.ReadString()
-
-			menu:SetConfig(c)
-		end)
-
-	end)
-end
-
-if SERVER then
-	util.AddNetworkString("nzu_menu_loadconfigs")
-
-	local configtoload
-	local function writeconfigtoload()
-		net.WriteString(configtoload.Codename)
-		net.WriteString(configtoload.Type)
-		net.WriteString(configtoload.Name)
-		net.WriteString(configtoload.Map)
-		net.WriteString(configtoload.Authors)
-	end
-
-	net.Receive("nzu_menu_loadconfigs", function(len, ply)
-		if not nzu.IsAdmin(ply) then return end
-
-		local codename = net.ReadString()
-		local ctype = net.ReadString()
-
-		local config = nzu.GetConfig(codename, ctype)
-		if config then
-			configtoload = config
-			net.Start("nzu_menu_loadconfigs")
-				writeconfigtoload()
-			net.Broadcast()
-		end
-	end)
-
-	-- Players that join should see this on the menu
-	hook.Add("PlayerInitialSpawn", "nzu_MenuLoadedConfig", function(ply)
-		if configtoload then
-			net.Start("nzu_menu_loadconfigs")
-				writeconfigtoload()
-			net.Send(ply)
-		end
 	end)
 end

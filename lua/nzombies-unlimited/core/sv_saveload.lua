@@ -19,30 +19,10 @@ duplicator.RegisterEntityModifier("nzu_saveid", function(ply, ent, data)
 	if loadedents then loadedents[id] = ent end -- Doesn't actually modify the entity, just registers who it used to be
 end)
 
-local function loadconfig(config)
-	hook.Run("nzu_PreLoadConfig")
-
-	-- 1) Load Extensions
-	if file.Exists(config.Path.."/settings.txt", "GAME") then
-		local tbl = util.JSONToTable(file.Read(config.Path.."/settings.txt", "GAME"))
-		local toload = {}
-		local core = {}
-		if tbl then
-			for k,v in pairs(tbl) do
-				-- Load extensions with specified settings (rather than defaults)
-				-- These are loaded in the order they were saved (unless the .txt was modified)
-
-				if nzu.GetExtension(v.ID) then
-					nzu.UpdateExtension(v.ID, v.Settings) -- Update if already loaded (Core)
-				else
-					nzu.LoadExtension(v.ID, v.Settings)
-				end
-			end
-		end
-	end
-
-	-- 2) Load Map + Save Extensions
-	-- Mostly copied from gmsave module
+function nzu.ReloadConfigMap(config)
+	local config = config or nzu.CurrentConfig
+	if not config then return end
+	
 	if not file.Exists(config.Path.."/config.dat", "GAME") then return end -- Not error, just load nothing
 	local str = file.Read(config.Path.."/config.dat", "GAME")
 	
@@ -69,6 +49,8 @@ local function loadconfig(config)
 	end
 
 	timer.Simple(0.1, function()
+		navmesh.Load()
+	
 		-- Do preloads
 		for k,v in pairs(tab.SaveExtensions) do
 			if savefuncs[k] and savefuncs[k].PreLoad then
@@ -96,7 +78,7 @@ local function loadconfig(config)
 						end
 					end
 				end
-				savefuncs[k].Load(data, entities)
+				if savefuncs[k].Load then savefuncs[k].Load(data, entities) end
 
 				if savefuncs[k].PostLoad then table.insert(postloads, savefuncs[k].PostLoad) end
 			else
@@ -111,14 +93,39 @@ local function loadconfig(config)
 		for k,v in pairs(postloads) do
 			v(tab.SaveExtensions[k].PostSave)
 		end
+		
+		hook.Run("nzu_PostConfigMap", config)
 	end)
-
-	hook.Run("nzu_PostLoadConfig")
 end
 
+local function loadconfig(config)
+	hook.Run("nzu_PreLoadConfig", config)
 
+	-- 1) Load Extensions
+	if file.Exists(config.Path.."/settings.txt", "GAME") then
+		local tbl = util.JSONToTable(file.Read(config.Path.."/settings.txt", "GAME"))
+		local toload = {}
+		local core = {}
+		if tbl then
+			for k,v in pairs(tbl) do
+				-- Load extensions with specified settings (rather than defaults)
+				-- These are loaded in the order they were saved (unless the .txt was modified)
 
+				if nzu.GetExtension(v.ID) then
+					nzu.UpdateExtension(v.ID, v.Settings) -- Update if already loaded (Core)
+				else
+					nzu.LoadExtension(v.ID, v.Settings)
+				end
+			end
+		end
+	end
 
+	-- 2) Load Map + Save Extensions
+	-- Mostly copied from gmsave module
+	nzu.ReloadConfigMap(config)
+
+	hook.Run("nzu_PostLoadConfig", config)
+end
 
 local function getplystonetworkto()
 	local plys = {}
@@ -196,7 +203,7 @@ end)
 local dontnetwork = false
 hook.Add("nzu_ConfigInfoSaved", "nzu_NetworkUpdatedConfigs", function(config)
 	if dontnetwork then return end
-	networkconfig(config, getplystonetworkto()) -- Network this updated config to all players
+	networkconfig(config, config == nzu.CurrentConfig and player.GetAll() or getplystonetworkto()) -- Network this updated config to all players
 end)
 
 
@@ -213,7 +220,7 @@ Loading a Config
 ---------------------------------------------------------------------------]]
 util.AddNetworkString("nzu_loadconfig") -- SERVER: Load a config || CLIENT: Receive list of missing addons
 
-function nzu.LoadConfig(config, ctype)
+function nzu.LoadConfig(config, ctype, mode)
 	if type(config) == "string" then config = nzu.GetConfig(config, ctype) end -- Compatibility with string arguments (codenames)
 
 	if not config or not config.Codename or not config.Path or not config.Map then
@@ -221,18 +228,13 @@ function nzu.LoadConfig(config, ctype)
 		return
 	end
 
-	if not nzu.CurrentConfig and config.Map == game.GetMap() then
+	if not nzu.CurrentConfig and config.Map == game.GetMap() and mode ~= false then
 		-- Allow immediate loading if no config has previously been loaded (default gamemode state)
-		loadconfig(config)
 		nzu.CurrentConfig = config
+		loadconfig(config)
 		networkconfig(config, player.GetAll(), true)
 		hook.Run("nzu_ConfigLoaded", config)
 		return
-	end
-	
-	if config.Path == nzu.CurrentConfig.Path then --and NZU_SANDBOX then -- Should this only apply in Sandbox?
-		-- Just clean up the map and refresh
-		--return
 	end
 
 	timer.Create("nzu_saveload", 0.25, 5, function()
@@ -241,6 +243,11 @@ function nzu.LoadConfig(config, ctype)
 
 			print("nzu_saveload: Changing map and loading config '"..config.Codename.."'...")
 			timer.Destroy("nzu_saveload")
+
+			if mode == false then -- Pass the mode you want to play in - i.e. nzu.LoadConfig(config, nil, NZU_NZOMBIES) to load in nZombies (it'll be false in Sandbox, thus changing mode here)
+				RunConsoleCommand("nzu_sandbox_enable", "1")
+				RunConsoleCommand("gamemode", NZU_NZOMBIES and "sandbox" or "nzombies-unlimited")
+			end
 			RunConsoleCommand("changelevel", config.Map)
 		end
 	end)
@@ -314,6 +321,25 @@ end)
 
 
 
+--[[-------------------------------------------------------------------------
+Edit/Play loading by switching modes
+---------------------------------------------------------------------------]]
+util.AddNetworkString("nzu_loadconfig_mode")
+net.Receive("nzu_loadconfig_mode", function(len, ply)
+	if not nzu.IsAdmin(ply) then return end -- Still only admins!
+
+	local codename = net.ReadString()
+	local ctype = net.ReadString()
+	local config = nzu.GetConfig(codename, ctype)
+	if not config then
+		print("nzu_saveload: Client attempted to load to a non-existing config.", ply, codename, type)
+	return end
+
+	nzu.LoadConfig(config, nil, false) -- When it's false, it will think it's always the opposite mode
+end)
+
+
+
 
 
 
@@ -369,6 +395,12 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 		ignoredfields[key] = true
 	end
 
+	local ENTITY = FindMetaTable("Entity")
+	function ENTITY:IgnoreField(key)
+		if not self.nzu_IgnoredFields then self.nzu_IgnoredFields = {} end
+		self.nzu_IgnoredFields[key] = true
+	end
+
 	local function getmapjson()
 		local tbl = {}
 		tbl.SaveExtensions = {}
@@ -400,6 +432,16 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 						v[k2] = nil
 					end
 				end
+
+				if v.nzu_IgnoredFields then
+					for k2,v2 in pairs(v.nzu_IgnoredFields) do
+						temp[k2] = v[k2]
+						v[k2] = nil
+					end
+					temp.nzu_IgnoredFields = v.nzu_IgnoredFields
+					v.nzu_IgnoredFields = nil
+				end
+
 				map = duplicator.Copy(v, map)
 				for k2,v2 in pairs(temp) do
 					v[k2] = v2
@@ -410,16 +452,18 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 		
 		local postsaves = {}
 		for k,v in pairs(savefuncs) do
-			local data, entities = v.Save()
-			if data or entities then
-				local save = {Data = data}
-				if entities then
-					save.Entities = {}
-					for k2,v2 in pairs(entities) do
-						table.insert(save.Entities, v2:EntIndex())
+			if v.Save then
+				local data, entities = v.Save()
+				if data or entities then
+					local save = {Data = data}
+					if entities then
+						save.Entities = {}
+						for k2,v2 in pairs(entities) do
+							table.insert(save.Entities, v2:EntIndex())
+						end
 					end
+					tbl.SaveExtensions[k].Save = save
 				end
-				tbl.SaveExtensions[k].Save = save
 			end
 
 			if v.PostSave then table.insert(postsaves, v.PostSave) end
@@ -458,15 +502,18 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 		for k,v in pairs(nzu.GetLoadedExtensionOrder()) do
 			local ext = nzu.GetExtension(v)
 			if ext then
-				local t = {}
-				-- Loop through the settings meta; If any have a "Save" we will save the value of that function instead
-				for k,v in pairs(ext.GetSettingsMeta()) do
-					local tosave = ext.Settings[k]
-					if v.Save then tosave = v.Save(tosave) end
-					t[k] = tosave
-				end
-
-				table.insert(tbl, {ID = ext.ID, Settings = t})
+				if ext.GetSettingsMeta() then
+					local t = {}
+					-- Loop through the settings meta; If any have a "Save" we will save the value of that function instead
+					for k,v in pairs(ext.GetSettingsMeta()) do
+						local tosave = ext.Settings[k]
+						if v.Save then tosave = v.Save(tosave) end
+						t[k] = tosave
+					end
+					table.insert(tbl, {ID = ext.ID, Settings = t})
+				else
+					table.insert(tbl, {ID = ext.ID})
+				end				
 			end
 		end
 		return util.TableToJSON(tbl)
@@ -547,7 +594,6 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 			config.Path = nzu.GetConfigDir("Local")..codename
 
 			nzu.CurrentConfig = config
-			print("Changed config: ", config.Codename)
 			tonetwork = true
 		end
 
@@ -565,8 +611,6 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 			local name = net.ReadString()
 			config.RequiredAddons[id] = name
 		end
-
-		PrintTable(config)
 
 		if net.ReadBool() then
 			-- Save the map, settings, and all!
@@ -635,6 +679,25 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 		if not nzu.IsAdmin(ply) then return end -- Of course only admins can delete folders and files!!
 		nzu.DeleteConfig(net.ReadString())
 	end)
+end
+
+
+
+--[[-------------------------------------------------------------------------
+Additional Config folder file read/write
+---------------------------------------------------------------------------]]
+function nzu.WriteConfigFile(name, str)
+	if nzu.CurrentConfig and nzu.CurrentConfig.Type == "Local" then
+		file.Write("nzombies-unlimited/localconfigs/"..nzu.CurrentConfig.Codename.."/"..name, str)
+		return true
+	end
+	return false
+end
+
+function nzu.ReadConfigFile(name)
+	if nzu.CurrentConfig then
+		return file.Read(nzu.CurrentConfig.Path.."/"..name, "GAME")
+	end
 end
 
 

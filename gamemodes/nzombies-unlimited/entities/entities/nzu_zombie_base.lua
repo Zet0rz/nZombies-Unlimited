@@ -23,6 +23,7 @@ a model that has the appropriate animations)
 ---------------------------------------------------------------------------]]
 
 --------------
+-- Fields: Values that you can set for your subclass (or on initialize for the specific entity)
 -- Callable: Functions you can call, but really shouldn't overwrite
 -- Overridables: These can be overridden to make your own implementation and are called internally by the base. They all have a default (as seen here).
 --------------
@@ -44,12 +45,23 @@ local coroutine = coroutine
 Initialization
 ---------------------------------------------------------------------------]]
 if SERVER then
+	------- Fields -------
+	-- TODO: Change the structure of this so that a subclass implementation doesn't inheret this table too
+	ENT.Models = {
+		{Model = "models/nzu/nzombie_honorguard.mdl", Skin = 0, Bodygroups = {0,0}},
+		{Model = "models/nzu/nzombie_honorguard.mdl", Skin = 0, Bodygroups = {0,1}},
+	}
+
+	-- Smaller than players except in the forward direction
+	ENT.CollisionMins = Vector(-12,-8,0)
+	ENT.CollisionMaxs = Vector(12,16,64)
+
 	------- Overridables -------
 
 	-- Lets you determine what class of model this zombie is, along with a default
 	-- if it cannot be chosen by the gamemode's Model Packs settings
 	function ENT:SelectModel()
-		return "ZombieModels", "models/nzu/nzombie_honorguard.mdl"
+		return "ZombieModels", self.Models
 	end
 
 	-- Called after each event to determine its base movement animation
@@ -96,7 +108,7 @@ Targeting
 if SERVER then
 	------- Callables -------
 	function ENT:GetTarget() return self.Target end -- Get the current target
-	function ENT:SetTarget(t) if self:AcceptTarget(t) then self.Target = t end end -- Sets the target for the next path update
+	function ENT:SetTarget(t) if self:AcceptTarget(t) then self.Target = t return true else return false end end -- Sets the target for the next path update
 	function ENT:SetTargetLocked(b) self.TargetLocked = b end -- Stops the Zombie from retargetting and keeps this target while it is valid and targetable
 	function ENT:SetNextRetarget(time) self.NextRetarget = CurTime() + time end -- Sets the next time the Zombie will repath to its target
 	function ENT:Retarget() -- Causes a retarget
@@ -153,8 +165,8 @@ Pathing - SERVER
 
 if SERVER then
 	------- Fields -------
-	ENT.Acceleration = 400
-	ENT.Deceleration = 400
+	ENT.Acceleration = 500
+	ENT.Deceleration = 500
 	ENT.JumpHeight = 60
 	ENT.MaxYawRate = 360
 	ENT.StepHeight = 18
@@ -178,6 +190,11 @@ if SERVER then
 	-- Returns whether the current path goal exists and it is in the same 180-degree direction as the argument position
 	function ENT:IsMovingTowards(pos)
 		return self.Path and (pos - self:GetPos()):Dot(self.Path:GetCurrentGoal().forward) > 0
+	end
+
+	-- Opposite of above. But instead of using 'not', this would return false if we don't have a path at all (arbitrary what direction we move - we'll always move towards the target pos)
+	function ENT:IsNotMovingTowards(pos)
+		return self.Path and (pos - self:GetPos()):Dot(self.Path:GetCurrentGoal().forward) < 0
 	end
 
 	------- Overridables -------
@@ -260,23 +277,43 @@ if SERVER then
 	-- A damage info can be passed, otherwise a default is created
 	function ENT:AttackTarget(target, dmg, move)
 		if IsValid(target) then
-			local dmg = dmg
+		
+			local tbl = {}
 			if not dmg then
-				dmg = DamageInfo()
-				dmg:SetDamage(self.AttackDamage)
-				dmg:SetDamageType(DMG_SLASH)
-				dmg:SetAttacker(self)
-				--dmg:SetDamageForce()
+				tbl.Damage = self.AttackDamage
+				tbl.Type = DMG_SLASH
+			else
+				tbl.Damage = dmg:GetDamage()
+				tbl.Type = dmg:GetDamageType()
+				tbl.Force = dmg:GetDamageForce()
 			end
 
 			-- Perform the attack with the function of hurting the target!
 			if move then
 				self:DoMovingAttackFunction(target, function(self, target)
-					if self:GetRangeTo(target) <= self.AttackRange then target:TakeDamageInfo(dmg) end
+					if self:GetRangeTo(target) <= self.AttackRange then
+						local dmg = DamageInfo()
+						dmg:SetDamage(tbl.Damage)
+						dmg:SetDamageType(tbl.Type)
+						if tbl.Force then dmg:SetDamageForce(tbl.Force) end
+						dmg:SetAttacker(self)
+						dmg:SetInflictor(self)
+						
+						target:TakeDamageInfo(dmg)
+					end
 				end, true)
 			else
 				self:DoAttackFunction(target, function(self, target)
-					if self:GetRangeTo(target) <= self.AttackRange then target:TakeDamageInfo(dmg) end
+					if self:GetRangeTo(target) <= self.AttackRange then
+						local dmg = DamageInfo()
+						dmg:SetDamage(tbl.Damage)
+						dmg:SetDamageType(tbl.Type)
+						if tbl.Force then dmg:SetDamageForce(tbl.Force) end
+						dmg:SetAttacker(self)
+						dmg:SetInflictor(self)
+						
+						target:TakeDamageInfo(dmg)
+					end
 				end, true)
 			end
 		end
@@ -348,7 +385,7 @@ if SERVER then
 				if goal < CurTime() then return end
 				if IsValid(path) then
 					path:Update(self)
-					path:Draw()
+					--path:Draw() -- DEBUG
 				end
 				if path:GetAge() > repath then path:Compute(self, target:GetPos(), compute) end
 				coroutine.yield()
@@ -392,13 +429,13 @@ if SERVER then
 	-- This is the place where you'll want to adjust movement speed if you want a small slowdown
 	-- The base merely applies insane acceleration to make the zombie always able to keep up
 	function ENT:StartMovingAttack(target, attack, speed)
-		self.loco:SetAcceleration(9999)
+		--self.loco:SetAcceleration(10000)
 	end
 
 	-- Called at the end of a moving attack
 	-- This is where you'll want to revert the changes made in ENT:StartMovingAttack
 	function ENT:FinishMovingAttack()
-		self.loco:SetAcceleration(self.Acceleration)
+		--self.loco:SetAcceleration(self.Acceleration)
 	end
 end
 
@@ -423,6 +460,14 @@ if SERVER then
 		Sound("nzu/zombie/death/death_09.wav"),
 		Sound("nzu/zombie/death/death_10.wav"),
 	}
+	
+	-- The amount of force to skip the death animation and do a ragdoll instead
+	-- Set to 0 to always ragdoll, -1 to never
+	ENT.DeathRagdollForce = 0
+	
+	-- A table of death animations. Will play if the force of the damage is below ENT.DeathRagdollForce
+	-- Default: nil (since the base always ragdolls)
+	ENT.DeathAnimations = nil
 
 	------- Overridables -------
 
@@ -437,7 +482,14 @@ if SERVER then
 	-- Default: Fling like a ragdoll based on the damage and play a death sound!
 	function ENT:PerformDeath(dmg)
 		self:PlaySound(self.DeathSounds[math.random(#self.DeathSounds)])
-		self:BecomeRagdoll(dmg)
+		if self.DeathRagdollForce == 0 or self.DeathRagdollForce <= dmg:GetDamageForce():Length() then
+			self:BecomeRagdoll(dmg)
+		else
+			self:TriggerEvent("Death", function(self, seq)
+				self:PlaySequenceAndWait(seq)
+				self:BecomeRagdoll(DamageInfo())
+			end, self.DeathAnimations[math.random(#self.DeathAnimations)])
+		end
 	end
 
 
@@ -467,7 +519,7 @@ Similar to attacks, these are just fields along with a SelectVault function
 if SERVER then
 	------- Fields -------
 	ENT.VaultSequence = "nz_barricade_walk_1" -- What animation to vault with
-	ENT.VaultSpeed = 50 -- How fast the zombie moves over the vault
+	ENT.VaultSpeed = 30 -- How fast the zombie moves over the vault
 
 	------- Overridables -------
 
@@ -521,14 +573,15 @@ if SERVER then
 			to = pos
 		end
 
-		if self.Path and (to - self:GetPos()):Dot(self.Path:GetCurrentGoal().forward) < 0 then return end -- Don't vault at all if the direction of vault is away from where we want to go
+		if self:IsNotMovingTowards(to) then return end -- Don't vault at all if the direction of vault is away from where we want to go
 
 		local stucktime
 
 		-- If from exists, move to that position first
 		if from then
 			local path = Path("Follow")
-			path:SetGoalTolerance(20)
+			path:SetGoalTolerance(10)
+			path:SetMinLookAheadDistance(10)
 			path:Compute(self, from, self.ComputePath)
 			if not path:IsValid() then return end
 
@@ -550,23 +603,26 @@ if SERVER then
 		end
 		stucktime = nil
 
+		-- Get a path to the target location so we can get the distance
+		local path = Path("Follow")
+		path:SetGoalTolerance(10)
+		path:Compute(self, to, self.ComputePath)
+		if not path:IsValid() then return end
+
 		local name,groundspeed = self:SelectVaultSequence(to)
 		if not groundspeed then groundspeed = self.VaultSpeed end
 		local seq,dur = self:LookupSequence(name)
 
-		-- Get a path to the target location so we can get the distance
-		local path = Path("Follow")
-		path:SetGoalTolerance(20)
-		path:Compute(self, to, self.ComputePath)
-		if not path:IsValid() then return end
-
 		local dist = path:GetLength()
 		self:ResetSequence(seq)
 		self:SetCycle(0)
+
 		local rate = dur/(dist/groundspeed)
 		self:SetPlaybackRate(rate)
-		self.loco:SetDesiredSpeed(dist/dur)
+		local t = CurTime()
 
+		self.loco:SetAcceleration(500)
+		self.loco:SetDesiredSpeed(groundspeed)
 		self:SetSolidMask(MASK_NPCWORLDSTATIC) -- Nocollide with props and other entities (we remove this with CollideWhenPossible)
 
 		while path:IsValid() do
@@ -578,7 +634,7 @@ if SERVER then
 					self:SetPlaybackRate(0)
 				elseif stucktime < CurTime() then
 					self:SetPos(to) -- Give up and teleport
-					return
+					break
 				end
 			elseif stucktime then -- Resume the vault
 				stucktime = nil
@@ -587,8 +643,75 @@ if SERVER then
 			coroutine.yield()
 		end
 
+		self.loco:SetAcceleration(self.Acceleration)
 		self.loco:SetDesiredSpeed(self.DesiredSpeed)
 		self:CollideWhenPossible() -- Remove the mask as soon as we can
+	end
+end
+
+--[[-------------------------------------------------------------------------
+Anti-Stuck
+Functions and callables relating to being stuck or getting obstructing entities
+---------------------------------------------------------------------------]]
+if SERVER then
+	------- Fields -------
+	ENT.MaxStuckTime = 5 -- How long to be stuck for for the zombie to give up and call ENT:OnFullyStuck()
+	ENT.StuckPushDelay = 0.5 -- How long time between random pushes when stuck
+	ENT.RandomPushForce = 100 -- How powerful a ENT:ApplyRandomPush() is when supplied no arguments
+
+	------- Callables -------
+
+	-- Applies a push to the locomotion of the the zombie in a random direction
+	-- If force is not supplied, ENT.RandomPushForce is used
+	function ENT:ApplyRandomPush(force)
+		local force = force or self.RandomPushForce
+		self.loco:SetVelocity(self.loco:GetVelocity() + VectorRand()*force)
+	end
+
+	------- Overridables -------
+
+	-- Called when the Zombie is stuck and attempting to handle it
+	-- Runs continuously as the zombie remains stuck
+	-- Default: Perform random pushes at the interval specified in StuckPushDelay
+	function ENT:Stuck()
+		if not self.NextRandomPush or CurTime() > self.NextRandomPush then
+			self:ApplyRandomPush()
+			self.NextRandomPush = CurTime() + self.StuckPushDelay
+		end
+	end
+
+	-- Called when the Zombie is stuck for longer than MaxStuckTime
+	-- You can call self.loco:ClearStuck() here for the timer to reset if you want
+	-- Default: Respawn the zombie completely
+	function ENT:OnFullyStuck()
+		self:Respawn()
+	end
+
+
+
+	------- Internals -------
+	-- You really shouldn't overwrite these unless you know what you're doing
+	-- Called from the Nextbot itself when stuck. Handles the calling of ENT:Stuck() and ENT:OnFullyStuck()
+	-- You can overwrite these if you don't want that system, but just want your own
+	
+	-- Perform the two functions based on the time
+	function ENT:HandleStuck()
+		if self.ActiveEvent then return end
+		if self.FullyStuckTime and CurTime() > self.FullyStuckTime then
+			self:OnFullyStuck()
+		else
+			self:Stuck()
+		end
+	end
+
+	-- Initialize the time
+	function ENT:OnStuck()
+		self.FullyStuckTime = CurTime() + self.MaxStuckTime
+	end
+
+	-- Reset the time
+	function ENT:OnUnStuck()
+		self.FullyStuckTime = nil
 	end
 end
 
@@ -600,15 +723,10 @@ These let you modify the bot's AI and behavior completely
 if SERVER then
 	------- Overridables -------
 
-	-- Called when the zombie is stuck
-	function ENT:OnStuck()
-		self:Respawn()
-	end
-
 	-- When a path ends. Either when the goal is reached, or when no path could be found
 	-- This is where you should trigger your attack event or idle
 	function ENT:OnPathEnd()
-		if IsValid(self.Target) and not self.PreventAttack then
+		if IsValid(self.Target) and self:AcceptTarget(self.Target) and not self.PreventAttack then
 			if self:GetRangeTo(self.Target) <= self.AttackRange then
 				self:TriggerEvent("Attack", self.Target)
 			end
@@ -638,6 +756,31 @@ if SERVER then
 	-- Note 2: This is called in every loop - use some delay measure to not spam expensive functions
 	-- Default: Do nothing (just move along the path)
 	function ENT:AI()
+
+	end
+
+	-- Called when the zombie collides with a non-target player according to its collision boxes
+	-- You can use this to call attacks before the end of the path is reached
+	-- Default: Change targets and attack if successful!
+	-- Note: If the player is the target, ENT:InteractTarget is called instead!
+	function ENT:InteractPlayer(ply)
+		if self:SetTarget(ply) then -- If we succeeded in targetting this player
+			self:TriggerEvent("Attack", ply)
+		end
+	end
+
+	-- Called when the zombie collides with the target. Note that this isn't necessarily a player!
+	-- Monkey bombs and other target entities go here as well
+	-- Default: Attack the target! (Even if it is a non-player!)
+	function ENT:InteractTarget(target)
+		self:TriggerEvent("Attack", target)
+	end
+
+	-- Called when bumping into any entity that doesn't have a ZombieInteract function and isn't a player
+	-- This is not affected by "zombie proxying", so it cannot be used to detect walking into a crowd of zombies
+	-- interacting with something else. You can use this to make special interactions that only this zombie can do
+	-- Default: Do nothing (ignore it)
+	function ENT:Interact(ent)
 
 	end
 end
@@ -713,7 +856,18 @@ Below here is the base code that you shouldn't override
 function ENT:Initialize()
 	if SERVER then
 		local m,fallback = self:SelectModel()
-		self:SetModel(fallback)
+
+		local models = m and nzu.GetResourceSet(m) or fallback
+		local choice = models[math.random(#models)]
+		self:SetModel(choice.Model)
+		if choice.Skin then self:SetSkin(choice.Skin) end
+		if choice.Bodygroups then
+			for k,v in pairs(choice.Bodygroups) do
+				self:SetBodygroup(k,v)
+			end
+		end
+
+		self:SetCollisionBounds(self.CollisionMins, self.CollisionMaxs)
 
 		self:SetNextRepath(0)
 		self:SetNextRetarget(0)
@@ -737,6 +891,9 @@ if SERVER then
 	end
 
 	function ENT:RunBehaviour()
+		self:Retarget()
+		self:InitializePath()
+
 		while true do
 			if self.ActiveEvent then
 				self:EventHandler(self.EventData) -- This handler should be holding the routine until it is done
@@ -744,7 +901,7 @@ if SERVER then
 				self.ActiveEvent = nil
 				self.EventData = nil
 
-				if self.EventMask then
+				if self.EventMask and not self.DoCollideWhenPossible then
 					self:SetSolidMask(MASK_NPCSOLID)
 					self.EventMask = nil
 				end
@@ -756,6 +913,8 @@ if SERVER then
 				end
 
 				if IsValid(self.Path) then self:ResetMovementSequence() end
+
+				if self.loco:IsStuck() then self.FullyStuckTime = CurTime() + self.MaxStuckTime end
 			end
 
 			local ct = CurTime()
@@ -769,49 +928,54 @@ if SERVER then
 
 			if not IsValid(self.Target) then
 				self:OnNoTarget()
-			else
-				local path = self.Path
-				if not path then
-					self:InitializePath()
-				elseif not IsValid(path) then -- We reached the goal, or path terminated for another reason
-					self:OnPathEnd()
-					self.Path = nil
-
-					if not IsValid(self.Target) or not self:AcceptTarget(self.Target) then
-						self:SetNextRetarget(0) -- Always retarget at the end of a path if the current target no longer exists or is not acceptable anymore (such as downed)
-					end
-				else
-					-- DEBUG
-					path:Draw()
-
-					if path:GetAge() >= self.NextRepath then
-						if not IsValid(self.Target) then
-							self:SetNextRetarget(0) -- Retarget next cycle
-							coroutine.yield()
-							continue
-						end
-						path:Compute(self, self:GetTargetPosition(), self.ComputePath)
-						self:SetNextRepath(self:CalculateNextRepath(path))
-					end
-					path:Update(self)
-
-					if not self.NextSound or self.NextSound < CurTime() then
-						self:Sound()
-					end
-					self:AI()
-				end
 			end
+
+			local path = self.Path
+			if not path then
+				self:InitializePath()
+				path = self.Path
+			elseif not IsValid(path) then -- We reached the goal, or path terminated for another reason
+				self:OnPathEnd()
+
+				if not IsValid(self.Target) or not self:AcceptTarget(self.Target) then
+					self:Retarget() -- Retarget on path end if the previous target is no longer valid
+					if not IsValid(self.Target) or not self:AcceptTarget(self.Target) then continue end
+				end
+
+				-- Recompute the path
+				path:Compute(self, self:GetTargetPosition(), self.ComputePath)
+				self:SetNextRepath(self:CalculateNextRepath(path))
+			end
+
+			if path:GetAge() >= self.NextRepath then
+				if not IsValid(self.Target) then
+					self:SetNextRetarget(0) -- Retarget next cycle
+					coroutine.yield()
+					continue
+				end
+				path:Compute(self, self:GetTargetPosition(), self.ComputePath)
+				self:SetNextRepath(self:CalculateNextRepath(path))
+			end
+			-- DEBUG
+			--path:Draw()
+			path:Update(self)
+			if self.loco:IsStuck() then self:HandleStuck() end
+
+			if not self.NextSound or self.NextSound < CurTime() then
+				self:Sound()
+			end
+			self:AI()
 
 			coroutine.yield()
 		end
 	end
 
+	ENT.CollisionBoxCheckInterval = 1
+	local boxcheckrange = 30
 	function ENT:OnContact(ent)
 		if not self.ActiveEvent and IsValid(ent) then
-			local ent2 = ent
-			if ent.nzu_InteractTarget then ent2 = ent.nzu_InteractTarget else ent2 = ent end -- Bumping into a proxy interactor
-
-			if IsValid(ent2) and ent2.ZombieInteract then
+			local ent2 = ent.nzu_InteractTarget or ent -- Bumping into a proxy interactor
+			if ent2.ZombieInteract then
 				self.nzu_InteractTarget = ent2 -- Turn ourselves into a proxy for the duration of the interaction
 				ent2:ZombieInteract(self, ent)
 
@@ -821,7 +985,41 @@ if SERVER then
 					self.nzu_InteractTarget = nil
 					if ent2.ZombieInteractEnd then ent2:ZombieInteractEnd(self) end
 				end
+				return
 			end
+			if ent2 == self.Target then self:InteractTarget(ent2, ent) return end
+			if ent2:IsPlayer() then self:InteractPlayer(ent2, ent) return end
+
+			-- The entity or its proxy did not pass any of the interactions
+			-- Attempt to find an interactable entity in a box 30 units ahead of us
+			if not self.NextBoxCheck or self.NextBoxCheck < CurTime() then
+				self.NextBoxCheck = CurTime() + self.CollisionBoxCheckInterval
+
+				-- TODO: Make this if-statement say only if static entity? Is that optimized? i.e. prevent this when bumping into moving zombies
+				--if self.loco:GetVelocity():Length2D() <= 10 then
+					local targetforward = IsValid(self.Path) and (self.Path:GetCurrentGoal().pos - self:GetPos()):GetNormalized()*boxcheckrange or self:GetAngles():Forward()*boxcheckrange
+					local a,b = self:GetCollisionBounds()
+
+					local p = self:GetPos() + targetforward
+					local tbl = ents.FindInBox(p+a,p+b)
+
+					for k,v in pairs(tbl) do
+						if v.ZombieInteract then -- This only works for entities with ZombieInteract
+							self.nzu_InteractTarget = v
+							v:ZombieInteract(self, ent)
+
+							if not self.ActiveEvent then
+								self.nzu_InteractTarget = nil
+								if v.ZombieInteractEnd then v:ZombieInteractEnd(self) end
+							end
+							return
+						end
+					end
+				--end
+			end
+
+			-- In the end, call our own Interact function on the initial (potentially proxied) entity we collided with
+			self:Interact(ent2)
 		end
 	end
 
@@ -849,7 +1047,16 @@ Pass potential data as the third argument rather than directly in the handler
 ---------------------------------------------------------------------------]]
 if SERVER then
 	function ENT:TriggerEvent(id, handler, data)
-		if self.ActiveEvent then return end
+		-- Lapsing events
+		if self.ActiveEvent and coroutine.running() then
+			local func = self["Event_"..id] or handler
+			if func then
+				self.ActiveEvent = id
+				self.EventHandler = func
+				self.EventData = data
+				func(self, data)
+			end
+		return end
 		
 		local func = self["Event_"..id] or handler
 		if func then
@@ -860,7 +1067,7 @@ if SERVER then
 		end
 		return false
 	end
-	 
+	
 	function ENT:RequestTerminateEvent()
 		if self.ActiveEvent then
 			self.Event_Terminate = true
@@ -940,6 +1147,7 @@ function ENT:Think()
 				self:SetSolidMask(MASK_NPCSOLID)
 				self.DoCollideWhenPossible = nil
 				self.NextCollideCheck = nil
+				self.EventMask = nil
 			else
 				self.NextCollideCheck = CurTime() + collidedelay
 			end

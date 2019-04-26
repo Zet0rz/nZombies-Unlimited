@@ -42,7 +42,7 @@ The tool to do the magic
 ---------------------------------------------------------------------------]]
 
 local TOOL = {}
-TOOL.Category = "Basic"
+TOOL.Category = "Navigation"
 TOOL.Name = "#tool.nzu_tool_navlock.name"
 
 TOOL.nzu_NavEdit = true
@@ -69,7 +69,7 @@ function TOOL:Holster()
 	if SERVER then
 		if GetConVar("nav_edit"):GetBool() then
 			for k,v in pairs(player.GetAll()) do
-				if v ~= self:GetOwner() and v:Alive() then
+				if v ~= self:GetOwner() and v:Alive() and nzu.IsAdmin(v) then
 					local tool = v:GetTool()
 					if tool and tool.nzu_NavEdit then return true end
 				end
@@ -80,32 +80,34 @@ function TOOL:Holster()
 	return true
 end
 
-function TOOL:LeftClick(trace)
-	if SERVER then		
-		if self:GetStage() == 0 then
-			if IsValid(trace.Entity) then
-				local data = trace.Entity:GetDoorData()
-				if data and data.Group and data.Group ~= "" then
+function TOOL:LeftClick(trace)	
+	if self:GetStage() == 0 then
+		if IsValid(trace.Entity) then
+			local data = trace.Entity:GetDoorData()
+			if data and data.Group and data.Group ~= "" then
+				if SERVER then
 					self:GetOwner():ConCommand("nzu_tool_navlock_group "..data.Group)
 					self:SetStage(1)
-					return true
-				else
-					self:GetOwner():ChatPrint("This entity has no Door Group set.")
 				end
+				return true
+			elseif SERVER then
+				self:GetOwner():ChatPrint("This entity has no Door Group set.")
 			end
-		elseif self:GetStage() == 1 then
-			local group = self:GetClientInfo("group")
-			if group and group ~= "" then
+		end
+	elseif self:GetStage() == 1 then
+		local group = self:GetClientInfo("group")
+		if group and group ~= "" then
+			if SERVER then
 				local nav = navmesh.GetNearestNavArea(trace.HitPos)
 				if IsValid(nav) then
 					locknavarea(nav, group)
 					self:SetStage(0)
-					return true
 				end
-			else
-				self:GetOwner():ChatPrint("Invalid Door Group. Did you change it in console?")
-				self:SetStage(0)
 			end
+			return true
+		elseif SERVER then
+			self:GetOwner():ChatPrint("Invalid Door Group. Did you change it in console?")
+			self:SetStage(0)
 		end
 	end
 end
@@ -116,27 +118,26 @@ function TOOL:RightClick(trace)
 		local nav = navmesh.GetNearestNavArea(trace.HitPos)
 		if IsValid(nav) then
 			blocknavarea(nav, group)
-			return true
 		end
 	end
+	return true
 end
 
 -- Cancels if mid-operation, removes lock if not
 function TOOL:Reload(trace)
 	if SERVER then
-		if self:GetStage() == 1 then
+		if self:GetStage() ~= 0 then
 			self:SetStage(0)
-			return true
-		elseif self:GetStage() == 0 then
+		else
 			local nav = navmesh.GetNearestNavArea(trace.HitPos)
 			if IsValid(nav) then
 				local id = nav:GetID()
 				navdoors[id] = nil
 				navblocks[id] = nil
-				return true
 			end
 		end
 	end
+	return true
 end
 
 if SERVER then

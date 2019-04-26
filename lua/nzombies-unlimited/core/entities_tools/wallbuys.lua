@@ -42,14 +42,24 @@ local defaultmodel = "models/weapons/w_rif_m4a1.mdl"
 local matrix = Matrix()
 matrix:Rotate(rotang)
 matrix:Scale(scale)
+function ENT:GetWallBounds()
+	local a,b = self:GetModelBounds()
+	return matrix*a, matrix*b
+end
+
 function ENT:Initialize()
 	if SERVER then
 		self:SetUseType(SIMPLE_USE)
 		self:SetCollisionGroup(COLLISION_GROUP_DEBRIS_TRIGGER)
 
-		self:SetModel(defaultmodel)
-		local a,b = self:GetModelBounds()
-		self:PhysicsInitBox(matrix*a, matrix*b)
+		local model = defaultmodel
+		if self:GetWeaponClass() then
+			local wep = weapons.GetStored(self:GetWeaponClass())
+			if wep then model = wep.WM or wep.WorldModel end
+		end
+		
+		self:PhysicsInitBox(self:GetWallBounds())
+		self:SetSolid(SOLID_OBB)
 	else
 		self:EnableMatrix("RenderMultiply", matrix)
 	end
@@ -57,20 +67,14 @@ function ENT:Initialize()
 end
 
 if SERVER then
-	function ENT:UpdateCollisionBounds()
-		local a,b = self:GetModelBounds()
-		self:SetCollisionBounds(matrix*a, matrix*b)
-		self:SetAngles(self:GetAngles())
-	end
-
 	function ENT:WeaponClassChanged(_, old, new)
 		if old ~= new then
 			local wep = weapons.GetStored(new)
-			local model = wep and wep.WM or wep.WorldModel or defaultmodel
+			local model = wep and (wep.WM or wep.WorldModel) or defaultmodel
 
 			if model ~= self:GetModel() then
 				self:SetModel(model)
-				self:UpdateCollisionBounds()
+				self:SetCollisionBounds(self:GetWallBounds())
 			end
 
 			self:SetBought(false)
@@ -110,7 +114,7 @@ if CLIENT then
 		Vector(0, 0.5, -0.5),
 		Vector(0, -0.5, 0.5),
 	}
-	local renderplane = Angle(90,0,0)
+	local renderplane = Angle(0,90,90)
 	function ENT:Draw()
 		if halo.RenderedEntity() ~= self then
 			render.ClearStencil()
@@ -140,10 +144,12 @@ if CLIENT then
 				-- Draw the chalk texture over itself with the marked pixels
 				render.SetStencilCompareFunction(STENCIL_EQUAL)
 
-				local a,b = self:GetCollisionBounds()
-				cam.Start3D2D(self:LocalToWorld(b), self:LocalToWorldAngles(renderplane), 1)
-					surface.SetDrawColor(255,255,255) -- Change this later to a chalk-like material
-					surface.DrawRect(0,0,30,50)
+				local a,b = self:GetRenderBounds()
+				local x1,x2,y1,y2 = b.y,a.y,-a.z,-b.z
+				cam.Start3D2D(self:GetPos(), self:LocalToWorldAngles(renderplane), 1)
+					surface.SetDrawColor(255,255,255) -- TODO: Change this later to a chalk-like material
+					surface.DrawRect(x1 + 4,y1 + 4,-x1 + x2 - 8,-y1 + y2 - 8)
+					--surface.DrawRect(x1,y1,-x1 + x2,-y1 + y2)
 				cam.End3D2D()
 
 			render.SetBlend(1)
@@ -172,15 +178,102 @@ if CLIENT then
 			return self.WeaponName, TARGETID_TYPE_BUY, self:GetPrice()
 		end
 	end
+	
+	function ENT:Think()
+		if self:GetModel() ~= self.LastModel then
+			self:SetRenderBounds(self:GetWallBounds())
+			self.LastModel = self:GetModel()
+		end
+	end
 end
 scripted_ents.Register(ENT, "nzu_wallbuy")
 
+--[[-------------------------------------------------------------------------
+Mismatch module
+---------------------------------------------------------------------------]]
+nzu.RegisterMismatch("Wall Buys", {
+	Collect = function()
+		local t = {}
+		for k,v in pairs(ents.FindByClass("nzu_wallbuy")) do
+			if not weapons.GetStored(v:GetWeaponClass()) then
+				table.insert(t, v)
+			end
+		end
+		if #t > 0 then return t end
+	end,
+	Write = function(t)
+		if SERVER then -- Servers write just the wrong classes
+			net.WriteUInt(#t, 16)
+			for k,v in ipairs(t) do
+				net.WriteEntity(v)
+			end
+		else -- Clients write the wrong class and the replacement class
+			net.WriteUInt(table.Count(t), 16)
+			for k,v in pairs(t) do
+				net.WriteEntity(k)
+				net.WriteString(v)
+			end
+		end
+	end,
+	Read = function()
+		local t = {}
+		local num = net.ReadUInt(16)
+		if CLIENT then -- Clients receive just the wrong classes, but generate the map table
+			for i = 1,num do
+				table.insert(t, net.ReadEntity())
+			end
+		else -- Servers read the table of entities and their new class
+			for i = 1,num do
+				local ent = net.ReadEntity()
+				local class = net.ReadString()
+				t[ent] = class
+			end
+		end
+		return t
+	end,
+	Apply = function(t)
+		for k,v in pairs(t) do
+			if v == "" then k:Remove() else k:SetWeaponClass(v) end
+		end
+	end,
+	BuildPanel = function(parent, t)
+		local dlist = vgui.Create("DListView", parent)
+		dlist:AddColumn("Invalid Wall Buy")
+		dlist:AddColumn("Replacement Weapon")
 
+		local weps = {}
+		for k,v in pairs(t) do
+			if IsValid(v) then
+				local class = v:GetWeaponClass()
+
+				local pnl = nzu.ExtensionSettingTypePanel("Weapon", parent)
+				pnl:Set(class)
+				dlist:AddLine(class .. " ("..v:GetPrice()..")", pnl):SetTall(100)
+
+				weps[v] = pnl
+			end
+		end
+
+		-- Collect the corrected data when the Apply button is pressed
+		function dlist:GetMismatch()
+			local tbl = {}
+			for k,v in pairs(weps) do
+				tbl[k] = v:Get()
+			end
+			return tbl
+		end
+
+		return dlist
+	end,
+	Icon = "icon16/gun.png",
+})
+
+if not NZU_SANDBOX then return end
 --[[-------------------------------------------------------------------------
 Tool for spawning wall buys, browses weapon classes through filters
 ---------------------------------------------------------------------------]]
 local TOOL = {}
-TOOL.Category = "Basic"
+TOOL.Category = "Weapons"
 TOOL.Name = "#tool.nzu_tool_wallbuy.name"
 
 TOOL.ClientConVar = {
@@ -205,23 +298,25 @@ function TOOL:LeftClick(trace)
 				undo.AddEntity(e)
 			undo.Finish()
 		end
-		return true
 	end
+	return true
 end
 
 function TOOL:RightClick(trace)
 	if IsValid(trace.Entity) and trace.Entity:GetClass() == "nzu_wallbuy" then
-		local tr = util.TraceLine({
-			start = trace.HitPos,
-			endpos = trace.HitPos + trace.Normal * 100,
-			filter = trace.Entity
-		})
+		if SERVER then
+			local tr = util.TraceLine({
+				start = trace.HitPos,
+				endpos = trace.HitPos + trace.Normal * 100,
+				filter = trace.Entity
+			})
 
-		if tr.Hit and tr.HitNormal then
-			trace.Entity:SetPos(tr.HitPos + tr.HitNormal*0.5)
-			trace.Entity:SetAngles(tr.HitNormal:Angle())
-		else
-			self:GetOwner():ChatPrint("Couldn't find wall behind Wall Buy to align to.")
+			if tr.Hit and tr.HitNormal then
+				trace.Entity:SetPos(tr.HitPos + tr.HitNormal*0.5)
+				trace.Entity:SetAngles(tr.HitNormal:Angle())
+			else
+				self:GetOwner():ChatPrint("Couldn't find wall behind Wall Buy to align to.")
+			end
 		end
 		return true
 	end
@@ -229,7 +324,7 @@ end
 
 function TOOL:Reload(trace)
 	if IsValid(trace.Entity) and trace.Entity:GetClass() == "nzu_wallbuy" then
-		trace.Entity:Remove()
+		if SERVER then trace.Entity:Remove() end
 		return true
 	end
 end

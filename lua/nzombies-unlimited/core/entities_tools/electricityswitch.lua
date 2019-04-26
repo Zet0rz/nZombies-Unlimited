@@ -2,8 +2,8 @@ local ENT = {}
 
 ENT.Type = "anim"
 ENT.Base = "base_entity"
-ENT.Model = "models/nzprops/zombies_power_lever.mdl"
-ENT.HandleModel = "models/nzprops/zombies_power_lever_handle.mdl"
+ENT.Model = "models/nzu/electricityswitch/zombies_power_lever.mdl"
+ENT.HandleModel = "models/nzu/electricityswitch/zombies_power_lever_handle.mdl"
 
 -- Why not also allow it to be spawned in the normal Entities menu?
 ENT.Category = "nZombies Unlimited"
@@ -104,7 +104,7 @@ Tool for creating switch
 ---------------------------------------------------------------------------]]
 if NZU_SANDBOX then
 	local TOOL = {}
-	TOOL.Category = "Basic"
+	TOOL.Category = "Power"
 	TOOL.Name = "#tool.nzu_tool_electricityswitch.name"
 
 	function TOOL:LeftClick(trace)
@@ -121,13 +121,13 @@ if NZU_SANDBOX then
 					undo.AddEntity(e)
 				undo.Finish()
 			end
-			return true
 		end
+		return true
 	end
 
 	function TOOL:RightClick(trace)
 		if IsValid(trace.Entity) and trace.Entity:GetClass() == "nzu_electricityswitch" then
-			trace.Entity:Remove()
+			if SERVER then trace.Entity:Remove() end
 			return true
 		end
 	end

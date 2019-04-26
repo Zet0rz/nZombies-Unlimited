@@ -31,6 +31,7 @@ if SERVER then
 		net.WriteBool(true)
 		net.WriteUInt(data.Price, 32)
 		net.WriteBool(data.Electricity)
+		net.WriteBool(data.FlagOpen)
 		if data.Group then
 			net.WriteBool(true)
 			net.WriteString(data.Group)
@@ -38,10 +39,10 @@ if SERVER then
 			net.WriteBool(false)
 		end
 
-		if data.Flags then
-			local num = #data.Flags
+		if data.Rooms then
+			local num = #data.Rooms
 			net.WriteUInt(num, 8)
-			for k,v in pairs(data.Flags) do
+			for k,v in pairs(data.Rooms) do
 				net.WriteString(v)
 			end
 		end
@@ -111,14 +112,17 @@ else
 				tbl.Electricity = true
 			end
 			if net.ReadBool() then
+				tbl.FlagOpen = true
+			end
+			if net.ReadBool() then
 				tbl.Group = net.ReadString()
 			end
 
 			local num = net.ReadUInt(8)
 			if num > 0 then
-				tbl.Flags = {}
+				tbl.Rooms = {}
 				for i = 1, num do
-					table.insert(tbl.Flags, net.ReadString())
+					table.insert(tbl.Rooms, net.ReadString())
 				end
 			end
 
@@ -151,21 +155,22 @@ end
 Tool!
 ---------------------------------------------------------------------------]]
 local TOOL = {}
-TOOL.Category = "Basic"
+TOOL.Category = "Mapping"
 TOOL.Name = "#tool.nzu_tool_doorlock.name"
 
 TOOL.ClientConVar = {
 	["price"] = "1000",
 	["group"] = "",
 	["electricity"] = "0",
-	["flags"] = "",
+	["rooms"] = "",
+	["flagopen"] = "0",
 }
 
 function TOOL:LeftClick(trace)
-	if SERVER then
-		if IsValid(trace.Entity) then
-			if trace.Entity:CanCreateDoor() then
-				local flags = self:GetClientInfo("flags")
+	if IsValid(trace.Entity) then
+		if trace.Entity:CanCreateDoor() then
+			if SERVER then
+				local flags = self:GetClientInfo("rooms")
 				local tbl
 				if flags ~= "" then
 					tbl = string.Explode(" ", string.Trim(flags))
@@ -174,14 +179,15 @@ function TOOL:LeftClick(trace)
 					Price = self:GetClientNumber("price"),
 					Group = self:GetClientInfo("group"),
 					Electricity = self:GetClientNumber("electricity") ~= 0,
-					Flags = tbl,
+					Rooms = tbl,
+					FlagOpen = self:GetClientNumber("flagopen") ~= 0,
 				}
 				trace.Entity:CreateDoor(data)
-
-				return true
-			else
-				self:GetOwner():ChatPrint("This entity does not support Locks.")
 			end
+
+			return true
+		elseif SERVER then
+			self:GetOwner():ChatPrint("This entity does not support Locks.")
 		end
 	end
 end
@@ -190,20 +196,23 @@ function TOOL:RightClick(trace)
 	if IsValid(trace.Entity) then
 		local data = trace.Entity:GetDoorData()
 		if data then
-			local owner = self:GetOwner()
-			owner:ConCommand("nzu_tool_doorlock_price "..data.Price)
-			owner:ConCommand("nzu_tool_doorlock_group \""..(data.Group or "\""))
-			owner:ConCommand("nzu_tool_doorlock_electricity "..(data.Electricity and "1" or "0"))
+			if SERVER then
+				local owner = self:GetOwner()
+				owner:ConCommand("nzu_tool_doorlock_price "..data.Price)
+				owner:ConCommand("nzu_tool_doorlock_group \""..(data.Group or "\""))
+				owner:ConCommand("nzu_tool_doorlock_electricity "..(data.Electricity and "1" or "0"))
+				owner:ConCommand("nzu_tool_doorlock_flagopen "..(data.FlagOpen and "1" or "0"))
 
-			local str = ""
-			if data.Flags then
-				for k,v in pairs(data.Flags) do
-					str = str .. v .. " "
+				local str = ""
+				if data.Rooms then
+					for k,v in pairs(data.Rooms) do
+						str = str .. v .. " "
+					end
+					str = string.Trim(str)
 				end
-				str = string.Trim(str)
+				owner:ConCommand("nzu_tool_doorlock_rooms \""..str.."\"")
+				owner:ChatPrint("Copied door data!")
 			end
-			owner:ConCommand("nzu_tool_doorlock_flags \""..str.."\"")
-			owner:ChatPrint("Copied door data!")
 			return true
 		end
 	end
@@ -211,7 +220,7 @@ end
 
 function TOOL:Reload(trace)
 	if IsValid(trace.Entity) and trace.Entity:GetDoorData() then
-		trace.Entity:RemoveDoor()
+		if SERVER then trace.Entity:RemoveDoor() end
 		return true
 	end
 end
@@ -249,20 +258,17 @@ if CLIENT then
 		
 		panel:Help("")
 
-		panel:Help("Select which Map Flags are opened by the door. This enables Spawners and other Map Flags enabled entities with one of the selected flags.")
-		panel:Help("Usually Doors want to select 2 flags (one for either side of the door).")
+		panel:ControlHelp("Select which Rooms are opened by the door. This enables Spawners and other Room enabled entities assigned to these. Usually Doors want to select 2 Rooms (one for either side of the door).")
 
-		local listbox = vgui.Create("nzu_MapFlagsPanel", panel)
-		--[[listbox:SetSelectedFlags(string.Explode(" ", GetConVar("nzu_tool_doorlock_flags"):GetString()))
-		listbox.OnSelectedFlagsChanged = function()
-			local flags = listbox:GetSelectedFlags()
-			GetConVar("nzu_tool_doorlock_flags"):SetString(table.concat(flags, " "))
-		end]]
-		listbox:SetConVar("nzu_tool_doorlock_flags")
+		local listbox = vgui.Create("nzu_RoomsPanel", panel)
+		listbox:SetConVar("nzu_tool_doorlock_rooms")
 		panel:AddItem(listbox)
-		listbox:RefreshFlags()
+		listbox:RefreshRooms()
 
-		panel:Help("Flags cannot contain spaces.")
+		panel:ControlHelp("Room names cannot contain spaces.")
+
+		panel:CheckBox("Open if all Rooms are open?", "nzu_tool_doorlock_flagopen")
+		panel:ControlHelp("Opens the door for free if all connected Rooms are opened through other doors.")
 	end
 end
 
@@ -279,14 +285,14 @@ properties.Add("nzu_DoorLock", {
 	PrependSpacer = true,
 
 	Filter = function(self, ent, ply) -- A function that determines whether an entity is valid for this property
-		if !IsValid(ent) then return false end
-		if !gamemode.Call("CanProperty", ply, "nzu_DoorLock", ent) then return false end
+		if not IsValid(ent) then return false end
+		if not gamemode.Call("CanProperty", ply, "nzu_DoorLock", ent) then return false end
 
 		return ent:GetDoorData() or ent:CanCreateDoor()
 	end,
 	Receive = function(self, length, player)
 		local ent = net.ReadEntity()
-		if !self:Filter(ent, player) then return end
+		if not self:Filter(ent, player) then return end
 
 		local tbl = {}
 		tbl.Price = net.ReadUInt(32)
@@ -294,15 +300,18 @@ properties.Add("nzu_DoorLock", {
 			tbl.Electricity = true
 		end
 		if net.ReadBool() then
+			tbl.FlagOpen = true
+		end
+
+		if net.ReadBool() then
 			tbl.Group = net.ReadString()
 		end
 
-
 		local num = net.ReadUInt(8)
 		if num > 0 then
-			tbl.Flags = {}
+			tbl.Rooms = {}
 			for i = 1,num do
-				table.insert(tbl.Flags, net.ReadString())
+				table.insert(tbl.Rooms, net.ReadString())
 			end
 		end
 
@@ -347,13 +356,19 @@ properties.Add("nzu_DoorLock", {
 		local lbl = frame:Add("DLabel")
 		lbl:Dock(TOP)
 		lbl:SetFont("Trebuchet18")
-		lbl:SetText("Connected Rooms (Map Flags)")
+		lbl:SetText("Connected Rooms")
 
-		local l = frame:Add("nzu_MapFlagsPanel")
+		local l = frame:Add("nzu_RoomsPanel")
 		l:Dock(FILL)
 		l:ShowRefreshButton(false)
-		l:SetSelectedFlags(data and data.Flags)
-		l:RefreshFlags()
+		l:SetSelectedRooms(data and data.Rooms)
+		l:RefreshRooms()
+
+		local val_flagopen = data and data.FlagOpen
+		local roomopen = top:CreateRow("Lock Properties", "Open if all Rooms are open?")
+		roomopen:Setup("Boolean")
+		roomopen:SetValue(val_flagopen)
+		function roomopen:DataChanged(v) val_flagopen = v end
 
 		local bottom = frame:Add("Panel")
 		bottom:Dock(BOTTOM)
@@ -370,6 +385,7 @@ properties.Add("nzu_DoorLock", {
 				net.WriteEntity(ent)
 				net.WriteUInt(val_price, 32)
 				net.WriteBool(val_elec)
+				net.WriteBool(val_flagopen)
 
 				if val_group and val_group ~= "" then
 					net.WriteBool(true)
@@ -378,7 +394,7 @@ properties.Add("nzu_DoorLock", {
 					net.WriteBool(false)
 				end
 
-				local flags = l:GetSelectedFlags()
+				local flags = l:GetSelectedRooms()
 				net.WriteUInt(#flags, 8)
 				for k,v in pairs(flags) do
 					net.WriteString(v)

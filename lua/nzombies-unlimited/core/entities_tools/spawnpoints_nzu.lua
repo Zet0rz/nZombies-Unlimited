@@ -144,13 +144,15 @@ local function NewSpawner(type, pos, ang)
 	Spawner.Pos = pos
 	Spawner.Angles = ang
 	Spawner.Type = type
-	ENTITY.EnableMapFlags(Spawner, "Spawnpoints") -- Yes, this does work ;)
+	ENTITY.SetRoomHandler(Spawner, "Spawnpoints") -- Yes, this does work ;)
 
 	return Spawner
 end
 
-local spawnpoints = {}
-local openspawns = {}
+nzu.Spawns = nzu.Spawns or {}
+local spawnpoints = nzu.Spawns
+nzu.OpenSpawns = nzu.OpenSpawns or {}
+local openspawns = nzu.OpenSpawns
 function SPAWNER:Activate()
 	if not self.Active then
 		openspawns[self.Type][self] = true
@@ -174,8 +176,8 @@ nzu.AddSaveExtension("Spawnpoints", {
 			if not openspawns[v.Type] then openspawns[v.Type] = {} end
 
 			local spawner = NewSpawner(v.Type, v.Pos, v.Ang)
-			if v.MapFlags and table.Count(v.MapFlags) > 0 then
-				spawner:SetMapFlags(v.MapFlags)
+			if v.Rooms and table.Count(v.Rooms) > 0 then
+				spawner:SetRooms(v.Rooms)
 			else
 				spawner:Activate()
 			end
@@ -185,15 +187,15 @@ nzu.AddSaveExtension("Spawnpoints", {
 	end
 })
 
--- This is a cheeky way of enabling Entity-based Map Flag system on non-entities (but it works fine, since they just need to be indexable - aka tables)
+-- This is a cheeky way of enabling Entity-based Room system on non-entities (but it works fine, since they just need to be indexable - aka tables)
 -- To make the hack work, we just have to ensure it doesn't error due to a lack of functions
-function SPAWNER:AddMapFlag(v)
-	ENTITY.AddMapFlag(self, v)
+function SPAWNER:AddRoom(v)
+	ENTITY.AddRoom(self, v)
 end
-function SPAWNER:SetMapFlags(tbl)
-	ENTITY.SetMapFlags(self, tbl)
+function SPAWNER:SetRooms(tbl)
+	ENTITY.SetRooms(self, tbl)
 end
-nzu.AddMapFlagsHandler("Spawnpoints", function(spawner) spawner:Activate() end)
+nzu.AddRoomHandler("Spawnpoints", function(spawner) spawner:Activate() end)
 
 --[[-------------------------------------------------------------------------
 Now getters and utility

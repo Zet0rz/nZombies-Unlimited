@@ -140,17 +140,17 @@ if SERVER then
 				for k,v in pairs(doorgroups[data.Group]) do
 					local data2 = k:GetDoorData()
 					if data2.Price == data.Price and data2.Electricity == data.Electricity then
-						if data2.Flags == nil and data.Flags == nil then
+						if data2.Rooms == nil and data.Rooms == nil then
 							data = data2 -- We found a clone!
 							networkclone = k
-						elseif data2.Flags and data.Flags then
+						elseif data2.Rooms and data.Rooms then
 							local clone = {}
-							for k2,v2 in pairs(data.Flags) do
+							for k2,v2 in pairs(data.Rooms) do
 								clone[v2] = true
 							end
 
 							local isclone = true
-							for k2,v2 in pairs(data2.Flags) do
+							for k2,v2 in pairs(data2.Rooms) do
 								if clone[v2] then
 									clone[v2] = nil
 								else
@@ -187,6 +187,11 @@ if SERVER then
 			net.Broadcast()
 		end
 
+		if data.FlagOpen and data.Rooms then
+			self:SetRoomHandler("DoorAutoOpen")
+			self:SetRooms(data.Rooms)
+		end
+
 		hook.Run("nzu_DoorLockCreated", self, data)
 	end
 
@@ -217,13 +222,20 @@ if SERVER then
 	--[[-------------------------------------------------------------------------
 	Opening doors
 	---------------------------------------------------------------------------]]
-	local effectdelay = 2
-	local function openprops(ent, ply)
+	local effectdelay = 1
+	local function openprops(ent, ply, t, initial)
+		if not initial or ent == initial then
+			sound.Play("nzu/doors/disappear.wav", ent:GetPos(), 75, 100, 1)
+		end
+
 		ent:SetCollisionGroup(COLLISION_GROUP_DEBRIS) -- No longer collide
 		local e = EffectData()
 		e:SetEntity(ent)
 		e:SetScale(effectdelay)
-		util.Effect("nzu_Effect_ClearDebris", e, nil, true)
+		e:SetMagnitude(0.5)
+		e:SetRadius(0)
+		util.Effect("nzu_debris_clear", e, true, true)
+
 		SafeRemoveEntityDelayed(ent, effectdelay)
 	end
 
@@ -301,7 +313,7 @@ if SERVER then
 		["prop_dynamic_override"] = openprops,
 	}
 	function dooropeneffect(ent, ply, t, initial)
-		if ent.OpenDoor then return ent:OpenDoor(ply, t, initial) return end -- Call their own door effect
+		if ent.OpenDoor then return ent:OpenDoor(ply, t, initial) end -- Call their own door effect
 
 		local func = doortypes[ent:GetClass()]
 		if func then return func(ent, ply, t, initial) else
@@ -312,12 +324,12 @@ if SERVER then
 
 	function nzu.OpenDoor(ent, ply, t, initial)
 		local data = ent:GetDoorData()
-		if data and data.Flags then
-			for k,v in pairs(data.Flags) do
-				nzu.OpenMapFlag(v)
+		ent:RemoveDoor()
+		if data and data.Rooms then
+			for k,v in pairs(data.Rooms) do
+				nzu.OpenRoom(v)
 			end
 		end
-		ent:RemoveDoor()
 		local b = dooropeneffect(ent, ply, t, initial)
 		hook.Run("nzu_DoorOpened", ent, ply)
 		return b
@@ -379,6 +391,24 @@ if SERVER then
 			if data.Price == 0 and data.Electricity then
 				nzu.OpenDoor(ent)
 			end
+		end
+	end)
+
+	--[[-------------------------------------------------------------------------
+	Auto-opening doors if all connected rooms are opened
+	---------------------------------------------------------------------------]]
+	nzu.AddRoomHandler("DoorAutoOpen", function(door, room)
+		local data = door:GetDoorData()
+		if not data then return end
+
+		for k,v in pairs(door.nzu_Rooms) do
+			if not nzu.IsRoomOpen(k) then return true end -- Don't remove the handler/rooms from us yet
+		end
+
+		if data.Group then
+			nzu.OpenDoorGroup(data.Group, nil, nil, door)
+		else
+			nzu.OpenDoor(door, nil, nil, door)
 		end
 	end)
 end

@@ -30,15 +30,16 @@ SWEP.Secondary.Automatic = false
 SWEP.Secondary.Ammo = "none"
 
 -- Knife-specific values
-SWEP.KnifeRange = 100
+SWEP.KnifeRange = 75
 SWEP.KnifeDelay = 0.4
 SWEP.HullAttackMins = Vector(-5,-5,-5)
 SWEP.HullAttackMaxs = Vector(5,5,5)
+SWEP.DamageAllNPCs = false -- Only damage 1 zombie!
 
 -- Damage, types, and forces (for TraceHullAttack)
 SWEP.Primary.Damage = 150
 SWEP.Primary.DamageType = DMG_CLUB
-SWEP.Primary.DamageForce = 10
+SWEP.Primary.DamageForce = 100
 
 if CLIENT then SWEP.HUDIcon = Material("nzombies-unlimited/hud/crowbar_icon.png", "unlitgeneric smooth") end -- CONTENT + change this to crowbar png!
 
@@ -46,6 +47,7 @@ if CLIENT then SWEP.HUDIcon = Material("nzombies-unlimited/hud/crowbar_icon.png"
 Force the weapon to always be loaded into the Knife slot (unless otherwise specified)
 ---------------------------------------------------------------------------]]
 SWEP.nzu_DefaultWeaponSlot = "Knife"
+SWEP.nzu_InstantDeploy = true -- Ignore Holster functions when deploying this weapon
 
 -- We do our own logic for special deploying this weapon if it is in the knife slot
 -- This function replaces SWEP:Deploy() on creation when given into a Knife slot
@@ -55,8 +57,14 @@ function SWEP:SpecialDeployKnife()
 	self:PrimaryAttack()
 end
 
+function SWEP:SpecialSlotKnife()
+	self.OldDeploy = self.Deploy
+	self.Deploy = self.SpecialDeployKnife
+end
+
 function SWEP:PrimaryAttack()
 	self.IsKnifing = true
+	self.nzu_CanSpecialHolster = false
 
 	self:SwingAnimation()
 	if SERVER then
@@ -97,7 +105,28 @@ if SERVER then
 		local startpos = self.Owner:GetShootPos()
 		local endpos = startpos + self.Owner:GetAimVector()*self.KnifeRange
 
-		self.Owner:TraceHullAttack(startpos, endpos, self.HullAttackMins, self.HullAttackMaxs, self.Primary.Damage, self.Primary.DamageType, self.Primary.DamageForce, self.DamageAllNPCs)
+		if self.DamageAllNPCs then
+			self.Owner:TraceHullAttack(startpos, endpos, self.HullAttackMins, self.HullAttackMaxs, self.Primary.Damage, self.Primary.DamageType, self.Primary.DamageForce, self.DamageAllNPCs)
+		else
+			local tr = util.TraceHull({
+				start = startpos,
+				endpos = endpos,
+				mins = self.HullAttackMins,
+				maxs = self.HullAttackMaxs,
+				filter = self.Owner,
+			})
+			if IsValid(tr.Entity) then
+				local dmg = DamageInfo()
+				dmg:SetDamage(self.Primary.Damage)
+				dmg:SetDamageType(self.Primary.DamageType)
+				dmg:SetDamageForce(self.Owner:GetAimVector()*self.Primary.DamageForce)
+
+				dmg:SetAttacker(self.Owner)
+				dmg:SetInflictor(self)
+
+				tr.Entity:TakeDamageInfo(dmg)
+			end
+		end
 	end
 end
 
@@ -117,17 +146,29 @@ Internals
 function SWEP:Think()
 	if self.IsKnifing and CurTime() >= self:GetNextPrimaryFire() then
 		self.IsKnifing = nil
+		self.nzu_CanSpecialHolster = true
 		self:OnSwingFinished()
 	end
 end
 
 -- This lets you change what happens when the swing is finished
 -- It is predicted and shared from the Think() above
-function SWEP:OnSwingFinished()
-	self.Owner:SetWeaponLocked(false)
-	self.Owner:SelectPreviousWeapon()
+if NZU_NZOMBIES then
+	function SWEP:OnSwingFinished()
+		self.Owner:SetWeaponLocked(false)
+		self.Owner:SelectPreviousWeapon()
+	end
+else
+	function SWEP:OnSwingFinished()
+		self.Owner:ConCommand("lastinv")
+	end
 end
 
 function SWEP:Holster(wep)
 	return not self.IsKnifing
+end
+
+-- Sandbox compatibility pretty much
+function SWEP:Deploy()
+	self:PrimaryAttack()
 end

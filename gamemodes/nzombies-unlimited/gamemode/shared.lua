@@ -28,8 +28,8 @@ loadfile_c("fonts.lua")
 --[[-------------------------------------------------------------------------
 Extension Manager
 ---------------------------------------------------------------------------]]
-loadfile("nzombies-unlimited/core/extensions/extension_manager.lua")
-loadfile_c("nzombies-unlimited/core/extensions/extension_panels.lua")
+loadfile("nzombies-unlimited/core/extension_manager.lua")
+loadfile_c("nzombies-unlimited/core/extension_panels.lua")
 --loadfile_c("nzombies-unlimited/core/hudmanagement.lua") -- Needed for the settings panel
 
 --[[-------------------------------------------------------------------------
@@ -38,8 +38,10 @@ Core Modules shared with Sandbox
 loadfile_c("nzombies-unlimited/core/cl_nzombies_skin.lua")
 
 loadfile("nzombies-unlimited/core/configs.lua")
+loadfile("nzombies-unlimited/core/mismatch.lua")
+loadfile_c("nzombies-unlimited/core/config_panels.lua")
 loadfile_s("nzombies-unlimited/core/sv_saveload.lua")
-loadfile_s("nzombies-unlimited/core/mapflags.lua") -- Only Server outside Sandbox
+loadfile_s("nzombies-unlimited/core/rooms.lua") -- Only Server outside Sandbox
 
 --[[-------------------------------------------------------------------------
 Gamemode-specific files
@@ -56,8 +58,13 @@ loadfile("points.lua")
 loadfile_s("targeting.lua")
 loadfile("weapons.lua")
 loadfile("health.lua")
+loadfile("stamina.lua")
+
+loadfile_c("ragdoll_cleanup.lua")
 
 loadfile("menu/menu.lua")
+loadfile("menu/menu_configload.lua")
+loadfile_c("menu/menu_mismatch.lua")
 
 --[[-------------------------------------------------------------------------
 Gamemode modules
@@ -68,15 +75,30 @@ loadfile("nzombies-unlimited/core/entities_tools/doors_nzu.lua")
 loadfile("nzombies-unlimited/core/entities_tools/electricityswitch.lua")
 loadfile_s("nzombies-unlimited/core/entities_tools/navlocker_nzu.lua")
 loadfile("nzombies-unlimited/core/entities_tools/barricades.lua")
-
---[[-------------------------------------------------------------------------
-Gamemode multi-language
----------------------------------------------------------------------------]]
-
-include("translate.lua")
+loadfile("nzombies-unlimited/core/entities_tools/wallbuys.lua")
+loadfile("nzombies-unlimited/core/entities_tools/invisiblewalls.lua")
 
 --[[-------------------------------------------------------------------------
 Misc GM hooks
 ---------------------------------------------------------------------------]]
 -- No noclipping!
 function GM:PlayerNoClip(ply,on) return false end
+
+
+
+--[[-------------------------------------------------------------------------
+Sound play networking
+---------------------------------------------------------------------------]]
+if SERVER then
+	util.AddNetworkString("nzu_sound") -- Server: Broadcast a sound filepath to play on clients
+
+	function nzu.PlayClientSound(path, recipients)
+		net.Start("nzu_sound")
+			net.WriteString(path)
+		if recipients then net.Send(recipients) else net.Broadcast() end
+	end
+else
+	net.Receive("nzu_sound", function()
+		surface.PlaySound(net.ReadString())
+	end)
+end

@@ -33,7 +33,7 @@ local configdirs = {
 }
 function nzu.GetConfigDir(ctype) return configdirs[ctype] end
 function nzu.GetConfigThumbnail(config)
-	return "../"..configdirs[config.Type]..config.Codename.."/thumb.jpg"
+	return configdirs[config.Type] and "../"..configdirs[config.Type]..config.Codename.."/thumb.jpg"
 end
 
 -- Making this shared. It has little meaning clientside, but could be used to determine what configs the client may have locally saved
@@ -152,16 +152,12 @@ if CLIENT then
 			end
 		end
 
-		-- DEBUG
-		print("Running here")
 		hook.Run("nzu_ConfigInfoSaved", config, new) -- Call the same hook
 
 		if net.ReadBool() then -- Currently loaded
 			nzu.CurrentConfig = config
 			hook.Run("nzu_ConfigLoaded", config)
 		end
-
-		print("Received Config networking: " ..config.Codename .." ("..config.Type..") New: "..(new and "true" or "false"))
 	end)
 
 	local function requestconfigs()
@@ -182,105 +178,8 @@ if CLIENT then
 		return configs
 	end
 
-	-- CONFIG PANEL
-	local CONFIGPANEL = {}
-	local emptyfunc = function() end
-	function CONFIGPANEL:Init()
-		self.Thumbnail = self:Add("DImage")
-		self.Thumbnail:Dock(LEFT)
-
-		local status = self:Add("Panel")
-		status:Dock(RIGHT)
-
-		self.Type = status:Add("DLabel")
-		self.Type:Dock(TOP)
-		self.Type:SetContentAlignment(3)
-		self.Type:SetText("")
-
-		self.MapStatus = status:Add("DLabel")
-		self.MapStatus:Dock(BOTTOM)
-		self.MapStatus:SetContentAlignment(9)
-		self.MapStatus:SetText("")
-
-		local center = self:Add("Panel")
-		center:Dock(FILL)
-		center:DockMargin(5,0,5,0)
-
-		self.Name = center:Add("DLabel")
-		self.Name:SetFont("Trebuchet24")
-		self.Name:Dock(FILL)
-		self.Name:SetContentAlignment(1)
-		self.Name:SetText("No Config loaded")
-
-		self.Map = center:Add("DLabel")
-		self.Map:Dock(BOTTOM)
-		self.Map:SetContentAlignment(7)
-		self.Map:DockMargin(0,0,0,-5)
-		self.Map:SetText("")
-
-		self.Button = self:Add("DButton")
-		self.Button:SetText("")
-		self.Button:SetSize(self:GetSize())
-		self.Button.Paint = emptyfunc
-		self.Button.DoClick = function() self:DoClick() end
-
-		self:DockPadding(5,5,5,5)
-		self.m_bDrawCorners = true
-	end
-
-	local typecolors = {
-		Official = Color(255,0,0),
-		Local = Color(0,0,255),
-		Workshop = Color(150,0,255),
-	}
-	local mapinstalled,mapnotinstalled = Color(100,255,100), Color(255,100,100)
-	function CONFIGPANEL:Update(config)
-		--print(self, config.Name, self.Config.Name)
-		if self.Config == config then
-			self.Name:SetText(config.Name or "")
-			self.Map:SetText(config.Codename .. " || " .. config.Map)
-
-			local status = file.Find("maps/"..config.Map..".bsp", "GAME")[1] and true or false
-			self.MapStatus:SetText(status and "Map installed" or "Map not installed")
-			self.MapStatus:SetTextColor(status and mapinstalled or mapnotinstalled)
-
-			self.Type:SetText(config.Type)
-			self.Type:SetTextColor(typecolors[config.Type] or color_white)
-
-			self.Thumbnail:SetImage(nzu.GetConfigThumbnail(config))
-		end
-	end
-
-	function CONFIGPANEL:SetConfig(config)
-		self.Config = config
-		self:Update(config)
-		timer.Simple(0, function() hook.Add("nzu_ConfigInfoSaved", self, self.Update) end) -- Auto-update ourselves whenever updates arrive to this config
-	end
-
-	function CONFIGPANEL:DoClick() end
-	function CONFIGPANEL:DoRightClick() end
-
-	function CONFIGPANEL:PerformLayout(w,h)
-		self.Button:SetSize(w,h)
-		self.Thumbnail:SetWide((h-10)*(16/9))
-	end
-
-	local sortorder = {
-		Official = 1,
-		Local = 2,
-		Workshop = 3
-	}
-	function CONFIGPANEL:Sort()
-		if self.Config then
-			self:SetZPos((self.Config.Map == game.GetMap() and 0 or 5) + (sortorder[self.Config.Type] or 0))
-		else
-			self:SetZPos(-1)
-		end
-	end
-	vgui.Register("nzu_ConfigPanel", CONFIGPANEL, "DPanel")
-
 	-- FUNCTIONS FOR UPDATING AND CREATING CONFIGS (Requests)
-	function nzu.RequestLoadConfig(config)
+	function nzu.RequestLoadConfig(config, realm)
 		if not nzu.IsAdmin(LocalPlayer()) then return end
 		net.Start("nzu_loadconfig")
 			net.WriteBool(true)
@@ -336,8 +235,6 @@ if CLIENT then
 
 				net.WriteBool(false) -- Only save settings and info
 			net.SendToServer()
-			print("Networked to server")
-			PrintTable(config)
 		end
 
 		function nzu.RequestSaveConfigSettings()
@@ -361,9 +258,23 @@ if CLIENT then
 			local config = configs[ctype][codename]
 			configs[ctype][codename] = nil
 			hook.Run("nzu_ConfigDeleted", config)
+		end)
 
-			print("Received Config deletion: " ..codename .." ("..ctype..")")
-		end)		
+		-- Requesting to play in NZU
+		function nzu.RequestPlayConfig(config)
+			net.Start("nzu_loadconfig_mode")
+				net.WriteString(config.Codename)
+				net.WriteString(config.Type)
+			net.SendToServer()
+		end
+	else
+		-- Requesting to edit in Sandbox
+		function nzu.RequestEditConfig(config)
+			net.Start("nzu_loadconfig_mode")
+				net.WriteString(config.Codename)
+				net.WriteString(config.Type)
+			net.SendToServer()
+		end
 	end
 
 	-- Receive missing addons list
@@ -458,7 +369,5 @@ if CLIENT then
 		f:Center()
 		f:MakePopup()
 		f:DoModal()
-
-		print("Received Config deletion: " ..codename .." ("..ctype..")")
 	end)
 end

@@ -43,12 +43,12 @@ if CLIENT then function ENT:Draw() self:DrawModel() end end
 
 scripted_ents.Register(ENT, "nzu_prop_playerclip")
 
-
+if not NZU_SANDBOX then return end
 --[[-------------------------------------------------------------------------
 Tool for spawning wall buys, browses weapon classes through filters
 ---------------------------------------------------------------------------]]
 local TOOL = {}
-TOOL.Category = "Basic"
+TOOL.Category = "Mapping"
 TOOL.Name = "#tool.nzu_tool_invisibleprop.name"
 
 TOOL.ClientConVar = {
@@ -71,8 +71,8 @@ function TOOL:LeftClick(trace)
 				undo.AddEntity(e)
 			undo.Finish()
 		end
-		return true
 	end
+	return true
 end
 
 function TOOL:RightClick(trace)
@@ -81,40 +81,45 @@ function TOOL:RightClick(trace)
 		if not IsValid(trace.Entity) or trace.Entity:GetClass() ~= "nzu_prop_playerclip" then
 			trace = util.TraceLine({
 				start = trace.HitPos,
-				endpos = trace.HitPos + trace.Normal * 1,
+				endpos = trace.HitPos - trace.Normal * 1,
 				ignoreworld = true,
+				filter = trace.Entity,
 			})
 		end
 
 		if IsValid(trace.Entity) and trace.Entity:GetClass() == "nzu_prop_playerclip" then
-			self.TargetedEntity = trace.Entity
-			self.LocalAng = trace.HitNormal:Angle()
-			self.LocalPos = trace.Entity:WorldToLocal(trace.HitPos)
-			self:SetStage(1)
+			if SERVER then
+				self.TargetedEntity = trace.Entity
+				self.LocalAng = trace.HitNormal:Angle()
+				self.LocalPos = trace.Entity:WorldToLocal(trace.HitPos)
+				self:SetStage(1)
+			end
 			return true
 		end
 	else
-		if IsValid(self.TargetedEntity) then
-			local trace = trace
-			if trace.Entity == self.TargetedEntity then
-				trace = util.TraceLine({
-					start = trace.HitPos,
-					endpos = trace.HitPos + trace.Normal * 4096 * 8,
-					filter = self.TargetedEntity
-				})
+		if SERVER then
+			if IsValid(self.TargetedEntity) then
+				local trace = trace
+				if trace.Entity == self.TargetedEntity then
+					trace = util.TraceLine({
+						start = trace.HitPos,
+						endpos = trace.HitPos + trace.Normal * 4096 * 8,
+						filter = self.TargetedEntity
+					})
+				end
+
+				if trace.Hit then
+					self.TargetedEntity:SetAngles(trace.HitNormal:Angle() - self.LocalAng + self.TargetedEntity:GetAngles())
+					self.TargetedEntity:SetPos(self.TargetedEntity:LocalToWorld(self.TargetedEntity:WorldToLocal(trace.HitPos) - self.LocalPos))
+					--self:GetOwner():SetPos(self.TargetedEntity:GetPos())
+				end
 			end
 
-			if trace.Hit then
-				self.TargetedEntity:SetAngles(trace.HitNormal:Angle() - self.LocalAng + self.TargetedEntity:GetAngles())
-				self.TargetedEntity:SetPos(self.TargetedEntity:LocalToWorld(self.TargetedEntity:WorldToLocal(trace.HitPos) - self.LocalPos))
-				--self:GetOwner():SetPos(self.TargetedEntity:GetPos())
-			end
+			self:SetStage(0)
+			self.TargetedEntity = nil
+			self.LocalPos = nil
+			self.LocalAng = nil
 		end
-
-		self:SetStage(0)
-		self.TargetedEntity = nil
-		self.LocalPos = nil
-		self.LocalAng = nil
 		return true
 	end
 	
@@ -123,7 +128,7 @@ end
 function TOOL:Reload(trace)
 	if self:GetStage() ~= 0 then self:SetStage(0) return true end
 	if IsValid(trace.Entity) and trace.Entity:GetClass() == "nzu_prop_playerclip" then
-		trace.Entity:SetMaterial(trace.Entity:GetMaterial() == "" and mat or "")
+		if SERVER then trace.Entity:SetMaterial(trace.Entity:GetMaterial() == "" and mat or "") end
 		return true
 	end
 end

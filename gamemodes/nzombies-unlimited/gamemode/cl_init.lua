@@ -1,7 +1,5 @@
 include( "shared.lua" )
 
-local translate = translate
-
 local hidden = {
 	CHudHealth = true,
 	CHudBattery = true,

@@ -1,7 +1,7 @@
 -- Create a global module
 nzu = nzu or {}
 
-function nzu.IsAdmin(ply) return ply:IsAdmin() end -- Replace this later
+function nzu.IsAdmin(ply) return ply:IsAdmin() end -- TODO: Replace this later
 
 -- Globals to act like SERVER and CLIENT (reversed when modules are loaded in the main mode)
 NZU_SANDBOX = true
@@ -22,41 +22,42 @@ end
 --[[-------------------------------------------------------------------------
 Spawnmenu & Panels Preparation
 ---------------------------------------------------------------------------]]
+--loadfile("utils.lua")
 loadfile_c("cl_nzombies_skin.lua")
 loadfile_c("cl_spawnmenu.lua")
+loadfile("mismatch.lua")
 
 --[[-------------------------------------------------------------------------
 Configs & Saving
 ---------------------------------------------------------------------------]]
 loadfile("configs.lua")
+loadfile_c("config_panels.lua")
 loadfile_s("sv_saveload.lua")
-loadfile("extensions/extension_manager.lua")
-loadfile_c("extensions/extension_panels.lua")
+loadfile("extension_manager.lua")
+loadfile_c("extension_panels.lua")
 
 --[[-------------------------------------------------------------------------
 Components & Modules
 ---------------------------------------------------------------------------]]
 --loadfile("resources.lua")
 --loadfile_c("hudmanagement.lua")
-loadfile("logic/logic_manager.lua")
-loadfile("mapflags.lua")
+--loadfile("logic/logic_manager.lua")
+loadfile("rooms.lua")
 
 --[[-------------------------------------------------------------------------
 Spawnmenu & Networking
 ---------------------------------------------------------------------------]]
-loadfile_s("logic/sv_logicmap.lua")
-loadfile_c("logic/cl_logicmap.lua")
+--loadfile_s("logic/sv_logicmap.lua")
+--loadfile_c("logic/cl_logicmap.lua")
 loadfile_c("spawnmenu_saveload.lua")
-loadfile("spawnmenu_entities.lua")
+--loadfile("spawnmenu_entities.lua")
 loadfile_c("spawnmenu_extensions.lua")
 loadfile("spawnmenu_tools.lua")
+loadfile_c("spawnmenu_mismatch.lua")
 
 --[[-------------------------------------------------------------------------
 Core item population
 ---------------------------------------------------------------------------]]
-loadfile("logic/nzu_logic_testunit.lua")
-loadfile("spawnmenu_entities_test.lua")
-
 loadfile("entities_tools/spawnpoints_sandbox.lua")
 loadfile("entities_tools/doors_sandbox.lua")
 loadfile("entities_tools/electricityswitch.lua")
@@ -64,52 +65,6 @@ loadfile("entities_tools/wallbuys.lua")
 loadfile("entities_tools/navlocker_sandbox.lua")
 loadfile("entities_tools/barricades.lua")
 loadfile("entities_tools/invisiblewalls.lua")
+loadfile("entities_tools/naveditor.lua")
 
---[[if SERVER then
-	AddCSLuaFile("cl_nzombies_skin.lua")
-	AddCSLuaFile("cl_spawnmenu.lua")
-	AddCSLuaFile("entities.lua")
-	AddCSLuaFile("logicmap.lua")
-	AddCSLuaFile("configsettings.lua")
-	AddCSLuaFile("spawnmenu_saveload.lua")
-	AddCSLuaFile("configs.lua")
-	AddCSLuaFile("cl_vgui_configtree.lua")
-	AddCSLuaFile("logic/logic_manager.lua")
-	AddCSLuaFile("logic/cl_logicmap.lua")
-	AddCSLuaFile("spawnmenu_entities.lua")
-
-	AddCSLuaFile("extensions/extension_manager.lua")
-	AddCSLuaFile("extensions/extension_panels.lua")
-	AddCSLuaFile("spawnmenu_extensions.lua")
-	AddCSLuaFile("hudmanagement.lua")
-
-	include("configs.lua")
-	include("sv_saveload.lua")
-	include("logic/sv_logicmap.lua")
-	include("extensions/extension_manager.lua")
-else
-	include("cl_nzombies_skin.lua")
-	include("cl_spawnmenu.lua")
-	include("cl_vgui_configtree.lua")
-	include("configs.lua")
-	include("spawnmenu_saveload.lua")
-	include("logic/cl_logicmap.lua")
-
-	include("extensions/extension_panels.lua")
-	include("extensions/extension_manager.lua")
-	include("hudmanagement.lua")
-	include("spawnmenu_extensions.lua")
-end
-include("entities.lua")
-include("logicmap.lua")
-include("configsettings.lua")
-include("logic/logic_manager.lua")
-
-include("spawnmenu_entities.lua")
-
--- Test unit
-AddCSLuaFile("logic/nzu_logic_testunit.lua")
-include("logic/nzu_logic_testunit.lua")
-
-AddCSLuaFile("spawnmenu_entities_test.lua")
-include("spawnmenu_entities_test.lua")]]
+--loadfile("entities_tools/thumbnail_camera.lua")

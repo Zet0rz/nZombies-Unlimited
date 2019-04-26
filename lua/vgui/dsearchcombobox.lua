@@ -68,7 +68,7 @@ function PANEL:FilterMenu(str)
 			local sorted = {}
 			for k,v in pairs(tbl) do
 				local val = tostring( v ) --tonumber( v ) || v -- This would make nicer number sorting, but SortedPairsByMemberValue doesn't seem to like number-string mixing
-				if (string.len( val ) > 1 && !tonumber( val ) && val:StartWith( "#" )) then val = language.GetPhrase( val:sub( 2 )) end
+				if (string.len( val ) > 1 and not tonumber( val ) and val:StartWith( "#" )) then val = language.GetPhrase( val:sub( 2 )) end
 				table.insert( sorted, { id = k, data = v, label = val } )
 			end
 			for k,v in SortedPairsByMemberValue( sorted, "label" ) do
