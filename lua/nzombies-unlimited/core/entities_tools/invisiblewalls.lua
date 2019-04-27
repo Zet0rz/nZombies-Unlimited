@@ -15,7 +15,7 @@ local mat = "models/wireframe"
 function ENT:Initialize()
 	if SERVER then
 		self:SetNoDraw(NZU_NZOMBIES)
-		self:UpdateModel(defaultmodel)
+		self:UpdateModel(self:GetModel() ~= "models/error.mdl" and self:GetModel() or defaultmodel)
 	end
 
 	if NZU_NZOMBIES then

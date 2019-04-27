@@ -21,13 +21,19 @@ if CLIENT then
 		self:DrawModel()
 	end
 end
-scripted_ents.Register(SPAWNPOINT_ZOMBIE, "nzu_spawnpoint")
 
 local spawnpointtypes = {
 	["zombie"] = {"Zombie Spawnpoint", Color(0,255,0)},
 	["special"] = {"Special Spawnpoint", Color(255,0,0)},
 	["player"] = {"Player Spawnpoint", Color(0,0,255)}
 }
+
+function SPAWNPOINT_ZOMBIE:SetSpawnpointType(spawntype)
+	self.SpawnpointType = spawntype
+	self:SetColor(spawnpointtypes[spawntype][2])
+end
+
+scripted_ents.Register(SPAWNPOINT_ZOMBIE, "nzu_spawnpoint")
 
 local TOOL = {}
 TOOL.Category = "Mapping"
@@ -48,8 +54,7 @@ function TOOL:LeftClick(trace)
 			local e = ents.Create("nzu_spawnpoint")
 			e:SetPos(trace.HitPos)
 			e:SetAngles(Angle(0,(ply:GetPos() - trace.HitPos):Angle()[2],0))
-			e:SetColor(spawnpointtypes[spawntype][2])
-			e.SpawnpointType = spawntype
+			e:SetSpawnpointType(spawntype)
 			e:Spawn()
 
 			local flags = self:GetClientInfo("rooms")
@@ -169,10 +174,9 @@ if SERVER then
 			for k,v in pairs(tbl) do
 				if spawnpointtypes[v.Type] then
 					local e = ents.Create("nzu_spawnpoint")
-					e:SetColor(spawnpointtypes[v.Type][2])
+					e:SetSpawnpointType(v.Type)
 					e:SetPos(v.Pos)
 					e:SetAngles(v.Ang)
-					e.SpawnpointType = v.Type
 					e:Spawn()
 					e:SetRooms(v.Rooms)
 				end

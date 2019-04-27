@@ -6,7 +6,7 @@ local configpaneltall = 60
 nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	--panel:SetSkin("nZombies Unlimited")
 	--panel:SetBackgroundColor(Color(150,150,150))
-	local selectedconfig, editedconfig
+	local editedconfig
 	
 	local configpanel = panel:Add("DPanel")
 	configpanel:SetWidth(400)
@@ -90,6 +90,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	configlist:Dock(FILL)
 	configlist:DockMargin(5,0,0,5)
 	configlist:SetPaintBackground(true)
+	configlist:SetSelectable(true)
 	configlist:LoadConfigs()
 	
 	local img = infopanel:Add("DImage")
@@ -280,10 +281,11 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	save:SetText("Save Config")
 
 	playbutton.DoClick = function(s)
-		if selectedconfig.Config then
-			if selectedconfig.Config == editedconfig then save:DoClick() end
+		local selectedconfig = configlist:GetSelectedConfig()
+		if selectedconfig then
+			if selectedconfig == editedconfig then save:DoClick() end
 			Derma_Query("Do you wish to change gamemode to NZOMBIES UNLIMITED?", "Mode change confirmation", "Change gamemode", function()
-				nzu.RequestPlayConfig(selectedconfig.Config)
+				nzu.RequestPlayConfig(selectedconfig)
 			end, "Cancel"):SetSkin("nZombies Unlimited")
 		end
 	end
@@ -319,11 +321,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 
 	-- Control selecting configs
 	local function doconfigclick(pnl)
-		if not IsValid(pnl) or not pnl.Config then selectedconfig = nil infopanel:SetVisible(false) return end
-	
-		if IsValid(selectedconfig) then selectedconfig:SetBackgroundColor(Color(0,0,0)) end
-		selectedconfig = pnl
-		selectedconfig:SetBackgroundColor(Color(0,150,255))
+		if not IsValid(pnl) or not pnl.Config then infopanel:SetVisible(false) return end
 		infopanel:SetVisible(true)
 
 		local cfg = pnl.Config
@@ -379,7 +377,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 			playbutton:SetText("Load and Play")
 		end
 	end
-	configlist.OnConfigClicked = function(s,cfg,pnl) doconfigclick(pnl) end
+	configlist.OnConfigSelected = function(s,cfg,pnl) doconfigclick(pnl) end
 
 	-- Create new config button
 	createbutton:SetEnabled(nzu.IsAdmin(LocalPlayer()))
@@ -500,22 +498,24 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 		if editedconfig and (editedconfig.Type == "Local" or editedconfig.Type == "Unsaved") then applyinfo() nzu.RequestSaveConfig(editedconfig) end
 	end
 	reload.DoClick = function()
-		if selectedconfig.Config then
+		local selectedconfig = configlist:GetSelectedConfig()
+		if selectedconfig then
 			local txt = "Are you sure you want to load?"
 			if nzu.CurrentConfig then txt = txt .. " This will reload the server." end
 			Derma_Query(txt, "Config load confirmation",
-				"Load the Config", function() nzu.RequestLoadConfig(selectedconfig.Config) end,
+				"Load the Config", function() nzu.RequestLoadConfig(selectedconfig) end,
 				"Cancel"
 			):SetSkin("nZombies Unlimited")
 		end
 	end
 
 	delete.DoClick = function()
-		if selectedconfig.Config then
+		local selectedconfig = configlist:GetSelectedConfig()
+		if selectedconfig then
 			local txt = "Are you sure you want to delete this Config?"
-			if selectedconfig.Config == nzu.CurrentConfig then txt = txt .. " This will reload the server." end
+			if selectedconfig == nzu.CurrentConfig then txt = txt .. " This will reload the server." end
 			Derma_Query(txt, "Config deletion confirmation",
-				"Delete the Config", function() nzu.RequestDeleteConfig(selectedconfig.Config) end,
+				"Delete the Config", function() nzu.RequestDeleteConfig(selectedconfig) end,
 				"Cancel"
 			):SetSkin("nZombies Unlimited")
 		end
@@ -529,7 +529,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 		Derma_Query("Are you sure you want to unload?\nThis will reload the server.", "Config load confirmation",
 			"Unload", function()
 				if editedconfig and editedconfig.Type == "Unsaved" then
-					if editedconfig == selectedconfig.Config then doconfigclick() end -- Reset info if it is the one shown
+					if editedconfig == configlist:GetSelectedConfig() then doconfigclick() end -- Reset info if it is the one shown
 					updateloadedconfig() -- Reset
 				return end
 				nzu.RequestUnloadConfig()

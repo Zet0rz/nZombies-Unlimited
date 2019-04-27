@@ -1,5 +1,7 @@
 local PANEL = {}
 
+AccessorFunc(PANEL, "m_bAllowSelect", "Selectable", FORCE_BOOL)
+
 function PANEL:Init()
 	self.MapConfigList = self:Add("DListLayout")
 	self.MapConfigList:Dock(TOP)
@@ -48,6 +50,24 @@ function PANEL:SetConfigPanelHeight(height)
 	self.MapConfigList:DockMargin(0,0,0,math.Round(height/2))
 end
 
+function PANEL:SelectConfig(cfg)
+	if self.ConfigPanels[cfg] then
+		if self.ConfigPanels[cfg] == self.SelectedPanel then return end
+
+		if IsValid(self.SelectedPanel) then self.SelectedPanel:SetSelected(false) end
+
+		self.SelectedConfig = cfg
+		self.SelectedPanel = self.ConfigPanels[cfg]
+		self.ConfigPanels[cfg]:SetSelected(true)
+	else
+		if IsValid(self.SelectedPanel) then self.SelectedPanel:SetSelected(false) end
+		self.SelectedConfig = nil
+		self.SelectedPanel = nil
+	end
+
+	self:OnConfigSelected(self.SelectedConfig, self.SelectedPanel)
+end
+
 function PANEL:AddConfig(cfg)
 	if self.ConfigPanels[cfg] then return self.ConfigPanels[cfg] end
 
@@ -58,7 +78,10 @@ function PANEL:AddConfig(cfg)
 		pnl:SetTall(self.m_iPanelHeight or 50)
 	end
 	
-	pnl.DoClick = function(s) self:OnConfigClicked(s.Config, s) end
+	pnl.DoClick = function(s)
+		if self:GetSelectable() then self:SelectConfig(s.Config) end
+		self:OnConfigClicked(s.Config, s)
+	end
 	pnl:Dock(TOP)
 	
 	if pnl.Config and pnl.Config.Map == game.GetMap() then
@@ -116,6 +139,14 @@ function PANEL:OnConfigClicked(cfg, pnl)
 	-- Override me :D
 end
 
+function PANEL:OnConfigSelected(cfg, pnl)
+	-- Override me too :D
+end
+
+function PANEL:GetSelectedConfig()
+	return self.SelectedConfig, self.SelectedPanel
+end
+
 vgui.Register("nzu_ConfigList", PANEL, "DScrollPanel")
 
 -- CONFIG PANEL
@@ -161,6 +192,7 @@ function CONFIGPANEL:Init()
 	self.Button.DoClick = function() self:DoClick() end
 
 	self:DockPadding(5,5,5,5)
+	self.Button:DockMargin(-5,-5,-5,-5)
 	self.m_bDrawCorners = true
 end
 
@@ -209,5 +241,10 @@ function CONFIGPANEL:Sort()
 	else
 		self:SetZPos(-1)
 	end
+end
+
+local selectcol = Color(0,150,255)
+function CONFIGPANEL:SetSelected(b)
+	self:SetBackgroundColor(b and selectcol or nil)
 end
 vgui.Register("nzu_ConfigPanel", CONFIGPANEL, "DPanel")

@@ -9,6 +9,10 @@ local function blocknavarea(a)
 	navblocks[a:GetID()] = true
 end
 
+function nzu.LockNavArea(a, group)
+	if group then locknavarea(a, group) else blocknavarea(a) end
+end
+
 if SERVER then
 	-- Saving! Man, isn't it just easy?
 	nzu.AddSaveExtension("NavLocks", {
@@ -32,7 +36,7 @@ if SERVER then
 			navdoors = {}
 			navblocks = {}
 
-			ply:ChatPrint("Nav Locks cleared.")
+			PrintMessage(HUD_PRINTTALK, "Nav Locks cleared by "..ply:Nick())
 		--end
 	end)
 end

@@ -42,7 +42,7 @@ spawnmenu.AddCreationTab(tabname, function()
 	if IsValid(LocalPlayer()) then createtabs(tab) end
 	
 	return tab
-end, "icon16/control_repeat_blue.png", 1000, "nZombies Unlimited - Control Panel")
+end, "icon16/briefcase.png", 1000, "nZombies Unlimited - Control Panel")
 
 hook.Add("InitPostEntity", "nzu_Spawnmenu_Initialize", function()
 	if IsValid(tab) then createtabs(tab) end

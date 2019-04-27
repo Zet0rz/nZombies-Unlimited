@@ -54,6 +54,7 @@ loadfile_c("spawnmenu_saveload.lua")
 loadfile_c("spawnmenu_extensions.lua")
 loadfile("spawnmenu_tools.lua")
 loadfile_c("spawnmenu_mismatch.lua")
+loadfile("spawnmenu_legacyconfigs.lua")
 
 --[[-------------------------------------------------------------------------
 Core item population
