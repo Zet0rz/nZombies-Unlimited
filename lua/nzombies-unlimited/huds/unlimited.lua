@@ -687,3 +687,33 @@ function HUD:Draw_TargetID(text, typ, data, ent)
 		draw.SimpleText(str, targetidfont, x, y, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	end
 end
+
+--[[-------------------------------------------------------------------------
+Game Over Panel
+This is actually an internal function, but it is called through the Scoreboard file
+The _ prefix means it is ignored by the HUD system, and thus internal (or accessed directly)
+---------------------------------------------------------------------------]]
+function HUD:_GameOverPanel()
+	local p = vgui.Create("Panel")
+	local txt = p:Add("DLabel")
+	txt:SetFont("nzu_Font_Bloody_Biggest")
+	txt:SetTextColor(Color(150,0,0))
+	txt:SetText("GAME OVER")
+	txt:SetContentAlignment(5)
+	txt:Dock(FILL)
+	txt:DockMargin(0,0,0,-50)
+
+	local r = p:Add("DLabel")
+	r:SetFont("nzu_Font_Bloody_Large")
+	r:SetText(nzu.Round:GetRound() == 1 and "You survived 1 round." or "You survived "..(nzu.Round:GetRound() or 0).." rounds.")
+	r:SetTextColor(Color(150,0,0))
+	r:SetContentAlignment(5)
+	r:Dock(BOTTOM)
+	r:SizeToContentsY()
+	r:DockMargin(0,0,0,50)
+
+	p:SetTall(250)
+	p:SetWide(1000)
+
+	return p
+end

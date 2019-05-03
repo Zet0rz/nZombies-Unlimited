@@ -314,84 +314,45 @@ if CLIENT then
 	
 	--function PANEL:AddNetworkedButton(text, )
 
-	-- Internal functions you don't really need to worry about
-	local function readybuttonload(self)
-		if self.Menu.Config then
-			nzu.RequestLoadConfig(self.Menu.Config)
+
+	function PANEL:AddReadyButtonFunction(text, weight, condition, func, admin)
+		for k,v in pairs(self.ReadyButtonFuncs) do
+			if weight > v.Weight then
+				table.insert(self.ReadyButtonFuncs, k, {Weight = weight, Text = text, Condition = condition, Function = func, Admin = admin})
+				if k <= self.CurrentReadyButtonFunc then self.CurrentReadyButtonFunc = self.CurrentReadyButtonFunc + 1 end -- We pushed the currently selected one down
+				return
+			end
 		end
+		table.insert(self.ReadyButtonFuncs, {Weight = weight, Text = text, Condition = condition, Function = func, Admin = admin})
 	end
+
 	local function thinkreadybutton(self)
-		if self.Menu.Config then
-			if nzu.CurrentConfig and nzu.CurrentConfig.Codename == self.Menu.Config.Codename and nzu.CurrentConfig.Type == self.Menu.Config.Type then
-				-- Same config
-				local state = nzu.Round:GetState()
-				if state ~= ROUND_GAMEOVER then
-					if LocalPlayer():Alive() then
-						local totext = "Unspawn"
-						if self:GetText() ~= totext then
-							self:SetText(totext)
-							self.ClickFunction = nzu.Unready
+		for k,v in pairs(self.Menu.ReadyButtonFuncs) do
+			if v.Condition() then
+				if k ~= self.Menu.CurrentReadyButtonFunc then
+					self:SetText(v.Text)
+					self.ClickFunction = v.Function
+					self.Menu.CurrentReadyButtonFunc = k
 
-							self.AdminOnly = false
-							self:SetDisabled(false)
-						end
-					elseif not LocalPlayer():IsReady() then
-						local totext = state == ROUND_WAITING and "Ready" or "Spawn in"
-						if self:GetText() ~= totext then
-							self:SetText(totext)
-							self.ClickFunction = nzu.Ready
-
-							self.AdminOnly = false
-							self:SetDisabled(false)
-						end
+					if v.Admin then
+						self:SetDisabled(not nzu.IsAdmin(LocalPlayer()))
+						self.AdminOnly = true
 					else
-						local totext = "Unready"
-						if self:GetText() ~= totext then
-							self:SetText(totext)
-							self.ClickFunction = nzu.Unready
-
-							self.AdminOnly = false
-							self:SetDisabled(false)
-						end
+						self:SetDisabled(false)
+						self.AdminOnly = false
 					end
-					return
-				end
-			else
-				if self:GetText() ~= "Load selected Config" then
-					-- Different config, only admins can trigger a load
-					self:SetText("Load selected Config")
-					self.ClickFunction = readybuttonload
-					self.AdminOnly = true
-					self:SetDisabled(false)
 				end
 				return
 			end
 		end
 
-		self:SetText("[No valid action]")
-		self:SetDisabled(true)
-	end
-
-	function PANEL:SetConfig(config)
-		self.Config = config
-		if config then
-			self.ConfigPanel:SetImage(nzu.GetConfigThumbnail(config))
-			self.ConfigPanel.Map:SetText(config.Map)
-			self.ConfigPanel.Map:SizeToContents()
-			self.ConfigPanel.Name:SetText(config.Name)
-			self.ConfigPanel.Name:SizeToContents()
-			self.ConfigPanel.Authors:SetText(config.Authors)
-			self.ConfigPanel.Authors:SizeToContents()			
-		else
-			self.ConfigPanel:SetImage("vgui/black")
-			self.ConfigPanel.Map:SetText("")
-			self.ConfigPanel.Map:SizeToContents()
-			self.ConfigPanel.Name:SetText("No Config selected")
-			self.ConfigPanel.Name:SizeToContents()
-			self.ConfigPanel.Authors:SetText("Use the Load Configs menu to select a Config to load.")
-			self.ConfigPanel.Authors:SizeToContents()
+		if self.Menu.CurrentReadyButtonFunc ~= 0 then
+			self:SetText("[No valid action]")
+			self:SetDisabled(true)
 		end
 	end
+	function PANEL:SetConfig(config) self.ConfigPanel:SetConfig(config) end
+	function PANEL:GetConfig() return self.ConfigPanel:GetConfig() end
 
 	local countdowntextstates = {
 		[ROUND_PREPARING] = "Prepare",
@@ -465,40 +426,11 @@ if CLIENT then
 		self.LeftSide:DockMargin(100,100,50,50)
 
 		-- The loaded config icon
-		self.ConfigPanel = self.LeftSide:Add("DImage")
+		self.ConfigPanel = self.LeftSide:Add("nzu_ConfigImagePanel")
 		self.ConfigPanel:Dock(BOTTOM)
-		self.ConfigPanel:SetTall(337)
+		self.ConfigPanel:SetMaintainAspectRatio(true)
 		self.ConfigPanel:DockMargin(0,35,0,0)
-
-		self.ConfigPanel.InfoBar = self.ConfigPanel:Add("Panel")
-		self.ConfigPanel.InfoBar:Dock(BOTTOM)
-		self.ConfigPanel.InfoBar:SetTall(45)
-		function self.ConfigPanel.InfoBar.Paint(s)
-			surface.SetDrawColor(0,0,0,252)
-			s:DrawFilledRect()
-		end
-
-		local namemap = self.ConfigPanel.InfoBar:Add("Panel")
-		namemap:Dock(TOP)
-		namemap:SetTall(40)
-
-		self.ConfigPanel.Name = namemap:Add("DLabel")
-		self.ConfigPanel.Name:SetFont("Trebuchet24")
-		self.ConfigPanel.Name:SetTextColor(color_white)
-		self.ConfigPanel.Name:Dock(LEFT)
-		self.ConfigPanel.Name:DockMargin(5,0,5,10)
-
-		self.ConfigPanel.Map = namemap:Add("DLabel")
-		--self.ConfigPanel.Map:SetFont("Trebuchet24")
-		self.ConfigPanel.Map:SetTextColor(Color(200,200,200))
-		self.ConfigPanel.Map:Dock(LEFT)
-		self.ConfigPanel.Map:DockMargin(5,0,5,5)
-
-		self.ConfigPanel.Authors = self.ConfigPanel.InfoBar:Add("DLabel")
-		--self.ConfigPanel.Authors:SetFont("Trebuchet24")
-		self.ConfigPanel.Authors:SetTextColor(Color(150,150,150))
-		self.ConfigPanel.Authors:Dock(BOTTOM)
-		self.ConfigPanel.Authors:DockMargin(5,5,5,5)
+		self.ConfigPanel:SetNoConfigAuthors("Use the Load Configs menu to select a Config to load.")
 
 		self.RightSide = self:Add("DDragBase")
 		self.RightSide:Dock(RIGHT)
@@ -553,11 +485,18 @@ if CLIENT then
 		self.MenuRoot:Dock(FILL)
 		self.MenuRoot.Menu = self
 
-		-- Now populate!
-		local canready = true
-		self.ReadyButton = self:AddButton("Ready", 1)
+		self.ReadyButtonFuncs = {}
+		self.CurrentReadyButtonFunc = -1 -- Cause refresh next think
+
+		-- Now populate! Ready button needs its base conditions set
+		self.ReadyButton = self:AddButton("", 1)
 		self.ReadyButton.Menu = self
 		self.ReadyButton.Think = thinkreadybutton
+
+		self:AddReadyButtonFunction("Unspawn", 1000, function() return nzu.Round:GetState() ~= ROUND_GAMEOVER and not LocalPlayer():IsUnspawned() end, nzu.Unready)
+		self:AddReadyButtonFunction("Unready", 100, function() return LocalPlayer():IsReady() end, nzu.Unready)
+		self:AddReadyButtonFunction("Ready", 50, function() return nzu.CurrentConfig and nzu.Round:GetState() == ROUND_WAITING end, nzu.Ready)
+		self:AddReadyButtonFunction("Spawn In", 40, function() return nzu.CurrentConfig and nzu.Round:GetState() ~= ROUND_GAMEOVER end, nzu.Ready)
 
 		self.PlayerList.Think = function(s)
 			local plys = player.GetAll()
@@ -598,7 +537,7 @@ if CLIENT then
 		end
 
 		-- TODO: Add the link and uncomment this section when the server is open
-		--[[self.Promo = self.LeftSide:Add("DImageButton")
+		self.Promo = self.LeftSide:Add("DImageButton")
 		self.Promo:Dock(BOTTOM)
 		self.Promo:SetTall(75)
 		self.Promo:SetImage("nzombies-unlimited/menu/discord-promo.png")
@@ -647,7 +586,7 @@ if CLIENT then
 			frame:Center()
 			frame:SetMouseInputEnabled(true)
 			frame:DoModal()
-		end]]
+		end
 
 		-- Music!
 		--[[local rsctr = self.RightSide:Add("DPanel")
@@ -712,14 +651,13 @@ if CLIENT then
 
 	function PANEL:Toggle()
 		if self:IsVisible() then
-			if nzu.Round:GetState() ~= ROUND_WAITING then self:Close() end -- Can't close in waiting state
+			if nzu.Round:GetState() ~= ROUND_WAITING or (IsValid(LocalPlayer()) and not LocalPlayer():IsUnspawned()) then self:Close() end -- Can't close in waiting state
 		else
 			self:Open()
 		end
 	end
 	vgui.Register("nzu_MenuPanel", PANEL, "Panel")
 
-	local menuhooks = {}
 	local function togglemenu()
 		local mainmenu = nzu.Menu
 		--if mainmenu then mainmenu:Remove() mainmenu = nil end -- DEBUG
@@ -727,14 +665,17 @@ if CLIENT then
 		if net.ReadBool() then
 			if net.ReadBool() then
 				if not mainmenu then
-					mainmenu = vgui.Create("nzu_MenuPanel")
-					mainmenu:SetSkin("nZombies Unlimited")
-					nzu.Menu = mainmenu
-					for k,v in pairs(menuhooks) do
-						v(mainmenu)
+					if IsValid(LocalPlayer()) then
+						mainmenu = vgui.Create("nzu_MenuPanel")
+						mainmenu:SetSkin("nZombies Unlimited")
+						nzu.Menu = mainmenu
+						hook.Run("nzu_MenuCreated", mainmenu)
+					else
+						nzu.Menu = true
+						return
 					end
-					mainmenu:Open()
 				end
+				mainmenu:Open()
 			elseif mainmenu then
 				mainmenu:Close()
 			end
@@ -743,9 +684,8 @@ if CLIENT then
 				mainmenu = vgui.Create("nzu_MenuPanel")
 				mainmenu:SetSkin("nZombies Unlimited")
 				nzu.Menu = mainmenu
-				for k,v in pairs(menuhooks) do
-					v(mainmenu)
-				end
+				hook.Run("nzu_MenuCreated", mainmenu)
+
 				mainmenu:Open()
 			else
 				mainmenu:Toggle()
@@ -755,15 +695,15 @@ if CLIENT then
 	end
 	net.Receive("nzu_OpenMenu", togglemenu)
 
-	function nzu.AddMenuHook(id, func)
-		menuhooks[id] = func
-		if IsValid(nzu.Menu) then
-			func(nzu.Menu)
+	hook.Add("InitPostEntity", "nzu_Menu_InitializeMenu", function()
+		if not IsValid(nzu.Menu) then
+			nzu.Menu = vgui.Create("nzu_MenuPanel")
+			nzu.Menu:SetSkin("nZombies Unlimited")
+			hook.Run("nzu_MenuCreated", nzu.Menu)
+
+			nzu.Menu:Open()
 		end
-	end
-	function nzu.RemoveMenuHook(id)
-		menuhooks[id] = nil
-	end
+	end)
 
 else
 	util.AddNetworkString("nzu_OpenMenu")

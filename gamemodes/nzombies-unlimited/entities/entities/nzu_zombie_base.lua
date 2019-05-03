@@ -44,17 +44,26 @@ local coroutine = coroutine
 --[[-------------------------------------------------------------------------
 Initialization
 ---------------------------------------------------------------------------]]
+------- Fields -------
+
+if CLIENT then
+	-- Draw red eyes while the zombie is alive, as done in ENT:DrawEyeLight()
+	-- Default draws at attachments "lefteye" and "righteye" or offset from "eyes"
+	ENT.RedEyes = true
+end
+
 if SERVER then
-	------- Fields -------
 	-- TODO: Change the structure of this so that a subclass implementation doesn't inheret this table too
 	ENT.Models = {
 		{Model = "models/nzu/nzombie_honorguard.mdl", Skin = 0, Bodygroups = {0,0}},
 		{Model = "models/nzu/nzombie_honorguard.mdl", Skin = 0, Bodygroups = {0,1}},
 	}
 
-	-- Smaller than players except in the forward direction
-	ENT.CollisionMins = Vector(-12,-8,0)
-	ENT.CollisionMaxs = Vector(12,16,64)
+	-- This should be the same as the model bounds to prevent the player from getting stuck in the zombie moving into us
+	ENT.CollisionMins = Vector(-13,-13,0)
+	ENT.CollisionMaxs = Vector(13,13,72)
+
+
 
 	------- Overridables -------
 
@@ -102,6 +111,10 @@ function ENT:OnSpawn()
 	if SERVER then self:TriggerEvent("Spawn") end
 end
 
+-- Called from ENT:SetupDataTables(). Allows you to set up more NetworkVars
+-- than the built-in Bool "Alive" in slot 0 (don't use Bool slot 0)
+function ENT:DataTables() end
+
 --[[-------------------------------------------------------------------------
 Targeting
 ---------------------------------------------------------------------------]]
@@ -109,10 +122,10 @@ if SERVER then
 	------- Callables -------
 	function ENT:GetTarget() return self.Target end -- Get the current target
 	function ENT:SetTarget(t) if self:AcceptTarget(t) then self.Target = t return true else return false end end -- Sets the target for the next path update
-	function ENT:SetTargetLocked(b) self.TargetLocked = b end -- Stops the Zombie from retargetting and keeps this target while it is valid and targetable
+	AccessorFunc(ENT, "m_bTargetLocked", "TargetLocked", FORCE_BOOL) -- Stops the Zombie from retargetting and keeps this target while it is valid and targetable
 	function ENT:SetNextRetarget(time) self.NextRetarget = CurTime() + time end -- Sets the next time the Zombie will repath to its target
 	function ENT:Retarget() -- Causes a retarget
-		if self.TargetLocked and validtarget(self.Target) then return end
+		if self:GetTargetLocked() and validtarget(self.Target) then return end
 
 		local target, dist = self:SelectTarget()
 		if target ~= self.Target then
@@ -146,7 +159,7 @@ if SERVER then
 	end
 
 	-- Lets you determine how long until the next retarget
-	-- This is called after a retarget. You can use the distance, we it is known to be the smallest distance to all players
+	-- This is called after a retarget. You can use the distance, it is known to be the smallest distance to all players
 	function ENT:CalculateNextRetarget(target, dist)
 		return math.Clamp(dist/200, 3, 15) -- 1 second for every 100 units to the closet player
 	end
@@ -226,6 +239,8 @@ Attacking
 ---------------------------------------------------------------------------]]
 if SERVER then
 	------- Fields -------
+	AccessorFunc(ENT, "m_bAttackBlocked", "BlockAttack", FORCE_BOOL) -- Stops the Zombie from attacking
+
 	ENT.AttackDamage = 30
 	ENT.AttackRange = 60
 
@@ -276,7 +291,7 @@ if SERVER then
 	-- It selects an attack animation and plays it, dealing damage during its moments of impact
 	-- A damage info can be passed, otherwise a default is created
 	function ENT:AttackTarget(target, dmg, move)
-		if IsValid(target) then
+		if not self:GetBlockAttack() and IsValid(target) then
 		
 			local tbl = {}
 			if not dmg then
@@ -469,13 +484,24 @@ if SERVER then
 	-- Default: nil (since the base always ragdolls)
 	ENT.DeathAnimations = nil
 
+	------- Callables -------
+
+	-- Performs an animation and dies. This overwrites the RunBehaviour routine, and thus will instantly cancel any and all events
+	-- Events must be coded with this in mind!
+	function ENT:DoDeathAnimation(seq)
+		self.BehaveThread = coroutine.create(function()
+			self:PlaySequenceAndWait(seq)
+			self:BecomeRagdoll(DamageInfo())
+		end)
+	end
+
 	------- Overridables -------
 
 	-- Called when the Zombie is about to die, right before ENT:PerformDeath.
 	-- If you want to perform specific logic on the zombie dying, this is where
 	-- Default: Do nothing really
 	function ENT:OnDeath(dmg)
-
+		
 	end
 
 	-- Called when the bot wants to perform a death. Become ragdoll or otherwise perform a death animation here
@@ -485,10 +511,7 @@ if SERVER then
 		if self.DeathRagdollForce == 0 or self.DeathRagdollForce <= dmg:GetDamageForce():Length() then
 			self:BecomeRagdoll(dmg)
 		else
-			self:TriggerEvent("Death", function(self, seq)
-				self:PlaySequenceAndWait(seq)
-				self:BecomeRagdoll(DamageInfo())
-			end, self.DeathAnimations[math.random(#self.DeathAnimations)])
+			self:DoDeathAnimation(self.DeathAnimations[math.random(#self.DeathAnimations)])
 		end
 	end
 
@@ -503,10 +526,10 @@ if SERVER then
 
 	-- Perform the actual spawn. This can be overwritten if you want to do something COMPLETELY
 	-- different for the spawn. This is running during the bot's "Spawn" event
-	function ENT:PerformSpawn()
+	function ENT:Event_Spawn()
 		local seq,s = self:SelectSpawnSequence()
 		if seq then
-			self:PlaySequenceAndWait(self.SpawnSequence)
+			self:PlaySequenceAndWait(seq)
 		end
 		if s then self:PlaySound(s) end
 	end
@@ -549,11 +572,6 @@ if SERVER then
 	function ENT:CollideWhenPossible() self.DoCollideWhenPossible = true end -- Make the zombie solid again as soon as there is space
 
 	------- Basic Events -------
-
-	-- Play whatever is defined in the bot's PerformSpawn function
-	function ENT:Event_Spawn()
-		self:PerformSpawn()
-	end
 
 	-- Perform a basic attack on the given target
 	-- We do a moving attack if the target is a player
@@ -720,13 +738,17 @@ AI
 A stack of functions that are called from the bot's RunBehaviour
 These let you modify the bot's AI and behavior completely
 ---------------------------------------------------------------------------]]
+
+------- Callables -------
+function ENT:Alive() return self:GetAlive() end -- Pretty obvious
+
 if SERVER then
 	------- Overridables -------
 
 	-- When a path ends. Either when the goal is reached, or when no path could be found
 	-- This is where you should trigger your attack event or idle
 	function ENT:OnPathEnd()
-		if IsValid(self.Target) and self:AcceptTarget(self.Target) and not self.PreventAttack then
+		if not self:GetBlockAttack() and IsValid(self.Target) and self:AcceptTarget(self.Target) then
 			if self:GetRangeTo(self.Target) <= self.AttackRange then
 				self:TriggerEvent("Attack", self.Target)
 			end
@@ -764,7 +786,7 @@ if SERVER then
 	-- Default: Change targets and attack if successful!
 	-- Note: If the player is the target, ENT:InteractTarget is called instead!
 	function ENT:InteractPlayer(ply)
-		if self:SetTarget(ply) then -- If we succeeded in targetting this player
+		if not self:GetBlockAttack() and self:SetTarget(ply) then -- If we succeeded in targetting this player
 			self:TriggerEvent("Attack", ply)
 		end
 	end
@@ -773,7 +795,7 @@ if SERVER then
 	-- Monkey bombs and other target entities go here as well
 	-- Default: Attack the target! (Even if it is a non-player!)
 	function ENT:InteractTarget(target)
-		self:TriggerEvent("Attack", target)
+		if not self:GetBlockAttack() then self:TriggerEvent("Attack", target) end
 	end
 
 	-- Called when bumping into any entity that doesn't have a ZombieInteract function and isn't a player
@@ -859,6 +881,7 @@ function ENT:Initialize()
 
 		local models = m and nzu.GetResourceSet(m) or fallback
 		local choice = models[math.random(#models)]
+		if not choice then choice = fallback[math.random(#fallback)] end
 		self:SetModel(choice.Model)
 		if choice.Skin then self:SetSkin(choice.Skin) end
 		if choice.Bodygroups then
@@ -877,6 +900,8 @@ function ENT:Initialize()
 		self.loco:SetJumpHeight(self.JumpHeight)
 		self.loco:SetMaxYawRate(self.MaxYawRate)
 		self.loco:SetStepHeight(self.StepHeight)
+
+		self:SetAlive(true)
 	end
 
 	self:Init()
@@ -1125,40 +1150,90 @@ end
 --[[-------------------------------------------------------------------------
 Misc
 ---------------------------------------------------------------------------]]
--- Collide When Possible
-local collidedelay = 0.5
-local bloat = Vector(5,5,0)
-function ENT:Think()
-	if self.DoCollideWhenPossible then
-		if not self.NextCollideCheck or self.NextCollideCheck < CurTime() then
-			local mins,maxs = self:GetCollisionBounds()
-			local tr = util.TraceHull({
-				start = self:GetPos(),
-				endpos = self:GetPos(),
-				filter = self,
-				mask = MASK_NPCSOLID,
-				mins = mins - bloat,
-				maxs = maxs + bloat,
-				ignoreworld = true
-			})
+if SERVER then
+	-- Collide When Possible
+	local collidedelay = 0.5
+	local bloat = Vector(5,5,0)
+	function ENT:Think()
+		if self.DoCollideWhenPossible then
+			if not self.NextCollideCheck or self.NextCollideCheck < CurTime() then
+				local mins,maxs = self:GetCollisionBounds()
+				local tr = util.TraceHull({
+					start = self:GetPos(),
+					endpos = self:GetPos(),
+					filter = self,
+					mask = MASK_NPCSOLID,
+					mins = mins - bloat,
+					maxs = maxs + bloat,
+					ignoreworld = true
+				})
 
-			local b = IsValid(tr.Entity)
-			if not b then
-				self:SetSolidMask(MASK_NPCSOLID)
-				self.DoCollideWhenPossible = nil
-				self.NextCollideCheck = nil
-				self.EventMask = nil
-			else
-				self.NextCollideCheck = CurTime() + collidedelay
+				local b = IsValid(tr.Entity)
+				if not b then
+					self:SetSolidMask(MASK_NPCSOLID)
+					self.DoCollideWhenPossible = nil
+					self.NextCollideCheck = nil
+					self.EventMask = nil
+				else
+					self.NextCollideCheck = CurTime() + collidedelay
+				end
 			end
 		end
 	end
 end
 
+function ENT:SetupDataTables()
+	self:NetworkVar("Bool", 0, "Alive")
+	self:DataTables()
+end
+
 if SERVER then
 	function ENT:OnKilled(dmg)
+		self:SetAlive(false)
+		self:SetCollisionGroup(COLLISION_GROUP_DEBRIS_TRIGGER)
 		hook.Run("OnNPCKilled", self, dmg:GetAttacker(), dmg:GetInflictor())
 		self:OnDeath(dmg)
 		self:PerformDeath(dmg)
+	end
+end
+
+if CLIENT then
+	function ENT:Draw()
+		self:DrawModel()
+		if self.RedEyes and self:Alive() then
+			self:DrawEyeLight()
+		end
+	end
+
+	local eyeglow = Material("sprites/redglow1")
+	local white = color_white
+	function ENT:DrawEyeLight()
+		local latt,ratt = self:LookupAttachment("lefteye"), self:LookupAttachment("righteye")
+
+		if latt < 1 then latt = self:LookupAttachment("left_eye") end
+		if ratt < 1 then ratt = self:LookupAttachment("right_eye") end
+		
+		local righteyepos
+		local lefteyepos
+		if latt > 0 and ratt > 0 then
+			local leye = self:GetAttachment(latt)
+			local reye = self:GetAttachment(ratt)
+			lefteyepos = leye.Pos + leye.Ang:Forward()*0.5
+			righteyepos = reye.Pos + reye.Ang:Forward()*0.5
+		else
+			local eyes = self:GetAttachment(self:LookupAttachment("eyes"))
+			if eyes then
+				local right = eyes.Ang:Right()
+				local forward = eyes.Ang:Forward()
+				lefteyepos = eyes.Pos + right * -1.5 + forward * 0.5
+				righteyepos = eyes.Pos + forward * 1.5 + forward * 0.5
+			end
+		end
+
+		if lefteyepos and righteyepos then
+			render.SetMaterial(eyeglow)
+			render.DrawSprite(lefteyepos, 4, 4, white)
+			render.DrawSprite(righteyepos, 4, 4, white)
+		end
 	end
 end

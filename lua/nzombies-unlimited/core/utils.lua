@@ -29,3 +29,38 @@ function nzu.WeightedRandom(tbl)
 		end
 	end
 end
+
+-- Queued net read entity functions. Read the ID of the entity and queue a function that runs as soon as the Entity becomes valid
+local function setfunc(t,f) t.Function = f end
+local queue
+local function doqueue(ent)
+	if queue[ent:EntIndex()] then
+		for k,v in pairs(queue[ent:EntIndex()]) do
+			v.Function(ent)
+		end
+		queue[ent:EntIndex()] = nil
+		if not next(queue) then
+			queue = nil
+			hook.Remove("OnEntityCreated", "nzu_Util_NetReadEntityQueued")
+		end
+	end
+end
+
+local function instantrun(t,f) f(t.Entity) end
+function net.ReadEntityQueued()
+	local i = net.ReadUInt(16)
+	local ent = Entity(i)
+	if IsValid(ent) then
+		return {Run = instantrun, Entity = ent}
+	end
+
+	if not queue then
+		queue = {}
+		hook.Add("OnEntityCreated", "nzu_Util_NetReadEntityQueued", doqueue)
+	end
+
+	local t = {Run = setfunc}
+	if not queue[i] then queue[i] = {} end
+	table.insert(queue[i], t)
+	return t
+end

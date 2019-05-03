@@ -77,6 +77,12 @@ function ENT:Initialize()
 
 		self:SetCanBeRepaired(false)
 		self:SetIsClear(self:GetPlankCount() == 0)
+
+		local phys = self:GetPhysicsObject()
+		if IsValid(phys) then
+			phys:EnableMotion(false)
+			phys:Sleep()
+		end
 	end
 
 	self:SetMaterial("models/wireframe")

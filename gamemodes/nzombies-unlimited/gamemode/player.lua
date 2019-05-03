@@ -104,7 +104,7 @@ TEAM_SURVIVORS = 1
 team.SetUp(TEAM_SURVIVORS, "Survivors", Color(100,255,150))
 
 function PLAYER:IsUnspawned()
-	return self:Team() == TEAM_UNASSIGNED
+	return self:Team() == TEAM_UNASSIGNED or self:Team() == TEAM_CONNECTING
 end
 
 if SERVER then
@@ -116,7 +116,7 @@ if SERVER then
 			self:SetTeam(TEAM_UNASSIGNED)
 			net.Start("nzu_playerunspawn")
 				net.WriteEntity(self)
-				net.WriteBool(false)
+				net.WriteBool(true)
 			net.Broadcast()
 
 			hook.Run("nzu_PlayerUnspawned", self)
@@ -125,21 +125,44 @@ if SERVER then
 
 
 	hook.Add("PlayerSpawn", "nzu_Player_Spawn", function(ply)
-		if ply:IsUnspawned() then
+		if ply:IsUnspawned() and ply:Team() ~= TEAM_CONNECTING then
 			ply:SetTeam(TEAM_SURVIVORS)
 			net.Start("nzu_playerunspawn")
 				net.WriteEntity(ply)
-				net.WriteBool(true)
+				net.WriteBool(false)
 			net.Broadcast()
 
 			hook.Run("nzu_PlayerInitialSpawned", ply)
 		end
 	end)
+
+	-- This is basically dropping out and being on the main menu
+	-- You can spectate from here too (later)
+	
+	function GM:PlayerInitialSpawn(ply)
+		-- Is this timer really necessary? :(
+		-- It doesn't seem to kill if not with the timer (probably cause it's before the spawn?)
+		timer.Simple(0, function()
+			if IsValid(ply) then
+				if ply:Alive() then ply:KillSilent() end
+
+				ply:SetTeam(TEAM_UNASSIGNED)
+				net.Start("nzu_playerunspawn")
+					net.WriteEntity(ply)
+					net.WriteBool(true)
+				net.Broadcast()
+
+				hook.Run("nzu_PlayerUnspawned", ply)
+			end
+		end)
+	end
+
+	function GM:PlayerDeathThink() end -- Don't allow button press respawns
 else
 	net.Receive("nzu_playerunspawn", function()
 		local ply = net.ReadEntity()
 		local b = net.ReadBool()
-		hook.Run(b and "nzu_PlayerInitialSpawned" or "nzu_PlayerUnspawned", ply)
+		hook.Run(b and "nzu_PlayerUnspawned" or "nzu_PlayerInitialSpawned", ply)
 	end)
 end
 

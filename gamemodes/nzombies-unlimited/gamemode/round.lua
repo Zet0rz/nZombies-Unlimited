@@ -47,8 +47,8 @@ if SERVER then
 	end)
 
 	ROUND.Zombies = ROUND.Zombies or {} -- List
-	ROUND.NumberZombies = 0 -- Count
-	ROUND.ZombiesToSpawn = 0 -- Zombies still not spawned
+	ROUND.NumberZombies = ROUND.NumberZombies or 0 -- Count
+	ROUND.ZombiesToSpawn = ROUND.ZombiesToSpawn or 0 -- Zombies still not spawned
 	function ROUND:GetRemainingZombies() return self.NumberZombies + self.ZombiesToSpawn end
 
 	local weightedrandom = nzu.WeightedRandom
@@ -87,6 +87,7 @@ if SERVER then
 			end
 		end
 	end
+	hook.Add("OnNPCKilled", "nzu_Round_ZombieDeath", dozombiedeath)
 	hook.Add("EntityRemoved", "nzu_Round_ZombieDeath", dozombiedeath)
 	--hook.Add("EntityRemoved", "nzu_Round_ZombieRemoved", dozombiedeath)
 
@@ -580,23 +581,4 @@ else
 			hook.Run("nzu_PlayerUnready", ply)
 		end
 	end)
-end
-
-
-if SERVER then
-	-- This is basically dropping out and being on the main menu
-	-- You can spectate from here too (later)
-	
-	function GM:PlayerInitialSpawn(ply)
-		-- Is this timer really necessary? :(
-		-- It doesn't seem to kill if not with the timer (probably cause it's before the spawn?)
-		timer.Simple(0, function()
-			if IsValid(ply) then
-				nzu.Unspawn(ply)
-				hook.Run("ShowHelp", ply) -- Open their F1 menu
-			end
-		end)
-	end
-
-	function GM:PlayerDeathThink() end
 end

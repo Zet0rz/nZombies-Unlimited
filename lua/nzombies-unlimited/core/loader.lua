@@ -22,7 +22,7 @@ end
 --[[-------------------------------------------------------------------------
 Spawnmenu & Panels Preparation
 ---------------------------------------------------------------------------]]
---loadfile("utils.lua")
+loadfile("utils.lua")
 loadfile_c("cl_nzombies_skin.lua")
 loadfile_c("cl_spawnmenu.lua")
 loadfile("mismatch.lua")

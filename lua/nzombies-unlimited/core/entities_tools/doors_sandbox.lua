@@ -48,6 +48,8 @@ if SERVER then
 		end
 	end
 	function ENTITY:CreateDoor(data)
+		if self.nzu_DoorHooked and not data.Group then return end
+
 		-- Sanity check
 		data.Price = data.Price or 0
 		if data.Group == "" then data.Group = nil end
@@ -76,7 +78,7 @@ if SERVER then
 	hook.Add("PlayerInitialSpawn", "nzu_Doors_InitSync", function(ply)
 		for k,v in pairs(doors) do
 			net.Start("nzu_doors")
-				networkdoordata(k, k.nzu_DoorData)
+				networkdoordata(k, k:GetDoorData())
 			net.Send(ply)
 		end
 	end)
@@ -87,8 +89,10 @@ if SERVER then
 			local doordata = {}
 			local doorents = {}
 			for k,v in pairs(doors) do
-				table.insert(doorents, k)
-				table.insert(doordata, k:GetDoorData())
+				if IsValid(k) then
+					table.insert(doorents, k)
+					table.insert(doordata, k:GetDoorData())
+				end
 			end
 
 			return doordata, doorents
@@ -104,7 +108,7 @@ if SERVER then
 	})
 else
 	net.Receive("nzu_doors", function()
-		local ent = net.ReadEntity()
+		local ent = net.ReadEntityQueued()
 		if net.ReadBool() then
 			local tbl = {}
 			tbl.Price = net.ReadUInt(32)
@@ -126,11 +130,16 @@ else
 				end
 			end
 
-			ent.nzu_DoorData = tbl
-			hook.Run("nzu_DoorLockCreated", ent, tbl)
+			ent:Run(function(e)
+				e.nzu_DoorData = tbl
+				hook.Run("nzu_DoorLockCreated", e, tbl)
+			end)
+			
 		else
-			ent.nzu_DoorData = nil
-			hook.Run("nzu_DoorLockRemoved", ent)
+			ent:Run(function(e)
+				e.nzu_DoorData = nil
+				hook.Run("nzu_DoorLockRemoved", e)
+			end)
 		end
 	end)
 
@@ -138,6 +147,10 @@ else
 	hook.Add("nzu_GetTargetIDText", "nzu_Doors_TargetID", function(ent)
 		local data = ent:GetDoorData()
 		if data then
+			if ent.nzu_DoorHooked then
+				return "This will be opened with Group ["..data.Group.."]"
+			end
+
 			local str = "Locked Door ["..data.Price.."]"
 			if data.Group then
 				str = str .. "[Group: "..data.Group.."]"

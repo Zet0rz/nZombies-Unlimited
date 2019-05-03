@@ -1,5 +1,10 @@
-local PANEL = {}
 
+--[[-------------------------------------------------------------------------
+Config List panel [nzu_ConfigList]
+Child of ScrollPanel which can automatically list a set of [nzu_ConfigPanel]s
+---------------------------------------------------------------------------]]
+
+local PANEL = {}
 AccessorFunc(PANEL, "m_bAllowSelect", "Selectable", FORCE_BOOL)
 
 function PANEL:Init()
@@ -51,7 +56,7 @@ function PANEL:SetConfigPanelHeight(height)
 end
 
 function PANEL:SelectConfig(cfg)
-	if self.ConfigPanels[cfg] then
+	if cfg and self.ConfigPanels[cfg] then
 		if self.ConfigPanels[cfg] == self.SelectedPanel then return end
 
 		if IsValid(self.SelectedPanel) then self.SelectedPanel:SetSelected(false) end
@@ -149,7 +154,12 @@ end
 
 vgui.Register("nzu_ConfigList", PANEL, "DScrollPanel")
 
--- CONFIG PANEL
+
+
+--[[-------------------------------------------------------------------------
+Config Panel [nzu_ConfigPanel]
+A panel that shows a small clickable bar of a Config
+---------------------------------------------------------------------------]]
 local CONFIGPANEL = {}
 local emptyfunc = function() end
 function CONFIGPANEL:Init()
@@ -226,6 +236,7 @@ function CONFIGPANEL:SetConfig(config)
 	self:Update(config)
 	timer.Simple(0, function() hook.Add("nzu_ConfigInfoSaved", self, self.Update) end) -- Auto-update ourselves whenever updates arrive to this config
 end
+function CONFIGPANEL:GetConfig() return self.Config end
 
 function CONFIGPANEL:DoClick() end
 function CONFIGPANEL:DoRightClick() end
@@ -246,5 +257,91 @@ end
 local selectcol = Color(0,150,255)
 function CONFIGPANEL:SetSelected(b)
 	self:SetBackgroundColor(b and selectcol or nil)
+	self.Selected = b
 end
+function CONFIGPANEL:GetSelected() return self.Selected end
 vgui.Register("nzu_ConfigPanel", CONFIGPANEL, "DPanel")
+
+
+--[[-------------------------------------------------------------------------
+Config Image [nzu_ConfigImagePanel]
+A large showcase of a Config. Shows a big thumbnail with overlayed info
+This is what is used on the Main Menu
+---------------------------------------------------------------------------]]
+
+local MAPPANEL = {}
+AccessorFunc(MAPPANEL, "m_bAspectRatio", "MaintainAspectRatio", FORCE_BOOL)
+
+function MAPPANEL:Init()
+	self.InfoBar = self:Add("Panel")
+	self.InfoBar:Dock(BOTTOM)
+	self.InfoBar:SetTall(45)
+	function self.InfoBar.Paint(s)
+		surface.SetDrawColor(0,0,0,252)
+		s:DrawFilledRect()
+	end
+
+	local namemap = self.InfoBar:Add("Panel")
+	namemap:Dock(TOP)
+	namemap:SetTall(40)
+
+	self.Name = namemap:Add("DLabel")
+	self.Name:SetFont("Trebuchet24")
+	self.Name:SetTextColor(color_white)
+	self.Name:Dock(LEFT)
+	self.Name:DockMargin(5,0,5,10)
+
+	self.Map = namemap:Add("DLabel")
+	--self.Map:SetFont("Trebuchet24")
+	self.Map:SetTextColor(Color(200,200,200))
+	self.Map:Dock(LEFT)
+	self.Map:DockMargin(5,0,5,5)
+
+	self.Authors = self.InfoBar:Add("DLabel")
+	--self.Authors:SetFont("Trebuchet24")
+	self.Authors:SetTextColor(Color(150,150,150))
+	self.Authors:Dock(BOTTOM)
+	self.Authors:DockMargin(5,5,5,5)
+end
+
+AccessorFunc(MAPPANEL, "m_strNoConfigImage", "NoConfigImage", FORCE_STRING)
+AccessorFunc(MAPPANEL, "m_strNoConfigName", "NoConfigName", FORCE_STRING)
+AccessorFunc(MAPPANEL, "m_strNoConfigMap", "NoConfigMap", FORCE_STRING)
+AccessorFunc(MAPPANEL, "m_strNoConfigAuthors", "NoConfigAuthors", FORCE_STRING)
+function MAPPANEL:SetConfig(config)
+	self.Config = config
+	if config then
+		self:SetImage(nzu.GetConfigThumbnail(config))
+		self.Map:SetText(config.Map)
+		self.Map:SizeToContents()
+		self.Name:SetText(config.Name)
+		self.Name:SizeToContents()
+		self.Authors:SetText(config.Authors)
+		self.Authors:SizeToContents()			
+	else
+		self:SetImage(self:GetNoConfigImage() or "vgui/black")
+		self.Map:SetText(self:GetNoConfigMap() or "")
+		self.Map:SizeToContents()
+		self.Name:SetText(self:GetNoConfigName() or "No Config selected")
+		self.Name:SizeToContents()
+		self.Authors:SetText(self:GetNoConfigAuthors() or "")
+		self.Authors:SizeToContents()
+	end
+end
+
+function MAPPANEL:PerformLayout(w,h)
+	if self:GetMaintainAspectRatio() then
+		local d = self:GetDock()
+		if d == TOP or d == BOTTOM then
+			self:SetTall(w * 9/16)
+		elseif d == LEFT or d == RIGHT then
+			self:SetWide(h * 16/9)
+		end
+	end
+end
+
+function MAPPANEL:GetConfig()
+	return self.Config
+end
+
+vgui.Register("nzu_ConfigImagePanel", MAPPANEL, "DImage")

@@ -12,6 +12,8 @@ local defaultmodel = "models/hunter/plates/plate5x5.mdl"
 local col = Color(255,150,0,100)
 local mat = "models/wireframe"
 
+-- TODO: Ray traces are taken care of, but find a way to make Hull traces ignore the entity unless PLAYERCLIP mask? :(
+
 function ENT:Initialize()
 	if SERVER then
 		self:SetNoDraw(NZU_NZOMBIES)
@@ -19,7 +21,7 @@ function ENT:Initialize()
 	end
 
 	if NZU_NZOMBIES then
-		self:EnableCustomCollisions(true)
+		self:SetSolidFlags(FSOLID_CUSTOMRAYTEST) -- Runs TestCollision but ONLY for ray traces! (i.e. bullets and view traces)
 	end
 
 	self:DrawShadow(false)
@@ -30,16 +32,49 @@ end
 function ENT:UpdateModel(mdl)
 	self:SetModel(mdl)
 	self:PhysicsInit(SOLID_VPHYSICS)
+	--self:SetSolid(SOLID_CUSTOM)
+	--self:SetCollisionBounds(Vector(0,0,0), Vector(0,0,0))
+
+	--self:SetPos(Vector(0,0,0))
+	--local a,b = self:GetModelBounds()
+	--[[local a,b = Vector(-20,-20,-20), Vector(20,20,200)
+	self:PhysicsInitConvex({
+		a,
+		Vector(a.x,a.y,b.z),
+		Vector(a.x,b.y,a.z),
+		Vector(b.x,a.y,a.z),
+		Vector(a.x,b.y,b.z),
+		Vector(b.x,a.y,b.z),
+		Vector(b.x,b.y,a.z),
+		b
+	})
+	print(a,b)
+	self:EnableCustomCollisions(true)]]
 
 	local phys = self:GetPhysicsObject()
 	if IsValid(phys) then
-		phys:SetContents(CONTENTS_PLAYERCLIP)
+		phys:SetContents(CONTENTS_PLAYERCLIP) -- This only allows props to pass through, it does nothing for traces D:
+		phys:SetMaterial("default_silent")
 		phys:EnableMotion(false)
+		phys:Sleep()
 	end
 end
 
-function ENT:TestCollision() end -- Return nothing = trace ignores, bullets and all entities go through (except players! :D)
+function ENT:TestCollision(start, delta, box, extents, mask)
+	-- Nothing! This runs when the entity is shot through - we return nothing to let the trace pass right through!
+end
 if CLIENT then function ENT:Draw() self:DrawModel() end end
+
+-- Support Door Tool, but have our own door handling logic
+ENT.nzu_CanDoor = true -- This entity can be given a Door Lock
+ENT.nzu_DoorHooked = true -- When given a door lock, this is instead a non-networked Group hook
+
+-- nzu_DoorHooked means this can be given door data, but it won't get a DoorData function - it'll just get hooked into that group and OpenDoor'd when that is opened
+if SERVER then	
+	function ENT:OpenDoor()
+		self:Remove() -- No fancy effects, just remove
+	end
+end
 
 scripted_ents.Register(ENT, "nzu_prop_playerclip")
 
@@ -144,7 +179,7 @@ if CLIENT then
 	}
 
 	language.Add("tool.nzu_tool_invisibleprop.name", "Invisible Wall")
-	language.Add("tool.nzu_tool_invisibleprop.desc", "Creates a prop that will be invisible in-game and only collide with Players.")
+	language.Add("tool.nzu_tool_invisibleprop.desc", "Creates a prop that will be invisible in-game and only collide with Players and Zombies.")
 
 	language.Add("tool.nzu_tool_invisibleprop.left", "Create Invisible Plate")
 	language.Add("tool.nzu_tool_invisibleprop.right", "Target Plate to Align to Wall")
@@ -154,14 +189,13 @@ if CLIENT then
 	language.Add("tool.nzu_tool_invisibleprop.reload_cancel", "Cancel Align")
 
 	function TOOL.BuildCPanel(panel)
-		panel:Help("Spawn a prop that collides only with players, and cannot be seen in nZombies Unlimited.")
+		panel:Help("Spawn a prop that collides only with players and NPCs, which cannot be seen in nZombies Unlimited.")
 
 		panel:TextEntry("Model", "nzu_tool_invisibleprop_model")
 
 		panel:Help("Tip: You can right-click any model in the Spawn Menu and 'Copy to clipboard', then paste in the text box above for that model.")
 
 		local f = file.Read("settings/spawnlist_default/008-plastic.txt", "GAME")
-		print(f)
 		if f then
 			local tbl = util.KeyValuesToTable(f)
 			if tbl then

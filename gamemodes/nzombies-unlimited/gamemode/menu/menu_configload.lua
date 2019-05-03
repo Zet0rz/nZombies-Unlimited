@@ -4,7 +4,7 @@ Config Loading
 if CLIENT then
 	local configpaneltall = 60
 
-	nzu.AddMenuHook("LoadConfig", function(menu)
+	hook.Add("nzu_MenuCreated", "LoadConfig", function(menu)
 		local function doconfigclick(cfg)
 			if cfg then
 				net.Start("nzu_menu_loadconfigs")
@@ -18,6 +18,7 @@ if CLIENT then
 		local sub = menu:AddPanel("Load Config ...", 3, l)
 		l:Dock(FILL)
 		l:SetPaintBackground(true)
+		l:SetSelectable(true)
 
 		-- Access the config in Sandbox!
 		local sand = sub:GetTopBar():Add("DButton")
@@ -25,11 +26,11 @@ if CLIENT then
 		sand:SetText("Edit selected in Sandbox")
 		sand:SetWide(200)
 		sand:DockMargin(0,10,0,0)
-		sand:SetEnabled(menu.Config and true or false)
+		sand:SetEnabled(menu:GetConfig() and true or false)
 		sand.DoClick = function()
 			Derma_Query("Are you sure you want to change to SANDBOX?", "Mode change confirmation", "Change gamemode", function()
-				if menu.Config then
-					nzu.RequestEditConfig(menu.Config)
+				if menu:GetConfig() then
+					nzu.RequestEditConfig(menu:GetConfig())
 				end
 			end, "Cancel"):SetSkin("nZombies Unlimited")
 		end
@@ -41,6 +42,7 @@ if CLIENT then
 		
 		function sub:OnShown()
 			l:LoadConfigs()
+			l:SelectConfig(menu:GetConfig())
 		end
 		function sub:OnHid()
 			l:Clear()
@@ -56,6 +58,20 @@ if CLIENT then
 
 			menu:SetConfig(c)
 		end)
+
+		-- Add a function to the Ready Button to load the config
+		local function readybuttonload(self)
+			if menu:GetConfig() then
+				nzu.RequestLoadConfig(menu:GetConfig())
+			end
+		end
+
+		menu:AddReadyButtonFunction("Load Selected Config", 70, function()
+			if menu:GetConfig() then
+				local cfg = menu:GetConfig()
+				return not nzu.CurrentConfig or cfg.Codename ~= nzu.CurrentConfig.Codename or cfg.Type ~= nzu.CurrentConfig.Type
+			end
+		end, readybuttonload, true)
 
 	end)
 end

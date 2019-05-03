@@ -2,8 +2,8 @@ local ENT = {}
 
 ENT.Type = "anim"
 ENT.Base = "base_entity"
-ENT.Model = "models/nzu/electricityswitch/zombies_power_lever.mdl"
-ENT.HandleModel = "models/nzu/electricityswitch/zombies_power_lever_handle.mdl"
+ENT.Model = Model("models/nzu/electricityswitch/zombies_power_lever.mdl")
+ENT.HandleModel = Model("models/nzu/electricityswitch/zombies_power_lever_handle.mdl")
 
 -- Why not also allow it to be spawned in the normal Entities menu?
 ENT.Category = "nZombies Unlimited"
@@ -16,12 +16,17 @@ util.PrecacheModel(ENT.HandleModel)
 
 function ENT:Initialize()
 	if SERVER then
-		self:SetModel("models/nzprops/zombies_power_lever.mdl")
-		self:SetSolid(SOLID_VPHYSICS)
-		self:SetMoveType(MOVETYPE_NONE)
+		self:SetModel(self.Model)
+		self:PhysicsInit(SOLID_VPHYSICS)
 		self:SetUseType(ONOFF_USE)
 
 		if NZU_NZOMBIES then nzu.ElectricityStartOff() end -- Notify server that electricity should start off
+
+		local phys = self:GetPhysicsObject()
+		if IsValid(phys) then
+			phys:EnableMotion(false)
+			phys:Sleep()
+		end
 	else
 		self.HandleSwitched = false
 	end
@@ -53,15 +58,15 @@ if CLIENT then
 			local lerp = math.Clamp((CurTime() - self.SwitchStartTime)/switchtime, 0, 1)
 
 			local ang
-			if nzu.Electricity() then
-				ang = LerpAngle(lerp, offang, onang)
-			else
+			if self:HasElectricity() then
 				ang = LerpAngle(lerp, onang, offang)
+			else
+				ang = LerpAngle(lerp, offang, onang)
 			end
 
 			self.Handle:SetAngles(self:LocalToWorldAngles(ang))
 			if lerp >= 1 then
-				self.HandleSwitched = nzu.Electricity()
+				self.HandleSwitched = self:HasElectricity()
 				self.SwitchStartTime = nil
 			end
 		end
@@ -74,7 +79,7 @@ if CLIENT then
 				self.Handle:SetParent(self)
 			end
 
-			if self.HandleSwitched ~= nzu.Electricity() then
+			if self.HandleSwitched ~= self:HasElectricity() then
 				self:DoHandleSwitch()
 			end
 		end
@@ -96,6 +101,10 @@ if CLIENT then
 			self.Handle = nil
 		end
 	end
+
+	function ENT:Draw()
+		self:DrawModel()
+	end
 end
 scripted_ents.Register(ENT, "nzu_electricityswitch")
 
@@ -110,9 +119,19 @@ if NZU_SANDBOX then
 	function TOOL:LeftClick(trace)
 		if SERVER then
 			local ply = self:GetOwner()
+
+			local tr = util.TraceLine({
+				start = trace.HitPos + trace.HitNormal,
+				endpos = trace.HitPos + trace.HitNormal + Vector(0,0,-100),
+				filter = ply,
+			})
+
+			local pos = tr.Hit and tr.HitPos or trace.HitPos
+			local ang = trace.HitNormal:Angle()
+
 			local e = ents.Create("nzu_electricityswitch")
-			e:SetPos(trace.HitPos)
-			e:SetAngles(Angle(0,(ply:GetPos() - trace.HitPos):Angle()[2],0))
+			e:SetPos(pos)
+			e:SetAngles(ang)
 			e:Spawn()
 			
 			if IsValid(ply) then

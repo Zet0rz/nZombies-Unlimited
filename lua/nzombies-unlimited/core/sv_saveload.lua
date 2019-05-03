@@ -23,8 +23,8 @@ function nzu.ReloadConfigMap(config)
 	local config = config or nzu.CurrentConfig
 	if not config then return end
 	
-	if not file.Exists(config.Path.."/config.dat", "GAME") then return end -- Not error, just load nothing
-	local str = file.Read(config.Path.."/config.dat", "GAME")
+	local str = file.Read(config.Path.."/config.dat", "GAME") or file.Read(config.Path.."/config.lua", "GAME")
+	if not str then return end -- Not error, just load nothing
 	
 	local startchar = string.find(str, '')
 	if startchar ~= nil then
@@ -41,7 +41,6 @@ function nzu.ReloadConfigMap(config)
 	local tab = util.JSONToTable(str)
 
 	game.CleanUpMap()
-
 	if not istable(tab) then
 		-- Error loading save!
 		print("nzu_saveload: Couldn't decode config save from JSON!")
@@ -688,7 +687,7 @@ Additional Config folder file read/write
 ---------------------------------------------------------------------------]]
 function nzu.WriteConfigFile(name, str)
 	if nzu.CurrentConfig and nzu.CurrentConfig.Type == "Local" then
-		file.Write("nzombies-unlimited/localconfigs/"..nzu.CurrentConfig.Codename.."/"..name, str)
+		file.Write("nzombies-unlimited/localconfigs/"..nzu.CurrentConfig.Codename.."/"..name..".txt", str)
 		return true
 	end
 	return false
@@ -696,7 +695,7 @@ end
 
 function nzu.ReadConfigFile(name)
 	if nzu.CurrentConfig then
-		return file.Read(nzu.CurrentConfig.Path.."/"..name, "GAME")
+		return file.Read(nzu.CurrentConfig.Path.."/"..name..".lua", "GAME") or file.Read(nzu.CurrentConfig.Path.."/"..name..".txt", "GAME")
 	end
 end
 
@@ -705,4 +704,6 @@ end
 -- Fixing up loading in nZombies
 if NZU_NZOMBIES then
 	duplicator.Allow("prop_physics")
+	duplicator.Allow("prop_physics_multiplayer")
+	duplicator.Allow("prop_effect")
 end

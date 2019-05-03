@@ -147,6 +147,7 @@ if NZU_NZOMBIES then
 	local removals = {}
 	local fallbacks = {}
 
+	local activehud
 	local deployed = false
 	local function undeploy()
 		for k,v in pairs(removals) do
@@ -155,11 +156,12 @@ if NZU_NZOMBIES then
 		paints = {}
 		removals = {}
 
+		if deployed and activehud and activehud.OnUndeployed then activehud:OnUndeployed() end
 		deployed = false
 	end
 
-	local function handlefunc(k,v)
-		if type(v) == "function" and string.sub(k, 1, 5) ~= "Draw_" then -- Draw_ functions are manually drawn through nzu library
+	local function handlefunc(k,v,hud)
+		if type(v) == "function" and string.sub(k, 1, 1) ~= "_" and string.sub(k, 1, 5) ~= "Draw_" then -- Draw_ functions are manually drawn through nzu library, _ functions are internals (ignored)
 			local rem = v(hud)
 			if rem then
 				removals[k] = rem -- A function returned means something was created, and this it not a paint
@@ -170,18 +172,19 @@ if NZU_NZOMBIES then
 	end
 
 	local function deploy(hud)
-		for k,v in pairs(hud) do handlefunc(k,v) end
+		for k,v in pairs(hud) do handlefunc(k,v,hud) end
 
 		for k,v in pairs(fallbacks) do
 			if not paints[k] and not removals[k] then
-				handlefunc(k,v) -- Deploy any fallbacks that aren't already made
+				handlefunc(k,v,hud) -- Deploy any fallbacks that aren't already made
 			end
 		end
 
+		if hud.OnDeployed then hud:OnDeployed() end
 		deployed = true
 	end
 
-	local activehud
+	
 	function nzu.SetHUD(class)
 		activehud = class
 	end
@@ -239,7 +242,7 @@ if NZU_NZOMBIES then
 	---------------------------------------------------------------------------]]
 	function nzu.HUDComponent(key, func)
 		fallbacks[key] = func
-		if deployed and not paints[key] and not removals[key] then handlefunc(key, func) end -- Deploy it if there isn't another one in its slot
+		if deployed and not paints[key] and not removals[key] then handlefunc(key, func, activehud) end -- Deploy it if there isn't another one in its slot
 	end
 end
 nzu.HUDSetting = settingtbl

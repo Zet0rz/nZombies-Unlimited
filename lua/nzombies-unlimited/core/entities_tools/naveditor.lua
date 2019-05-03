@@ -2,7 +2,7 @@ if SERVER then
 	local function loadnavmeshtable(tbl)
 		navmesh.Reset()
 		local areas = {}
-		for k,v in ipairs(tbl) do
+		for k,v in pairs(tbl) do
 			local area = navmesh.CreateNavArea(Vector(), Vector())
 			for i = 0, 3 do
 				area:SetCorner(i, v.Corners[i])
@@ -12,16 +12,46 @@ if SERVER then
 		end
 		
 		-- Create connections
-		for k,v in ipairs(tbl) do
+		for k,v in pairs(tbl) do
 			local area = areas[k]
 			if v.Connections then
 				for k2,v2 in pairs(v.Connections) do
-					area:ConnectTo(areas[v2])
+					if areas[v2] then
+						
+						-- Ensure the target area is in a straight line somewhere from the first by ensuring their corners are within ranges!
+						local from1 = area:GetCorner(0) -- NORTH_WEST
+						local from2 = area:GetCorner(2) -- SOUTH_EAST
+						local to1 = areas[v2]:GetCorner(0) -- NORTH_WEST
+						local to2 = areas[v2]:GetCorner(2) -- SOUTH_EAST
+
+						if (from1.x < to2.x and from2.x > to1.x) or (from1.y < to2.y and from2.y > to1.y) then
+							area:ConnectTo(areas[v2])
+						else
+							print("nzu_navmesh: Navmesh file attempts to connect area ["..k.."] to ["..v2.."] without a window between them.")
+						end
+					else
+						print("nzu_navmesh: Navmesh file attempts to connect area ["..k.."] with non-existent area ["..v2.."]!")
+					end
 				end
 			end
-			if v.Parent then
-				area:SetParent(areas[v.Parent])
-			end
+			--[[if v.Parent then
+				if areas[v.Parent] then
+					area:SetParent(areas[v.Parent])
+				else
+					print("nzu_navmesh: Navmesh file attempts to parent area ["..k.."] to non-existent area ["..v2.."]!")
+				end
+			end]]
+		end
+	end
+
+	-- We overwrite navmesh.Load - That way, any code attempting to load the navmesh will load the Config's, if it exists
+	local oldload = navmesh.Load
+	function navmesh.Load()
+		local str = nzu.ReadConfigFile("navmesh")
+		if str then
+			loadnavmeshtable(util.JSONToTable(str))
+		else
+			oldload()
 		end
 	end
 
@@ -45,20 +75,10 @@ if SERVER then
 			end
 			if v:GetParent() then t.Parent = v:GetParent():GetID() end
 			
-			tbl[k] = t
+			tbl[v:GetID()] = t
 		end
 		return tbl
 	end
-
-	-- Let's load the saved file if it exists
-	nzu.AddSaveExtension("NavmeshReplace", {
-		PreLoad = function()
-			local str = nzu.ReadConfigFile("navmesh.txt")
-			if str then
-				loadnavmeshtable(util.JSONToTable(str))
-			end
-		end
-	})
 	
 	-- Save/Load requestsing
 	if NZU_SANDBOX then
@@ -66,11 +86,11 @@ if SERVER then
 		net.Receive("nzu_customnavmesh", function(len, ply)
 			if nzu.IsAdmin(ply) then
 				if net.ReadBool() then
-					if not nzu.WriteConfigFile("navmesh.txt", util.TableToJSON(savenavmeshtable())) then
+					if not nzu.WriteConfigFile("navmesh", util.TableToJSON(savenavmeshtable())) then
 						ply:ChatPrint("Cannot write Config Navmesh file when no Config is being edited.")
 					end
 				else
-					local str = nzu.ReadConfigFile("navmesh.txt")
+					local str = nzu.ReadConfigFile("navmesh")
 					if str then
 						loadnavmeshtable(util.JSONToTable(str))
 					else

@@ -212,7 +212,7 @@ Game over sequence panel
 ---------------------------------------------------------------------------]]
 
 -- Global so extensions can replace it
-nzu.GameOverPanel = function()
+local gameoverpanelfunc = function()
 	local p = vgui.Create("Panel")
 	local txt = p:Add("DLabel")
 	txt:SetFont("nzu_Font_Bloody_Biggest")
@@ -240,7 +240,15 @@ end
 local gameoverpanel
 hook.Add("nzu_GameOverSequence", "nzu_Scoreboard_ShowOnGameOver", function(time)
 	if not LocalPlayer():IsUnspawned() then
-		local gp = gameoverpanel or nzu.GameOverPanel()
+		local gp = gameoverpanel
+		if not gp then
+			local hud = nzu.GetActiveHUD()
+			if hud and hud._GameOverPanel then
+				gp = hud:_GameOverPanel()
+			else
+				gp = gameoverpanelfunc()
+			end
+		end
 
 		show()
 
@@ -254,10 +262,18 @@ hook.Add("nzu_GameOverSequence", "nzu_Scoreboard_ShowOnGameOver", function(time)
 end)
 
 hook.Add("nzu_GameOver", "nzu_Scoreboard_ShowGameOverText", function(time)
-	if IsValid(gameoverpanel) then gameoverpanel:Remove() end
-	gameoverpanel = nzu.GameOverPanel()
+	if not LocalPlayer():IsUnspawned() then
+		if IsValid(gameoverpanel) then gameoverpanel:Remove() end
 
-	gameoverpanel:ParentToHUD()
-	gameoverpanel:SetPos(ScrW()/2 - gameoverpanel:GetWide()/2, ScrH()/2 - gameoverpanel:GetTall()/2)
-	gameoverpanel:SetVisible(true)
+		local hud = nzu.GetActiveHUD()
+		if hud and hud._GameOverPanel then -- Ask the HUD object to define a Game Over panel
+			gameoverpanel = hud:_GameOverPanel()
+		else
+			gameoverpanel = gameoverpanelfunc()
+		end
+
+		gameoverpanel:ParentToHUD()
+		gameoverpanel:SetPos(ScrW()/2 - gameoverpanel:GetWide()/2, ScrH()/2 - gameoverpanel:GetTall()/2)
+		gameoverpanel:SetVisible(true)
+	end
 end)

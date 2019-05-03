@@ -281,7 +281,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	save:SetText("Save Config")
 
 	playbutton.DoClick = function(s)
-		local selectedconfig = configlist:GetSelectedConfig()
+		local selectedconfig = loadedcfg:IsSelected() and loadedcfg:GetConfig() or configlist:GetSelectedConfig()
 		if selectedconfig then
 			if selectedconfig == editedconfig then save:DoClick() end
 			Derma_Query("Do you wish to change gamemode to NZOMBIES UNLIMITED?", "Mode change confirmation", "Change gamemode", function()
@@ -377,7 +377,10 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 			playbutton:SetText("Load and Play")
 		end
 	end
-	configlist.OnConfigSelected = function(s,cfg,pnl) doconfigclick(pnl) end
+	configlist.OnConfigClicked = function(s,cfg,pnl)
+		loadedcfg:SetSelected(loadedcfg:GetConfig() == cfg)
+		doconfigclick(pnl)
+	end
 
 	-- Create new config button
 	createbutton:SetEnabled(nzu.IsAdmin(LocalPlayer()))
@@ -476,7 +479,11 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 
 		entry:RequestFocus()
 	end
-	loadedcfg.DoClick = doconfigclick
+	loadedcfg.DoClick = function(s)
+		configlist:SelectConfig(s:GetConfig()) -- Update the selected list
+		s:SetSelected(true)
+		doconfigclick(s)
+	end
 
 	local function applyinfo()
 		if editedconfig then

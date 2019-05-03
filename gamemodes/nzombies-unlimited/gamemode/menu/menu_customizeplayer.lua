@@ -2,7 +2,7 @@
 
 local default_animations = { "idle_all_01", "menu_walk" }
 
-nzu.AddMenuHook("CustomizePlayer", function(menu)
+hook.Add("nzu_MenuCreated", "CustomizePlayer", function(menu)
 	-- Player color and model menu
 	local sheet = vgui.Create( "DPropertySheet" )
 	sheet:Dock(FILL)

@@ -132,43 +132,51 @@ if SERVER then
 
 		local networkclone
 		if data.Group then
-			if not doorgroups[data.Group] then
-				doorgroups[data.Group] = {}
-			else
-				-- Optimization: If this door belongs to a group, loop through other doors in this group and see if any are the same dataset
-				-- If so, just clone data from that in networking (and memory)
-				for k,v in pairs(doorgroups[data.Group]) do
-					local data2 = k:GetDoorData()
-					if data2.Price == data.Price and data2.Electricity == data.Electricity then
-						if data2.Rooms == nil and data.Rooms == nil then
-							data = data2 -- We found a clone!
+			local gtbl = doorgroups[data.Group]
+			if not gtbl then
+				gtbl = {}
+				doorgroups[data.Group] = gtbl
+			end
+
+			if self.nzu_DoorHooked then
+				gtbl[self] = true
+				return -- No networking, no function! Just place into the table so that this entity will be opened as well
+			end
+
+			-- Optimization: If this door belongs to a group, loop through other doors in this group and see if any are the same dataset
+			-- If so, just clone data from that in networking (and memory)
+			for k,v in pairs(gtbl) do
+				local data2 = k:GetDoorData()
+				if data2 and data2.Price == data.Price and data2.Electricity == data.Electricity then
+					if data2.Rooms == nil and data.Rooms == nil then
+						data = data2 -- We found a clone!
+						networkclone = k
+					elseif data2.Rooms and data.Rooms then
+						local clone = {}
+						for k2,v2 in pairs(data.Rooms) do
+							clone[v2] = true
+						end
+
+						local isclone = true
+						for k2,v2 in pairs(data2.Rooms) do
+							if clone[v2] then
+								clone[v2] = nil
+							else
+								isclone = false
+								break
+							end
+						end
+
+						-- All keys match, and there's no remaining in the clone table!
+						if isclone and not next(clone) then
+							data = data2
 							networkclone = k
-						elseif data2.Rooms and data.Rooms then
-							local clone = {}
-							for k2,v2 in pairs(data.Rooms) do
-								clone[v2] = true
-							end
-
-							local isclone = true
-							for k2,v2 in pairs(data2.Rooms) do
-								if clone[v2] then
-									clone[v2] = nil
-								else
-									isclone = false
-									break
-								end
-							end
-
-							-- All keys match, and there's no remaining in the clone table!
-							if isclone and not next(clone) then
-								data = data2
-								networkclone = k
-							end
-						end	
-					end
+						end
+					end	
 				end
 			end
-			doorgroups[data.Group][self] = true
+
+			gtbl[self] = true
 		else
 			nongroups[self] = true
 		end
@@ -323,6 +331,8 @@ if SERVER then
 	end
 
 	function nzu.OpenDoor(ent, ply, t, initial)
+		if not IsValid(ent) then return end
+
 		local data = ent:GetDoorData()
 		ent:RemoveDoor()
 		if data and data.Rooms then
@@ -343,6 +353,7 @@ if SERVER then
 				t[k] = nzu.OpenDoor(k, ply, t, initial)
 			end
 			doorgroups[id] = nil
+			hook.Run("nzu_DoorGroup_"..id, ply)
 			hook.Run("nzu_DoorGroupOpened", id, ply)
 
 			return t
@@ -352,13 +363,21 @@ if SERVER then
 	function nzu.BuyDoor(ent, ply)
 		local data = ent:GetDoorData()
 		if data then
-			return ply:Buy(data.Price, function()
+			if IsValid(ply) then
+				return ply:Buy(data.Price, function()
+					if data.Group then
+						nzu.OpenDoorGroup(data.Group, ply, ent)
+					else
+						nzu.OpenDoor(ent, ply)
+					end
+				end)
+			else -- No player given. Open the door for free (server-authorized)
 				if data.Group then
-					nzu.OpenDoorGroup(data.Group, ply)
+					nzu.OpenDoorGroup(data.Group, ply, ent)
 				else
 					nzu.OpenDoor(ent, ply)
 				end
-			end)
+			end
 		end
 	end
 
@@ -372,14 +391,14 @@ if SERVER then
 			for k2,v2 in pairs(v) do
 				local data = k2:GetDoorData()
 				if data and data.Price == 0 and data.Electricity then
-					nzu.OpenDoor(k2)
+					nzu.BuyDoor(k2)
 				end
 			end
 		end
 		for k,v in pairs(nongroups) do
 			local data = k:GetDoorData()
 			if data and data.Price == 0 and data.Electricity then
-				nzu.OpenDoor(k)
+				nzu.BuyDoor(k)
 			end
 		end
 	end)
@@ -389,7 +408,25 @@ if SERVER then
 		local data = ent:GetDoorData()
 		if data and (data.Group and doorgroups[data.Group][ent] or nongroups[ent]) then -- Verify it is a door in our system!
 			if data.Price == 0 and data.Electricity then
-				nzu.OpenDoor(ent)
+				nzu.BuyDoor(ent)
+			end
+		end
+	end)
+
+	-- Hook for when the game starts, open all doors that are free and require no electricity
+	hook.Add("nzu_GameStarted", "nzu_Doors_OpenAllFreeDoors", function()
+		for k,v in pairs(doorgroups) do
+			for k2,v2 in pairs(v) do
+				local data = k2:GetDoorData()
+				if data and data.Price == 0 and not data.Electricity then
+					nzu.BuyDoor(k2)
+				end
+			end
+		end
+		for k,v in pairs(nongroups) do
+			local data = k:GetDoorData()
+			if data and data.Price == 0 and not data.Electricity then
+				nzu.BuyDoor(k)
 			end
 		end
 	end)

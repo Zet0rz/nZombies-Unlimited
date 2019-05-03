@@ -57,7 +57,7 @@ if SERVER then
 		net.Broadcast()
 
 		toggleelec()
-		hook.Run("nzu_OnElectricityTurnedOn")
+		hook.Run("nzu_OnElectricityOn")
 	end
 	
 	function nzu.TurnOffElectricity()
@@ -67,7 +67,7 @@ if SERVER then
 		net.Broadcast()
 
 		toggleelec()
-		hook.Run("nzu_OnElectricityTurnedOff")
+		hook.Run("nzu_OnElectricityOff")
 	end
 
 	-- Do electricity permanent if the map has no power switch
@@ -79,6 +79,7 @@ if SERVER then
 	hook.Add("nzu_GameStarted", "nzu_Electricity_AutoOn", function()
 		if not startoff then
 			nzu.TurnOnElectricity()
+		else
 			startoff = nil
 		end
 	end)
