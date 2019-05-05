@@ -48,9 +48,9 @@ local function nwpanel(id, parent)
 end
 
 local PANEL = {}
-function PANEL:_HookUpdate(ext, setting, value)
-	if ext == self.Extension then
-		if self.SettingPanels[setting] then self.SettingPanels[setting]:_SetValue(value) end
+function PANEL:_HookUpdate(setting, value)
+	if self.SettingPanels[setting] then
+		self.SettingPanels[setting]:_SetValue(value)
 	end
 end
 
@@ -96,8 +96,9 @@ function PANEL:PaintOver(w,h)
 end
 
 local function dorebuilds(ext)
-	if extpanels[ext] then
-		for k,v in pairs(extpanels[ext]) do
+	local id = ext.ID
+	if extpanels[id] then
+		for k,v in pairs(extpanels[id]) do
 			if IsValid(k) then
 				k:Rebuild()
 			else
@@ -107,6 +108,18 @@ local function dorebuilds(ext)
 	end
 end
 
+hook.Add("nzu_ExtensionSettingChanged", "nzu_ExtensionPanels_NetworkUpdate", function(name, setting, value)
+	if extpanels[name] then
+		for k,v in pairs(extpanels[name]) do
+			if IsValid(k) then
+				k:_HookUpdate(setting, value)
+			else
+				extpanels[k] = nil
+			end
+		end
+	end
+end)
+
 function PANEL:SetExtension(ext)
 	self:Clear()
 	if type(ext) == "string" then
@@ -114,16 +127,17 @@ function PANEL:SetExtension(ext)
 	end
 
 	self.Extension = ext
+	local id = ext.ID
 	if ext then
 		self:Rebuild()
-		if not extpanels[ext] then extpanels[ext] = {} end
-		extpanels[ext][self] = true
-
+		if not extpanels[id] then extpanels[id] = {} end
+		extpanels[id][self] = true
 		ext.RebuildPanels = dorebuilds
-		hook.Add("nzu_ExtensionSettingChanged", self, self._HookUpdate)
 	else
-		if extpanels[ext] then extpanels[ext][self]  = nil end
-		hook.Remove("nzu_ExtensionSettingChanged", self)
+		if extpanels[id] then
+			extpanels[id][self]  = nil
+			if table.IsEmpty(extpanels[id]) then extpanels[id] = nil end
+		end
 	end
 
 	self:InvalidateLayout(true)

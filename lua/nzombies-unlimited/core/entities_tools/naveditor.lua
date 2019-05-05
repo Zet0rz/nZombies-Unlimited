@@ -269,7 +269,6 @@ function TOOL:RightClick(trace)
 				self.LastActiveCommand = nil
 			end
 		else
-			print("Used side right")
 			self.LastSide = "right"
 		end
 		return result
@@ -352,7 +351,6 @@ if CLIENT then
 			self.LastStage = self:GetStage()
 			self.LastMarked = ismarked
 			self.ActiveSide = self:GetStage() > 0 and self.LastSide or nil
-			print(self.ActiveSide)
 		end
 		
 		local lmode = self:GetClientInfo("left")

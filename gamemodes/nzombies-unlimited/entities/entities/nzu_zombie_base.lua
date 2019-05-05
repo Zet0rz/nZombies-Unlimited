@@ -917,7 +917,7 @@ if SERVER then
 
 	function ENT:RunBehaviour()
 		self:Retarget()
-		self:InitializePath()
+		if IsValid(self.Target) then self:InitializePath() end
 
 		while true do
 			if self.ActiveEvent then

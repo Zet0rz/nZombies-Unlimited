@@ -35,16 +35,19 @@ function ENT:SetupDataTables()
 	end
 end
 
-local scale = Vector(1,0.05,1)
-local rotang = Angle(0,90,0)
-
 local defaultmodel = "models/weapons/w_rif_m4a1.mdl"
 local matrix = Matrix()
-matrix:Rotate(rotang)
-matrix:Scale(scale)
+matrix:Rotate(Angle(0,90,0))
+matrix:Scale(Vector(1,0.05,1))
+
+local matrix2 = Matrix()
+matrix2:Scale(Vector(0.05,1,1))
 function ENT:GetWallBounds()
 	local a,b = self:GetModelBounds()
-	return matrix*a, matrix*b
+	if b.x - a.x < b.y - a.y then
+		return matrix2*a, matrix2*b, matrix2
+	end
+	return matrix*a, matrix*b, matrix
 end
 
 function ENT:Initialize()
@@ -58,7 +61,8 @@ function ENT:Initialize()
 			if wep then model = wep.WM or wep.WorldModel end
 		end
 		
-		self:PhysicsInitBox(self:GetWallBounds())
+		local a,b = self:GetWallBounds()
+		self:PhysicsInitBox(a,b)
 		self:SetSolid(SOLID_OBB)
 	else
 		self:EnableMatrix("RenderMultiply", matrix)
@@ -74,7 +78,8 @@ if SERVER then
 
 			if model ~= self:GetModel() then
 				self:SetModel(model)
-				self:SetCollisionBounds(self:GetWallBounds())
+				local a,b = self:GetWallBounds()
+				self:SetCollisionBounds(a,b)
 			end
 
 			self:SetBought(false)
@@ -159,6 +164,7 @@ if CLIENT then
 			self:DrawModel()
 		end		
 	end
+	ENT.DrawTranslucent = ENT.Draw
 
 	-- Display our own text :D
 	function ENT:GetTargetIDText()
@@ -181,7 +187,9 @@ if CLIENT then
 	
 	function ENT:Think()
 		if self:GetModel() ~= self.LastModel then
-			self:SetRenderBounds(self:GetWallBounds())
+			local a,b,matrix = self:GetWallBounds()
+			self:SetRenderBounds(a,b)
+			self:EnableMatrix("RenderMultiply", matrix)
 			self.LastModel = self:GetModel()
 		end
 	end
