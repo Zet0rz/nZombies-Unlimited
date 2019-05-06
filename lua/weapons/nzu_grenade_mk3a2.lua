@@ -40,6 +40,8 @@ SWEP.GrenadeCanCook = true
 SWEP.GrenadeTime = 3
 SWEP.GrenadeDamage = 150
 SWEP.GrenadeDamageRadius = 250
+SWEP.GrenadeMax = 4
+SWEP.AmmoPerRound = 2
 
 if CLIENT then SWEP.HUDIcon = Material("nzombies-unlimited/hud/mk3a2_icon.png", "unlitgeneric smooth") end -- CONTENT
 
@@ -140,7 +142,13 @@ if SERVER then
 	end
 
 	function SWEP:CalculateMaxAmmo()
-		return 4,nil
+		return self.GrenadeMax, nil
+	end
+
+	-- Called at the beginning of every round
+	function SWEP:GiveRoundProgressionAmmo()
+		local delta = math.Min(self.GrenadeMax - self:Ammo1(), self.AmmoPerRound)
+		if delta > 0 then self:GivePrimaryAmmo(delta) end
 	end
 end
 

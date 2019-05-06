@@ -46,12 +46,11 @@ local function doqueue(ent)
 	end
 end
 
-local function instantrun(t,f) f(t.Entity) end
 function net.ReadEntityQueued()
 	local i = net.ReadUInt(16)
 	local ent = Entity(i)
 	if IsValid(ent) then
-		return {Run = instantrun, Entity = ent}
+		return ent
 	end
 
 	if not queue then

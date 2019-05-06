@@ -130,16 +130,25 @@ else
 				end
 			end
 
-			ent:Run(function(e)
-				e.nzu_DoorData = tbl
+			if IsValid(ent) then -- If it's valid, then it's the entity directly read from the read
+				ent.nzu_DoorData = tbl
 				hook.Run("nzu_DoorLockCreated", e, tbl)
-			end)
-			
+			else
+				ent:Run(function(e) -- Otherwise it's a structure with a single function "Run" which sets the function to run once the entity becomes valid
+					e.nzu_DoorData = tbl
+					hook.Run("nzu_DoorLockCreated", e, tbl)
+				end)
+			end			
 		else
-			ent:Run(function(e)
-				e.nzu_DoorData = nil
+			if IsValid(ent) then
+				ent.nzu_DoorData = nil
 				hook.Run("nzu_DoorLockRemoved", e)
-			end)
+			else
+				ent:Run(function(e)
+					e.nzu_DoorData = nil
+				hook.Run("nzu_DoorLockRemoved", e)
+				end)
+			end
 		end
 	end)
 

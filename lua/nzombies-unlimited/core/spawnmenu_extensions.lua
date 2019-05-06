@@ -154,7 +154,6 @@ nzu.AddSpawnmenuTab("Extension Settings", "DPanel", function(panel)
 	
 	hook.Add("nzu_ConfigLoaded", curconfig, function(s,config)
 		if config then
-			print("We're here")
 			curconfig:SetConfig(config)
 			curconfig:SetVisible(true)
 		else
@@ -188,12 +187,13 @@ nzu.AddSpawnmenuTab("Extension Settings", "DPanel", function(panel)
 		checkbox:Dock(RIGHT)
 		checkbox:SetWide(20)
 		checkbox:SetChecked(nzu.IsExtensionLoaded(k))
-		checkbox:SetDisabled(not nzu.IsAdmin(LocalPlayer()))
+		
 		
 		checkbox.Extension = k
-		if k ~= "Core" then
+		if k ~= "Core" and nzu.IsAdmin(LocalPlayer()) then
 			checkbox.SaveButton = save
 			checkbox.OnChange = checkboxchange
+			checkbox:SetDisabled(false)
 		else
 			checkbox:SetDisabled(true)
 		end

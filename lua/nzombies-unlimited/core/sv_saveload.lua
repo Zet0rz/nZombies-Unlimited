@@ -288,8 +288,8 @@ net.Receive("nzu_loadconfig", function(len, ply)
 			if c_addons then
 				local addons = engine.GetAddons()
 				for k,v in pairs(addons) do
-					if c_addons[v.wsid] and v.mounted then
-						c_addons[v.wsid] = nil
+					if v.mounted and v.wsid then
+						c_addons[tonumber(v.wsid)] = nil
 					end
 				end
 

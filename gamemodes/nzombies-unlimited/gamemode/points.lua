@@ -48,18 +48,18 @@ if SERVER then
 		[HITGROUP_HEAD] = 100,
 		[HITGROUP_CHEST] = 60,
 	}
-	local function dopoints(ent, dmg)
+	local function dopoints(ent, dmg, hitgroup)
 		if ent.nzu_ShouldGivePoints then
 			local ply = dmg:GetAttacker()
 			if IsValid(ply) and ply:IsPlayer() then
 				local points,typ
-				if ent.DamagePoints then points,typ = ent:DamagePoints(dmg, ply) else
-					if dmg:GetDamage() >= ent:Health() then
+				local iskill = dmg:GetDamage() >= ent:Health()
+				if ent.DamagePoints then points,typ = ent:DamagePoints(dmg, hitgroup, ply) else
+					if iskill then
 						if knifetypes[dmg:GetDamageType()] then
 							points,typ = 130, "ZombieKnifeKill"
 						else
-							local trace = util.QuickTrace(dmg:GetDamagePosition(), dmg:GetDamagePosition())
-							points = hitboxes[trace.HitGroup] or 50
+							points = hitboxes[hitgroup] or 50
 							typ = "ZombieKill"
 						end
 					else
@@ -67,7 +67,7 @@ if SERVER then
 						typ = "ZombieHit"
 					end
 				end
-				if dmg:GetDamage() >= ent:Health() then ply:AddFrags(1) end
+				if iskill then ply:AddFrags(1) end
 				ply:GivePoints(points,typ,ent)
 			end
 		end
@@ -114,7 +114,7 @@ if SERVER then
 		return dmg_points[self]
 	end]]
 
-	hook.Add("EntityTakeDamage", "nzu_Test", dopoints)
+	hook.Add("PostEntityTakeDamage", "nzu_Points_ZombieDamage", dopoints)
 end
 
 if CLIENT then

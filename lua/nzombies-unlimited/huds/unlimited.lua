@@ -489,11 +489,11 @@ function HUD:Weapons()
 	surface.SetDrawColor(0,0,0,255)
 
 	for i = 1,2 do
-		surface.DrawTexturedRect(w - 190, nameposh, 85, nameh)
-		surface.DrawTexturedRectUV(w - 375, nameposh, 110, nameh, 1,0,0,1)
+		surface.DrawTexturedRect(w - 150, nameposh, 85, nameh)
+		surface.DrawTexturedRectUV(w - 335, nameposh, 110, nameh, 1,0,0,1)
 	end
 
-	surface.DrawTexturedRectUV(w - 800, h - 130, 600, 45, 1,0,0,1)
+	surface.DrawTexturedRectUV(w - 760, h - 130, 600, 45, 1,0,0,1)
 
 	surface.SetMaterial(point_glow)
 
@@ -502,18 +502,18 @@ function HUD:Weapons()
 	local v = ply:GetPlayerColor()
 	surface.SetDrawColor(v.x*200 + 55, v.y*200 + 55, v.z*200 + 55,255)
 
-	surface.DrawTexturedRect(w - 190, nameposh, 75, nameh)
-	surface.DrawTexturedRectUV(w - 365, nameposh, 100, nameh, 1,0,0,1)
+	surface.DrawTexturedRect(w - 150, nameposh, 75, nameh)
+	surface.DrawTexturedRectUV(w - 325, nameposh, 100, nameh, 1,0,0,1)
 
 	surface.SetMaterial(point_shadow)
 	surface.SetDrawColor(0,0,0,255)
-	surface.DrawRect(w-250, nameposh, 40, nameh)
+	surface.DrawRect(w-210, nameposh, 40, nameh)
 	for i = 1,2 do
-		surface.DrawTexturedRect(w - 210, nameposh, 75, nameh)
-		surface.DrawTexturedRectUV(w - 325, nameposh, 75, nameh, 1,0,0,1)
+		surface.DrawTexturedRect(w - 170, nameposh, 75, nameh)
+		surface.DrawTexturedRectUV(w - 285, nameposh, 75, nameh, 1,0,0,1)
 	end
 
-	surface.DrawTexturedRectUV(w - 375, h - 130, 110, 45, 1,0,0,1)
+	surface.DrawTexturedRectUV(w - 335, h - 130, 110, 45, 1,0,0,1)
 
 	-- Draw the ammo for the weapon
 	local wep = ply:GetActiveWeapon()
@@ -522,7 +522,7 @@ function HUD:Weapons()
 		local secondary = wep:GetSecondaryAmmoType()
 
 		local y1 = nameposh + nameh/2 + 20
-		local x = w - 235
+		local x = w - 195
 		local y = y1
 
 		if secondary >= 0 then
@@ -541,6 +541,7 @@ function HUD:Weapons()
 		if primary >= 0 then
 			local clip = wep:Clip1()
 			if clip >= 0 then
+				if clip >= 100 then x = x + 15 end
 				draw.SimpleText(clip,weaponfont_primary,x,y,color_white,TEXT_ALIGN_RIGHT, TEXT_ALIGN_BOTTOM)
 				draw.SimpleText("/"..ply:GetAmmoCount(primary),weaponfont_primary_reserve,x,y,color_white,TEXT_ALIGN_LEFT, TEXT_ALIGN_BOTTOM)
 			else
@@ -548,10 +549,10 @@ function HUD:Weapons()
 			end					
 		end
 
-		draw.SimpleTextOutlined(wep:GetPrintName(),weaponfont_name,w - 320,y1 - 12,color_white,TEXT_ALIGN_RIGHT, TEXT_ALIGN_BOTTOM,2,color_black)
+		draw.SimpleTextOutlined(wep:GetPrintName(),weaponfont_name,w - 280,y1 - 12,color_white,TEXT_ALIGN_RIGHT, TEXT_ALIGN_BOTTOM,2,color_black)
 	end
 
-	local x = w - 390
+	local x = w - 350
 	local y = h - 122
 	local iconsize = 30
 
@@ -571,7 +572,7 @@ function HUD:Weapons()
 			end
 
 			if todrawammo then
-				local count = ply:GetAmmoCount(wep:GetPrimaryAmmoType())
+				local count = wep:Ammo1()
 				draw.SimpleTextOutlined("x"..count,equipmentfont,x - 5,y + iconsize,count > 0 and color_white or col_noammo,TEXT_ALIGN_LEFT, TEXT_ALIGN_BOTTOM, 2, color_black)
 			end
 
@@ -595,11 +596,18 @@ local revivebarheight = 10
 local outlines = 5
 local waveheight = 40
 local pointheight = 15
+local bleedouttime = 45
 
-function HUD:Draw_DownedIndicator(ply, revivor)
+function HUD:_GetDownedIndicatorPosition(ply)
 	local pos = (ply:GetPos() + downedindicator):ToScreen()
 	if pos.visible then
-		local x,y = pos.x,pos.y
+		return pos.x,pos.y
+	end
+end
+
+function HUD:Draw_DownedIndicator(ply, revivor)
+	local x,y = self:_GetDownedIndicatorPosition(ply)
+	if x then
 		surface.SetFont(REVIVEfont)
 		local w,h = surface.GetTextSize(revivetext)
 
@@ -607,7 +615,7 @@ function HUD:Draw_DownedIndicator(ply, revivor)
 		local x2 = x - w/2 - outlines
 		local y2 = y - 6
 
-		surface.SetMaterial(mat)
+		surface.SetMaterial(point_shadow)
 		surface.SetDrawColor(0,0,0,255)
 		surface.DrawTexturedRectRotated(x, y - h, waveheight, w2, 90)
 
@@ -631,7 +639,7 @@ function HUD:Draw_DownedIndicator(ply, revivor)
 			surface.DrawRect(x2 + 4, y2 + 3, w2 - 8, revivebarheight - 6)
 		end
 		surface.DrawTexturedRect(x2 + 7, y2 + revivebarheight, w2 - 14, pointheight - 4)
-		surface.SetMaterial(mat2)
+		surface.SetMaterial(point_glow)
 		surface.DrawTexturedRectRotated(x, y - h, waveheight, w2, 90)
 		
 		surface.SetTextPos(pos.x - w/2, pos.y - h)
@@ -662,6 +670,27 @@ function HUD:Draw_ReviveProgress(ply, isbeingrevived)
 	else
 		draw.SimpleTextOutlined("Reviving "..ply:Nick(), "DermaLarge", w, h - 310, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM, 2, color_black)
 	end
+end
+
+--[[-------------------------------------------------------------------------
+Bleed Out Color Distortion
+---------------------------------------------------------------------------]]
+local colmod = {
+	["$pp_colour_addr"] = 0,
+	["$pp_colour_addg"] = 0,
+	["$pp_colour_addb"] = 0,
+	["$pp_colour_brightness"] = 0,
+	["$pp_colour_contrast"] = 1,
+	["$pp_colour_colour"] = 1,
+	["$pp_colour_mulr"] = 0,
+	["$pp_colour_mulg"] = 0,
+	["$pp_colour_mulb"] = 0
+}
+function HUD:Draw_BleedoutScreenspaceEffects(downtime, deathtime) -- Deathtime will be added later when variable down times is supported and networked
+	local pct = (CurTime() - downtime)/bleedouttime -- For now we just use the static 45 second variable
+	colmod["$pp_colour_colour"] = 1 - pct
+	colmod["$pp_colour_addr"] = pct*0.5
+	DrawColorModify(colmod)
 end
 
 --[[-------------------------------------------------------------------------

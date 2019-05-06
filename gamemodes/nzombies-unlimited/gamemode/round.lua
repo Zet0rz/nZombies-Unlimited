@@ -136,7 +136,7 @@ if SERVER then
 
 		if ct >= nextcheck then
 			for k,v in pairs(distribution) do
-				if ROUND.ZombiesToSpawn <= 0 then break end
+				if ROUND.ZombiesToSpawn <= 0 or ROUND.NumberZombies >= max:GetInt() then break end
 
 				if not k.NextSpawn or ct >= k.NextSpawn then
 					if not k:IsFrozen() and not k:HasQueue() and k:HasSpace() then
@@ -184,6 +184,8 @@ if SERVER then
 		if not timer.Start("nzu_Round_Prepare") then
 			timer.Create("nzu_Round_Prepare", time or 10, 1, startongoing)
 		end
+
+		hook.Run("nzu_RoundPrepare", ROUND.Round, time)
 	end
 
 	function ROUND:SetRound(num, time)
@@ -191,10 +193,10 @@ if SERVER then
 		--timer.Stop("nzu_Round_Spawning")
 		self.Round = num
 		PrintMessage(HUD_PRINTTALK, "Round is now: "..num)
-		self:SpawnPlayers()
-		self:Prepare(time) -- This networks
-
 		hook.Run("nzu_RoundChanged", num)
+
+		self:SpawnPlayers()
+		self:Prepare(time) -- This networks		
 	end
 
 	function ROUND:Progress()
@@ -298,7 +300,7 @@ if SERVER then
 	function ROUND:CalculateZombieHealth()
 		-- 950 for round 10, multiply 1.1 for each round after
 		local val = self.Round < 10 and 50 + 100*self.Round or 950*(math.pow(1.1, self.Round-10))
-		return val * 0.5 -- Scale down to gmod levels (for now). TODO: Balance
+		return val * 0.75 -- Scale down to gmod levels (for now). TODO: Balance
 	end
 
 	function ROUND:CalculateZombieAmount()

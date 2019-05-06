@@ -1,0 +1,1 @@
+{"requiredaddons":[],"map":"zs_snowedin","authors":"Zet0r","name":"Permafrost","description":"The outside might be barren and freezing cold, but the inside of this abandoned bunker is not much better... Why is this following us?"}

@@ -459,9 +459,9 @@ if SERVER then
 	util.AddNetworkString("nzu_extension_setting") -- SERVER: Network a setting to clients || CLIENT: Request setting change
 
 	net.Receive("nzu_extension_setting", function(len, ply)
-		if not nzu.IsAdmin(ply) then
-			-- Not an admin, network back the old value to correct them back
-			ply:ChatPrint("You cannot change this Extension setting without being an Admin.")
+		if NZU_NZOMBIES and not nzu.IsAdmin(ply) then
+			-- Only admins can change it in nZU
+			ply:ChatPrint("You cannot change Extension Settings without being an Admin.")
 		return end
 		
 		local ext = loaded_extensions[net.ReadString()]

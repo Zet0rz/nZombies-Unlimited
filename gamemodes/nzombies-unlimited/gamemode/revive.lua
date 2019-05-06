@@ -11,7 +11,7 @@ local bleedouttime = 45 -- Seconds
 Basic Revive state
 ---------------------------------------------------------------------------]]
 if SERVER then
-	util.AddNetworkString("nzu_playerdowned") -- Server: Broadcast that a player was downed, triggering their
+	util.AddNetworkString("nzu_playerdowned") -- Server: Broadcast that a player was downed
 
 	function PLAYER:DownPlayer()
 		if not self:GetIsDowned() then
@@ -49,6 +49,7 @@ if SERVER then
 			net.Start("nzu_playerdowned")
 				net.WriteEntity(self)
 				net.WriteBool(false)
+				net.WriteBool(true)
 				if IsValid(savior) then
 					net.WriteBool(true)
 					net.WriteEntity(savior)
@@ -84,9 +85,13 @@ if CLIENT then
 			hook.Run("nzu_PlayerDowned", ply)
 		else
 			ply.nzu_DownedTime = nil
-			local savior
-			if net.ReadBool() then savior = net.ReadEntity() end
-			hook.Run("nzu_PlayerRevived", ply, savior)
+			if net.ReadBool() then
+				local savior
+				if net.ReadBool() then savior = net.ReadEntity() end
+				hook.Run("nzu_PlayerRevived", ply, savior)
+			else
+				hook.Run("nzu_PlayerBledOut", ply)
+			end
 		end
 	end)
 end
@@ -134,7 +139,7 @@ if SERVER then
 		if ply:GetIsDowned() then
 			local passed = CurTime() - ply.nzu_DownedTime
 			if passed > bleedouttime then
-				--ply:Kill() -- Just using Kill() is how to kill a downed player
+				ply:Kill() -- Just using Kill() is how to kill a downed player
 			end
 		end
 	end)
@@ -144,21 +149,12 @@ if SERVER then
 		if ply:GetIsDowned() then
 			ply:SetIsDowned(false)
 			ply.nzu_DownedTime = nil
-		end
-	end)
 
-	-- Control downing through damage
-	hook.Add("EntityTakeDamage", "nzu_Revive_DownPlayer", function(ent, dmg)
-		if ent:IsPlayer() then
-			if ent:GetIsDowned() then
-				-- Downed player, block any damage
-				return true
-			else
-				if dmg:GetDamage() >= ent:Health() then
-					ent:DownPlayer()
-					return true
-				end
-			end
+			net.Start("nzu_playerdowned")
+				net.WriteEntity(ply)
+				net.WriteBool(false)
+				net.WriteBool(false)
+			net.Broadcast()
 		end
 	end)
 
@@ -394,6 +390,9 @@ end)
 
 local cyclex, cycley = 0.6,0.65
 local hullchange = Vector(0,0,25)
+
+local loweredpos = Vector(0,0,-30)
+local rotate = Angle(0,0,-30)
 hook.Add("UpdateAnimation", "nzu_Revive_DownedAnimation", function(ply, vel, seqspeed)
 	if ply:GetIsDowned() then
 		local movement = 0
@@ -411,39 +410,19 @@ hook.Add("UpdateAnimation", "nzu_Revive_DownedAnimation", function(ply, vel, seq
 		ply:SetPoseParameter("move_x", -1)
 		ply:SetPlaybackRate(movement)
 
+		if not ply.nzu_DownedAnim then
+			ply:ManipulateBonePosition(0, loweredpos)
+			ply:ManipulateBoneAngles(0, rotate)
+			ply.nzu_DownedAnim = true
+		end
+
 		return true
+	elseif ply.nzu_DownedAnim then
+		ply:ManipulateBonePosition(0, Vector(0,0,0))
+		ply:ManipulateBoneAngles(0, Angle(0,0,0))
+		ply.nzu_DownedAnim = false
 	end
 end)
-
-if CLIENT then
-	local loweredpos = Vector(20,0,-30)
-	local mat = Matrix()
-	mat:SetTranslation(loweredpos)
-	mat:Rotate(Angle(-30,0,0))
-
-	local mat2 = Matrix()
-
-	hook.Add("PrePlayerDraw", "nzu_Revive_DownedAnimation", function(ply)
-		if ply:GetIsDowned() then
-			if not ply.nzu_DownedAnim then
-				ply:EnableMatrix("RenderMultiply", mat)
-				ply.nzu_DownedAnim = true
-			end
-			--local ang = ply:GetAngles()
-			--ply:SetRenderAngles(Angle(-30, ang[2], ang[3]))
-			--ply:SetRenderOrigin(ply:GetPos() - loweredpos + ang:Forward()*20)
-			
-			--ply:InvalidateBoneCache()
-			
-			--local wep = ply:GetActiveWeapon()
-			--if IsValid(wep) then wep:InvalidateBoneCache() end
-		elseif ply.nzu_DownedAnim then
-			ply:DisableMatrix("RenderMultiply")
-			ply.nzu_DownedAnim = nil
-		end
-	end)
-end
-
 
 
 
@@ -466,6 +445,7 @@ if CLIENT then
 		end
 	end
 	hook.Add("nzu_PlayerRevived", "nzu_Revive_HUDDownedIndicator", playernolongerdown)
+	hook.Add("nzu_PlayerBledOut", "nzu_Revive_HUDDownedIndicator", playernolongerdown)
 	hook.Add("EntityRemoved", "nzu_Revive_HUDDownedIndicator", playernolongerdown)
 
 	-- When players start reviving a target, check to see if they're faster and update the revivor if so
@@ -541,7 +521,7 @@ if CLIENT then
 	-- Draw downed indicator on other players
 	hook.Add("HUDPaint", "nzu_Revive_DownedIndicator", function()
 		for k,v in pairs(downedplayers) do
-			dopaint("HUD_DownedIndicator", k, v)
+			dopaint("DownedIndicator", k, v)
 		end
 		--dopaint("HUD_DownedIndicator", Entity(2))
 	end)
@@ -549,7 +529,13 @@ if CLIENT then
 	-- Draw revive progress for local player
 	hook.Add("HUDPaint", "nzu_Revive_ReviveProgress", function()
 		if IsValid(localplayer) then
-			dopaint("HUD_ReviveProgress", localplayer, isbeingrevived)
+			dopaint("ReviveProgress", localplayer, isbeingrevived)
+		end
+	end)
+
+	hook.Add("RenderScreenspaceEffects", "nzu_Revive_BleedoutEffects", function()
+		if LocalPlayer():GetIsDowned() then
+			dopaint("BleedoutScreenspaceEffects", LocalPlayer().nzu_DownedTime)
 		end
 	end)
 

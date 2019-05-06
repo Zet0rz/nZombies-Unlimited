@@ -185,12 +185,7 @@ if NZU_NZOMBIES then
 	end
 
 	
-	function nzu.SetHUD(class)
-		activehud = class
-	end
-
-	-- Delay deployment until InitPostEntity
-	hook.Add("InitPostEntity", "nzu_HUD_Deploy", function()
+	if IsValid(LocalPlayer()) then
 		function nzu.SetHUD(class)
 			undeploy()
 			activehud = nil
@@ -199,8 +194,26 @@ if NZU_NZOMBIES then
 			activehud = HUD
 			if not LocalPlayer():IsUnspawned() then deploy(HUD) end
 		end
-		nzu.SetHUD(activehud)
-	end)
+		--nzu.SetHUD("Unlimited") -- DEBUG
+	else
+		function nzu.SetHUD(class)
+			activehud = class
+		end
+
+		-- Delay deployment until InitPostEntity
+		hook.Add("InitPostEntity", "nzu_HUD_Deploy", function()
+			function nzu.SetHUD(class)
+				undeploy()
+				activehud = nil
+
+				local HUD = loadhud(class)
+				activehud = HUD
+				if not LocalPlayer():IsUnspawned() then deploy(HUD) end
+			end
+			nzu.SetHUD(activehud)
+		end)
+	end
+	
 
 	hook.Add("nzu_PlayerUnspawned", "nzu_HUD_Disable", function(ply)
 		if ply == LocalPlayer() then undeploy() end

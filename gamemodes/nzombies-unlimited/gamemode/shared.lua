@@ -58,7 +58,7 @@ loadfile("round.lua")
 loadfile("points.lua")
 loadfile_s("targeting.lua")
 loadfile("weapons.lua")
-loadfile("health.lua")
+loadfile_s("health.lua")
 loadfile("stamina.lua")
 
 loadfile_c("ragdoll_cleanup.lua")

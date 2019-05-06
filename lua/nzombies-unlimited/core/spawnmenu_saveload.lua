@@ -321,10 +321,11 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 
 	-- Control selecting configs
 	local function doconfigclick(pnl)
-		if not IsValid(pnl) or not pnl.Config then infopanel:SetVisible(false) return end
+		if not IsValid(pnl) or not pnl.Config then infopanel:SetVisible(false) infopanel.Config = nil return end
 		infopanel:SetVisible(true)
 
 		local cfg = pnl.Config
+		infopanel.Config = cfg
 		configname:SetText(cfg.Name)
 		authors:SetText(cfg.Authors)
 		desc:SetText(cfg.Description)
@@ -381,6 +382,13 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 		loadedcfg:SetSelected(loadedcfg:GetConfig() == cfg)
 		doconfigclick(pnl)
 	end
+
+	-- Update through hook if the config updated is the currently viewed one
+	hook.Add("nzu_ConfigInfoSaved", infopanel, function(self, config)
+		if self.Config == config then
+			doconfigclick(self) -- Kinda a fun way to make it update itself, since self.Config is the same
+		end
+	end)
 
 	-- Create new config button
 	createbutton:SetEnabled(nzu.IsAdmin(LocalPlayer()))

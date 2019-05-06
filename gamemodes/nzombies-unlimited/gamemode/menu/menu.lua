@@ -226,7 +226,7 @@ if CLIENT then
 		self.Panel = self:Add("DPanel")
 		self.Panel:DockPadding(10,10,10,10)
 		self.Panel:Dock(FILL)
-		self.Panel.Paint = barpaint
+		self.Panel.m_bDrawCorners = true
 
 		self.Avatar = self.Panel:Add("AvatarImage")
 		self.Avatar:SetWide(44)
@@ -269,8 +269,7 @@ if CLIENT then
 		self:Think()
 	end
 
-	local spawnedcolor = Color(100,60,0)
-	local unspawnedcolor = Color(0,0,0)
+	local spawnedcolor = Color(20,30,60)
 	function PLAYER_LINE:Think()
 		if not IsValid(self.Player) then self:Remove() end
 
@@ -290,9 +289,9 @@ if CLIENT then
 			self.Mute.DoClick = function() self.Player:SetMuted(not self.Muted) end
 		end
 
-		if self.Unspawned == nil or self.Unspawned ~= self.Player:IsUnspawned() then
-			self.Unspawned = self.Player:IsUnspawned()
-			self.Panel:SetBackgroundColor(self.Unspawned and unspawnedcolor or spawnedcolor)
+		if self.IsReady == nil or self.IsReady ~= (self.Player:IsReady() or not self.Player:IsUnspawned()) then
+			self.IsReady = self.Player:IsReady() or not self.Player:IsUnspawned()
+			self.Panel:SetBackgroundColor(self.IsReady and spawnedcolor or nil)
 		end
 	end
 	vgui.Register("nzu_MenuPanel_PlayerLine", PLAYER_LINE, "Panel")
@@ -696,7 +695,7 @@ if CLIENT then
 	net.Receive("nzu_OpenMenu", togglemenu)
 
 	hook.Add("InitPostEntity", "nzu_Menu_InitializeMenu", function()
-		if not IsValid(nzu.Menu) then
+		if nzu.Menu == true or not IsValid(nzu.Menu) then
 			nzu.Menu = vgui.Create("nzu_MenuPanel")
 			nzu.Menu:SetSkin("nZombies Unlimited")
 			hook.Run("nzu_MenuCreated", nzu.Menu)

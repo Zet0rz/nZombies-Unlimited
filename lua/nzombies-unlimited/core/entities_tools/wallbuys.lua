@@ -64,6 +64,12 @@ function ENT:Initialize()
 		local a,b = self:GetWallBounds()
 		self:PhysicsInitBox(a,b)
 		self:SetSolid(SOLID_OBB)
+
+		local phys = self:GetPhysicsObject()
+		if IsValid(phys) then
+			phys:EnableMotion(false)
+			phys:Sleep()
+		end
 	else
 		self:EnableMatrix("RenderMultiply", matrix)
 	end
@@ -213,12 +219,15 @@ nzu.RegisterMismatch("Wall Buys", {
 		if SERVER then -- Servers write just the wrong classes
 			net.WriteUInt(#t, 16)
 			for k,v in ipairs(t) do
-				net.WriteEntity(v)
+				if IsValid(v) then
+					net.WriteEntity(v)
+					net.WriteString(v:GetWeaponClass())
+				end
 			end
 		else -- Clients write the wrong class and the replacement class
 			net.WriteUInt(table.Count(t), 16)
 			for k,v in pairs(t) do
-				net.WriteEntity(k)
+				net.WriteUInt(k, 16)
 				net.WriteString(v)
 			end
 		end
@@ -228,7 +237,8 @@ nzu.RegisterMismatch("Wall Buys", {
 		local num = net.ReadUInt(16)
 		if CLIENT then -- Clients receive just the wrong classes, but generate the map table
 			for i = 1,num do
-				table.insert(t, net.ReadEntity())
+				local id = net.ReadUInt(16)
+				t[id] = net.ReadString()
 			end
 		else -- Servers read the table of entities and their new class
 			for i = 1,num do
@@ -251,15 +261,12 @@ nzu.RegisterMismatch("Wall Buys", {
 
 		local weps = {}
 		for k,v in pairs(t) do
-			if IsValid(v) then
-				local class = v:GetWeaponClass()
+			local ent = Entity(k)
+			local pnl = nzu.ExtensionSettingTypePanel("Weapon", parent)
+			pnl:Set(v)
+			dlist:AddLine(v .. " (".. (IsValid(ent) and ent:GetPrice() or "Can't get Price")..")", pnl):SetTall(100)
 
-				local pnl = nzu.ExtensionSettingTypePanel("Weapon", parent)
-				pnl:Set(class)
-				dlist:AddLine(class .. " ("..v:GetPrice()..")", pnl):SetTall(100)
-
-				weps[v] = pnl
-			end
+			weps[k] = pnl
 		end
 
 		-- Collect the corrected data when the Apply button is pressed

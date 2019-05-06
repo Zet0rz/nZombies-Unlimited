@@ -129,7 +129,7 @@ nzu.RegisterMismatch("Required Addons", {
 			local addons = {}
 			for k,v in pairs(engine.GetAddons()) do
 				if v.wsid and v.mounted then
-					addons[v.wsid] = true
+					addons[tonumber(v.wsid)] = true
 				end
 			end
 
@@ -426,7 +426,7 @@ end
 
 function PANEL:CloseMismatch(key)
 	if IsValid(self.Items[key].Tab) then
-		if #self.Items <= 1 then self:AddDefaultTab() end
+		if table.Count(self.Items) <= 1 then self:AddDefaultTab() end
 
 		self.Sheet:CloseTab(self.Items[key].Tab, true)
 		self:OnMismatchClosed(key)

@@ -20,13 +20,13 @@ function ENT:Initialize()
 		self:PhysicsInit(SOLID_VPHYSICS)
 		self:SetUseType(ONOFF_USE)
 
-		if NZU_NZOMBIES then nzu.ElectricityStartOff() end -- Notify server that electricity should start off
-
 		local phys = self:GetPhysicsObject()
 		if IsValid(phys) then
 			phys:EnableMotion(false)
 			phys:Sleep()
 		end
+
+		hook.Add("nzu_ShouldElectricityStartOff", self, function() return true end) -- Start electricity off if we're valid (hook only runs if self is valid)
 	else
 		self.HandleSwitched = false
 	end

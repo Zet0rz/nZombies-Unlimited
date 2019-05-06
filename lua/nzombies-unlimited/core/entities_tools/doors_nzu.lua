@@ -451,24 +451,8 @@ if SERVER then
 end
 
 if CLIENT then
-	local queue = {}
-	local function doapplydoordata(index, data)
-		local ent = Entity(index)
-		if IsValid(ent) then
-			ent:SetBuyFunction(data)
-		else
-			queue[index] = data
-		end
-	end
-	hook.Add("OnEntityCreated", "nzu_Doors_DoorDataQueue", function(ent)
-		if queue[ent:EntIndex()] then
-			ent:SetBuyFunction(queue[ent:EntIndex()])
-			queue[ent:EntIndex()] = nil
-		end
-	end)
-
 	net.Receive("nzu_doors", function()
-		local ent = net.ReadUInt(16)
+		local ent = net.ReadEntityQueued(16)
 		if net.ReadBool() then
 			local tbl
 			if net.ReadBool() then
@@ -485,11 +469,25 @@ if CLIENT then
 				tbl.Text = " clear debris "
 			end
 
-			doapplydoordata(ent, tbl)
-			hook.Run("nzu_DoorLockCreated", ent, tbl)
+			if IsValid(ent) then
+				ent:SetBuyFunction(tbl)
+				hook.Run("nzu_DoorLockCreated", ent, tbl)
+			else
+				ent:Run(function(e)
+					e:SetBuyFunction(tbl)
+					hook.Run("nzu_DoorLockCreated", e, tbl)
+				end)
+			end
 		else
-			doapplydoordata(ent, nil)
-			hook.Run("nzu_DoorLockRemoved", ent)
+			if IsValid(ent) then
+				ent:SetBuyFunction(nil)
+				hook.Run("nzu_DoorLockRemoved", ent)
+			else
+				ent:Run(function(e)
+					e:SetBuyFunction(nil)
+					hook.Run("nzu_DoorLockRemoved", e)
+				end)
+			end
 		end
 	end)
 
@@ -505,9 +503,16 @@ if CLIENT then
 
 		local num = net.ReadUInt(32)
 		for i = 1, num do
-			local ent = net.ReadUInt(16)
-			doapplydoordata(ent, tbl)
-			hook.Run("nzu_DoorLockCreated", ent, tbl)
+			local ent = net.ReadEntityQueued()
+			if IsValid(ent) then
+				ent:SetBuyFunction(tbl)
+				hook.Run("nzu_DoorLockCreated", ent, tbl)
+			else
+				ent:Run(function(e)
+					e:SetBuyFunction(tbl)
+					hook.Run("nzu_DoorLockCreated", e, tbl)
+				end)
+			end
 		end
 	end)
 end

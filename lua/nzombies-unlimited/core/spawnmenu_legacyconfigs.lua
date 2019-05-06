@@ -44,13 +44,13 @@ local modules = {
 			for k,v in pairs(data) do
 				local e = ents.Create("nzu_wallbuy")
 
-				local pos,ang = LocalToWorld(Vector(0,0,0), Angle(0,90,0), v.pos, v.angle)
+				local pos,ang = LocalToWorld(Vector(0,0,0), v.flipped and Angle(0,90,0) or Angle(0,0,0), v.pos, v.angle)
 				e:SetPos(pos)
 				e:SetAngles(ang)
 
 				e:SetWeaponClass(v.wep)
 				e:SetPrice(v.price)
-				-- TODO: Support the "flipped" variable when wall buys get that
+
 				e:Spawn()
 			end
 		end
@@ -229,10 +229,12 @@ local modules = {
 		Label = "Nav Locks (Note: Will not be correct if Navmesh is not identical)",
 		Load = function(data)
 			for k,v in pairs(data) do
-				if v.locked then
+				if v.locked or v.link then
 					local a = navmesh.GetNavAreaByID(k)
-					if a then
+					if IsValid(a) then
 						nzu.LockNavArea(a, v.link)
+					else
+						print("nzu_legacy: Attempted to apply Nav Lock to non-existent Nav Area: "..k)
 					end
 				end
 			end
