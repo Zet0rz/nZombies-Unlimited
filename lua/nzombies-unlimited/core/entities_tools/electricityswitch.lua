@@ -83,6 +83,12 @@ if CLIENT then
 				self:DoHandleSwitch()
 			end
 		end
+
+		function ENT:GetTargetIDText()
+			if not self:HasElectricity() then
+				return "Press E to turn on Electricity", TARGETID_TYPE_ELECTRICITY
+			end
+		end
 	else
 		function ENT:Think()
 			if not IsValid(self.Handle) then

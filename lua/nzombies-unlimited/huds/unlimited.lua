@@ -133,7 +133,7 @@ function HUD:RoundIndicator()
 			surface.DrawText("Round")
 
 			surface.SetMaterial(tallymats[1])
-			surface.DrawTexturedRectUV(75, ScrH() - 175, tallysize, invpct2*tallysize, 0,0,1, invpct2)
+			--surface.DrawTexturedRectUV(75, ScrH() - 175, tallysize, invpct2*tallysize, 0,0,1, invpct2)
 		end
 
 		if r <= 5 and r >= 0 then
@@ -642,7 +642,7 @@ function HUD:Draw_DownedIndicator(ply, revivor)
 		surface.SetMaterial(point_glow)
 		surface.DrawTexturedRectRotated(x, y - h, waveheight, w2, 90)
 		
-		surface.SetTextPos(pos.x - w/2, pos.y - h)
+		surface.SetTextPos(x - w/2, y - h)
 		surface.DrawText(revivetext)
 	end
 end

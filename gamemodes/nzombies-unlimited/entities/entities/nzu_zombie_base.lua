@@ -179,7 +179,7 @@ Pathing - SERVER
 if SERVER then
 	------- Fields -------
 	ENT.Acceleration = 500
-	ENT.Deceleration = 500
+	ENT.Deceleration = 1000
 	ENT.JumpHeight = 60
 	ENT.MaxYawRate = 360
 	ENT.StepHeight = 18
@@ -200,14 +200,22 @@ if SERVER then
 		self:ResetSequence(seq)
 	end
 
+	-- Simple, get the current goal position of the path, including tolerance
+	function ENT:GetCurrentGoal() return IsValid(self.Path) and self.Path:GetCurrentGoal() end
+
 	-- Returns whether the current path goal exists and it is in the same 180-degree direction as the argument position
 	function ENT:IsMovingTowards(pos)
-		return self.Path and (pos - self:GetPos()):Dot(self.Path:GetCurrentGoal().forward) > 0
+		return (pos - self:GetPos()):Dot(self.loco:GetGroundMotionVector()) > 0
 	end
 
 	-- Opposite of above. But instead of using 'not', this would return false if we don't have a path at all (arbitrary what direction we move - we'll always move towards the target pos)
 	function ENT:IsNotMovingTowards(pos)
-		return self.Path and (pos - self:GetPos()):Dot(self.Path:GetCurrentGoal().forward) < 0
+		return (pos - self:GetPos()):Dot(self.loco:GetGroundMotionVector()) < 0
+	end
+
+	-- Same as above, but directly returns the number. You can do whatever you want with it. This one is normalized
+	function ENT:GetMotionDot(pos)
+		return (pos - self:GetPos()):GetNormalized():Dot(self.loco:GetGroundMotionVector())
 	end
 
 	------- Overridables -------
@@ -567,9 +575,22 @@ if SERVER then
 	------- Callables -------
 	function ENT:GetCurrentEvent() return self.ActiveEvent end -- Returns the string ID of the currently played event, if any
 	function ENT:GetInteractingEntity() return self.nzu_InteractTarget end -- Returns the entity the zombie is currently interacting with, if any. This is only set from ENTITY:ZombieInteract on entities the zombie walks into
-	function ENT:SolidMaskDuringEvent(mask) self:SetSolidMask(mask) self.EventMask = true end -- The zombie will not collide with other zombies for the duration of the current event
+	function ENT:SolidMaskDuringEvent(mask)  -- Changes the zombie's mask until the end of the event. If nil is passed, it immediately removes the mask
+		if mask then
+			self:SetSolidMask(mask)
+			self.EventMask = true
+			else
+			self:SetSolidMask(MASK_NPCSOLID)
+			self.EventMask = nil
+		end
+	end
 
 	function ENT:CollideWhenPossible() self.DoCollideWhenPossible = true end -- Make the zombie solid again as soon as there is space
+
+	-- Set the Event End function. This is called automatically when the event is ended, but can also be called manually in said event
+	-- For example, this is used by Barricades where they reserve a spot and a plank, and the terminate function un-reserves those spots
+	--function ENT:EventEndFunction(f) self.TerminateEventFunction = f end
+	--function ENT:ExecuteEventEndFunction() if self.TerminateEventFunction then self:TerminateEventFunction() self.TerminateEventFunction = nil end
 
 	------- Basic Events -------
 
@@ -593,21 +614,22 @@ if SERVER then
 
 		if self:IsNotMovingTowards(to) then return end -- Don't vault at all if the direction of vault is away from where we want to go
 
+		self:SolidMaskDuringEvent(MASK_NPCSOLID_BRUSHONLY) -- Nocollide with props and other entities while we attempt to vault (Gets removed after event, or with CollideWhenPossible)
 		local stucktime
 
 		-- If from exists, move to that position first
 		if from then
+			self:ResetMovementSequence()
 			local path = Path("Follow")
-			path:SetGoalTolerance(10)
+			path:SetGoalTolerance(20)
 			path:SetMinLookAheadDistance(10)
 			path:Compute(self, from, self.ComputePath)
-			if not path:IsValid() then return end
 
 			while path:IsValid() do
 				if self:ShouldEventTerminate() then return end -- We support terminating the event only before the vault
 
 				path:Update(self)
-				if self.loco:IsStuck() then
+				if self:IsStuck() then
 					if not stucktime then
 						stucktime = CurTime() + 2
 					elseif stucktime < CurTime() then
@@ -618,6 +640,8 @@ if SERVER then
 				end
 				coroutine.yield()
 			end
+
+			self:SetPos(from)
 		end
 		stucktime = nil
 
@@ -641,12 +665,12 @@ if SERVER then
 
 		self.loco:SetAcceleration(500)
 		self.loco:SetDesiredSpeed(groundspeed)
-		self:SetSolidMask(MASK_NPCWORLDSTATIC) -- Nocollide with props and other entities (we remove this with CollideWhenPossible)
 
+		local isdone = false
 		while path:IsValid() do
 			path:Update(self)
 
-			if self.loco:IsStuck() then
+			if self:IsStuck() then
 				if not stucktime then
 					stucktime = CurTime() + 2
 					self:SetPlaybackRate(0)
@@ -659,6 +683,10 @@ if SERVER then
 				self:SetPlaybackRate(rate)
 			end
 			coroutine.yield()
+			if self:GetCycle() == 1 and not isdone then
+				self:ResetMovementSequence()
+				isdone = true
+			end
 		end
 
 		self.loco:SetAcceleration(self.Acceleration)
@@ -673,9 +701,10 @@ Functions and callables relating to being stuck or getting obstructing entities
 ---------------------------------------------------------------------------]]
 if SERVER then
 	------- Fields -------
+	ENT.StuckDelay = 1 -- How long the zombie must remain still to begin counting as stuck
+	ENT.UnStuckDelay = 0.5 -- How long the zombie must have gone without a stuck update to be considered unstuck
 	ENT.MaxStuckTime = 5 -- How long to be stuck for for the zombie to give up and call ENT:OnFullyStuck()
-	ENT.StuckPushDelay = 0.5 -- How long time between random pushes when stuck
-	ENT.RandomPushForce = 100 -- How powerful a ENT:ApplyRandomPush() is when supplied no arguments
+	ENT.RandomPushForce = 200 -- How powerful a ENT:ApplyRandomPush() is when supplied no arguments
 
 	------- Callables -------
 
@@ -686,6 +715,19 @@ if SERVER then
 		self.loco:SetVelocity(self.loco:GetVelocity() + VectorRand()*force)
 	end
 
+	function ENT:IsStuck() return self.FullyStuckTime and true or false end -- Get whether the bot is stuck. This is not always equal to self.loco:IsStuck()
+	function ENT:GetStuckEntity() return self.CurrentlyStuckEntity end -- Get the entity the bot is stuck on. This is updated once every 0.5 seconds in OnContact and remains until OnUnStuck
+
+	-- Clears the stuck on the entity. It clears it on the loco if it is stuck, otherwise just on the bot
+	-- (the loco will also call OnUnStuck on the bot if it is stuck, so we prevent double-call)
+	function ENT:ClearStuck()
+		if self.loco:IsStuck() then
+			self.loco:ClearStuck()
+		else
+			self:OnUnStuck()
+		end
+	end
+
 	------- Overridables -------
 
 	-- Called when the Zombie is stuck and attempting to handle it
@@ -694,7 +736,7 @@ if SERVER then
 	function ENT:Stuck()
 		if not self.NextRandomPush or CurTime() > self.NextRandomPush then
 			self:ApplyRandomPush()
-			self.NextRandomPush = CurTime() + self.StuckPushDelay
+			self.NextRandomPush = CurTime() + 0.5
 		end
 	end
 
@@ -724,12 +766,15 @@ if SERVER then
 
 	-- Initialize the time
 	function ENT:OnStuck()
-		self.FullyStuckTime = CurTime() + self.MaxStuckTime
+		if not self.FullyStuckTime then self.FullyStuckTime = CurTime() + self.MaxStuckTime end
 	end
 
 	-- Reset the time
 	function ENT:OnUnStuck()
 		self.FullyStuckTime = nil
+		self.AboutToBeUnStuck = nil
+		self.AboutToBeStuck = nil
+		self.CurrentlyStuckEntity = nil
 	end
 end
 
@@ -765,7 +810,7 @@ if SERVER then
 		self.Path = path
 
 		path:SetMinLookAheadDistance(self.AttackRange)
-		path:SetGoalTolerance(self.AttackRange)
+		path:SetGoalTolerance(30)
 
 		path:Compute(self, self:GetTargetPosition(), self.ComputePath)
 		self:SetNextRepath(self:CalculateNextRepath(path))
@@ -937,7 +982,7 @@ if SERVER then
 					self.nzu_InteractTarget = nil -- Remove the proxy if any
 				end
 
-				if IsValid(self.Path) then self:ResetMovementSequence() end
+				self:ResetMovementSequence()
 
 				if self.loco:IsStuck() then self.FullyStuckTime = CurTime() + self.MaxStuckTime end
 			end
@@ -984,7 +1029,7 @@ if SERVER then
 			-- DEBUG
 			--path:Draw()
 			path:Update(self)
-			if self.loco:IsStuck() then self:HandleStuck() end
+			if self:IsStuck() then self:HandleStuck() end
 
 			if not self.NextSound or self.NextSound < CurTime() then
 				self:Sound()
@@ -996,7 +1041,9 @@ if SERVER then
 	end
 
 	ENT.CollisionBoxCheckInterval = 1
+	ENT.StuckCheckInterval = 0.5
 	local boxcheckrange = 30
+	local boxa,boxb = Vector(-16,-16,0), Vector(16,16,64)
 	function ENT:OnContact(ent)
 		if not self.ActiveEvent and IsValid(ent) then
 			local ent2 = ent.nzu_InteractTarget or ent -- Bumping into a proxy interactor
@@ -1022,11 +1069,14 @@ if SERVER then
 
 				-- TODO: Make this if-statement say only if static entity? Is that optimized? i.e. prevent this when bumping into moving zombies
 				--if self.loco:GetVelocity():Length2D() <= 10 then
-					local targetforward = IsValid(self.Path) and (self.Path:GetCurrentGoal().pos - self:GetPos()):GetNormalized()*boxcheckrange or self:GetAngles():Forward()*boxcheckrange
-					local a,b = self:GetCollisionBounds()
+					local targetforward = self.loco:GetGroundMotionVector()
 
-					local p = self:GetPos() + targetforward
-					local tbl = ents.FindInBox(p+a,p+b)
+					local p = self:GetPos() + targetforward*boxcheckrange
+					local tbl = ents.FindInBox(p+boxa,p+boxb)
+
+					--debugoverlay.Box(p,boxa,boxb,1,Color(255,255,255,50))
+					--debugoverlay.Line(self:GetPos(), p, 1, Color(0,0,255))
+					--debugoverlay.Sphere(goal.pos, 5, 2, Color(255,0,0), true)
 
 					for k,v in pairs(tbl) do
 						if v.ZombieInteract then -- This only works for entities with ZombieInteract
@@ -1045,6 +1095,23 @@ if SERVER then
 
 			-- In the end, call our own Interact function on the initial (potentially proxied) entity we collided with
 			self:Interact(ent2)
+
+			-- Anti-stuck earlier! We can use this part of the function as it means we have collided with something that didn't trigger an event
+			-- Since we haven't returned, we know we haven't found any other entity
+			if not self.NextStuckCheck or self.NextStuckCheck < CurTime() then
+				if self.loco:IsAttemptingToMove() and self.loco:GetVelocity():LengthSqr() < 100 then -- sqrt(100) = 10
+					if not self.AboutToBeStuck then
+						self.AboutToBeStuck = CurTime() + self.StuckDelay
+					end
+					if self.AboutToBeStuck <= CurTime() then
+						if not self:IsStuck() then self:OnStuck()end -- Become stuck, but only once
+						self.CurrentlyStuckEntity = ent -- Update the stuck entity every time
+						self.AboutToBeUnStuck = CurTime() + self.UnStuckDelay
+					end
+				end
+
+				self.NextStuckCheck = CurTime() + self.StuckCheckInterval
+			end
 		end
 	end
 
@@ -1052,6 +1119,23 @@ if SERVER then
 		self:PerformIdle()
 		coroutine.wait(time)
 	end
+
+	function ENT:Freeze(time)
+		if not self.FrozenThread then
+			self.FrozenThread = self.BehaveThread
+			self.BehaveThread = nil
+		end
+		self.FrozenTime = time and CurTime() + time or nil
+	end
+
+	function ENT:UnFreeze()
+		if self.FrozenThread then
+			self.BehaveThread = self.FrozenThread
+			self.FrozenThread = nil
+		end
+		self.FrozenTime = nil
+	end
+	function ENT:IsFrozen() return self.FrozenThread and true or false end
 
 	function ENT:FaceTowards(pos)
 		self.loco:FaceTowards(pos)
@@ -1071,26 +1155,17 @@ Each Zombie class may override the handler given they have an event of the same 
 Pass potential data as the third argument rather than directly in the handler
 ---------------------------------------------------------------------------]]
 if SERVER then
-	function ENT:TriggerEvent(id, handler, data)
-		-- Lapsing events
-		if self.ActiveEvent and coroutine.running() then
-			local func = self["Event_"..id] or handler
-			if func then
-				self.ActiveEvent = id
-				self.EventHandler = func
-				self.EventData = data
-				func(self, data)
-			end
-		return end
-		
+	function ENT:TriggerEvent(id, data, handler)
 		local func = self["Event_"..id] or handler
 		if func then
 			self.ActiveEvent = id
 			self.EventHandler = func
 			self.EventData = data
+
+			if self.ActiveEvent and coroutine.running() then func(self, data) end -- Lapsing events
 			return true
 		end
-		return false
+		return false		
 	end
 	
 	function ENT:RequestTerminateEvent()
@@ -1124,7 +1199,7 @@ if SERVER then
 
 			path:Update(self)
 			if options.draw then path:Draw() end
-			if self.loco:IsStuck() then
+			if self:IsStuck() then
 				self:HandleStuck()
 				return "stuck"
 			end
@@ -1179,7 +1254,14 @@ if SERVER then
 				end
 			end
 		end
-	end
+		if self.AboutToBeUnStuck and CurTime() >= self.AboutToBeUnStuck and CurTime() > self.NextStuckCheck then
+			self:OnUnStuck()
+		end
+
+		if self.FrozenTime and CurTime() >= self.FrozenTime then
+			self:UnFreeze()
+		end
+	end	
 end
 
 function ENT:SetupDataTables()

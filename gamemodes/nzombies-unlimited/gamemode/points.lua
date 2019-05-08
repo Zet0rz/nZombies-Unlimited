@@ -62,6 +62,7 @@ if SERVER then
 							points = hitboxes[hitgroup] or 50
 							typ = "ZombieKill"
 						end
+						ent.nzu_ShouldGivePoints = nil
 					else
 						points = 10
 						typ = "ZombieHit"
@@ -115,6 +116,11 @@ if SERVER then
 	end]]
 
 	hook.Add("PostEntityTakeDamage", "nzu_Points_ZombieDamage", dopoints)
+
+	hook.Add("nzu_PlayerInitialSpawned", "nzu_Points_StartPoints", function(ply)
+		local s = nzu.GetExtension("Core")
+		ply:SetPoints(s and s.Settings and s.Settings.StartPoints or 500)
+	end)
 end
 
 if CLIENT then

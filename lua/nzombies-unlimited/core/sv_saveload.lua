@@ -23,7 +23,7 @@ function nzu.ReloadConfigMap(config)
 	local config = config or nzu.CurrentConfig
 	if not config then return end
 	
-	local str = file.Read(config.Path.."/config.dat", "GAME") or file.Read(config.Path.."/config.lua", "GAME")
+	local str = file.Read(config.Path.."/config.lua", "GAME") or file.Read(config.Path.."/config.dat", "GAME")
 	if not str then return end -- Not error, just load nothing
 	
 	local startchar = string.find(str, '')
@@ -101,8 +101,9 @@ local function loadconfig(config)
 	hook.Run("nzu_PreLoadConfig", config)
 
 	-- 1) Load Extensions
-	if file.Exists(config.Path.."/settings.txt", "GAME") then
-		local tbl = util.JSONToTable(file.Read(config.Path.."/settings.txt", "GAME"))
+	local str = file.Read(config.Path.."/settings.txt", "GAME") or file.Read(config.Path.."/settings.lua", "GAME")
+	if str then
+		local tbl = util.JSONToTable(str)
 		local toload = {}
 		local core = {}
 		if tbl then
@@ -244,13 +245,21 @@ function nzu.LoadConfig(config, ctype, mode)
 			timer.Destroy("nzu_saveload")
 
 			if mode == false then -- Pass the mode you want to play in - i.e. nzu.LoadConfig(config, nil, NZU_NZOMBIES) to load in nZombies (it'll be false in Sandbox, thus changing mode here)
-				RunConsoleCommand("nzu_sandbox_enable", "1")
+				if NZU_NZOMBIES then RunConsoleCommand("nzu_sandbox_enable", "1") end
 				RunConsoleCommand("gamemode", NZU_NZOMBIES and "sandbox" or "nzombies-unlimited")
 			end
 			RunConsoleCommand("changelevel", config.Map)
 		end
 	end)
 	print("nzu_saveload: Couldn't write config_to_load.txt after 5 attempts. Manually change the map and load the config again.")
+end
+
+function nzu.LoadGamemode(mode)
+	if not mode then
+		if NZU_NZOMBIES then RunConsoleCommand("nzu_sandbox_enable", "1") end
+		RunConsoleCommand("gamemode", NZU_NZOMBIES and "sandbox" or "nzombies-unlimited")
+		RunConsoleCommand("changelevel", game.GetMap())
+	end
 end
 
 function nzu.UnloadConfig()
@@ -327,14 +336,18 @@ util.AddNetworkString("nzu_loadconfig_mode")
 net.Receive("nzu_loadconfig_mode", function(len, ply)
 	if not nzu.IsAdmin(ply) then return end -- Still only admins!
 
-	local codename = net.ReadString()
-	local ctype = net.ReadString()
-	local config = nzu.GetConfig(codename, ctype)
-	if not config then
-		print("nzu_saveload: Client attempted to load to a non-existing config.", ply, codename, type)
-	return end
+	if net.ReadBool() then
+		local codename = net.ReadString()
+		local ctype = net.ReadString()
+		local config = nzu.GetConfig(codename, ctype)
+		if not config then
+			print("nzu_saveload: Client attempted to load to a non-existing config.", ply, codename, type)
+		return end
 
-	nzu.LoadConfig(config, nil, false) -- When it's false, it will think it's always the opposite mode
+		nzu.LoadConfig(config, nil, false) -- When it's false, it will think it's always the opposite mode
+	else
+		nzu.LoadGamemode(false)
+	end
 end)
 
 

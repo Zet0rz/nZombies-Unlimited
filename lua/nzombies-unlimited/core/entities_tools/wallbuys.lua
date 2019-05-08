@@ -103,6 +103,7 @@ if SERVER then
 				else
 					activator:Buy(self:GetPrice(), function()
 						activator:Give(self:GetWeaponClass())
+						self:SetBought(true)
 					end)
 				end
 			end
@@ -142,8 +143,9 @@ if CLIENT then
 				render.SetBlend(0)
 				for k,v in pairs(outlines) do
 					self:SetRenderOrigin(self:LocalToWorld(v*1))
-					self:SetupBones()
+					self:InvalidateBoneCache()
 					self:DrawModel()
+					self:SetRenderOrigin(nil)
 				end
 
 				-- Render the central position to remove stencil writes

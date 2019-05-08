@@ -299,8 +299,9 @@ if SERVER then
 
 	function ROUND:CalculateZombieHealth()
 		-- 950 for round 10, multiply 1.1 for each round after
-		local val = self.Round < 10 and 50 + 100*self.Round or 950*(math.pow(1.1, self.Round-10))
-		return val * 0.75 -- Scale down to gmod levels (for now). TODO: Balance
+		local val = self.Round < 10 and 100 + 50*self.Round or 600*(math.pow(1.08, self.Round-10))
+		--return val * 0.5 -- Scale down to gmod levels (for now). TODO: Balance
+		return val
 	end
 
 	function ROUND:CalculateZombieAmount()
@@ -503,10 +504,6 @@ if SERVER then
 
 	function ROUND:SpawnPlayer(v)
 		v:Spawn()
-		if not v:CanAfford(SETTINGS.StartPoints) then
-			v:SetPoints(SETTINGS.StartPoints)
-		end
-
 		if SETTINGS.StartWeapon and SETTINGS.StartWeapon ~= "" then
 			v:Give(SETTINGS.StartWeapon)
 		end

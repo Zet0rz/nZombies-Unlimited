@@ -120,8 +120,12 @@ if SERVER then
 			end
 		end
 
+		hook.Add("nzu_PostConfigMap", "nzu_Rooms_ResetOpenRooms", function()
+			openedrooms = {}
+		end)
+
 		function nzu.IsRoomOpen(flag)
-			return openedrooms[flag]
+			return openedrooms[flag] or false
 		end
 	end
 

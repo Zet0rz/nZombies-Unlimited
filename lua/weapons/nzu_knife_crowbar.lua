@@ -85,7 +85,8 @@ function SWEP:SwingAnimation()
 	local tr = util.TraceLine({
 		start = startpos,
 		endpos = endpos,
-		filter = self.Owner
+		filter = self.Owner,
+		mask = MASK_SHOT,
 	})
 
 	if tr.Hit then

@@ -277,3 +277,7 @@ hook.Add("nzu_GameOver", "nzu_Scoreboard_ShowGameOverText", function(time)
 		gameoverpanel:SetVisible(true)
 	end
 end)
+
+hook.Add("nzu_PlayerUnspawned", "nzu_Scoreboard_RemoveGameOverText", function(ply)
+	if ply == LocalPlayer() and IsValid(gameoverpanel) then gameoverpanel:Remove() end
+end)

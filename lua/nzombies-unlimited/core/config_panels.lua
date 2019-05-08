@@ -227,7 +227,7 @@ function CONFIGPANEL:Update(config)
 		self.Type:SetText(config.Type)
 		self.Type:SetTextColor(typecolors[config.Type] or color_white)
 		
-		self.Thumbnail:SetImage(nzu.GetConfigThumbnail(config) or fallback)
+		self.Thumbnail:SetImage(nzu.GetConfigThumbnail(config), fallback)
 	end
 end
 
@@ -311,7 +311,7 @@ AccessorFunc(MAPPANEL, "m_strNoConfigAuthors", "NoConfigAuthors", FORCE_STRING)
 function MAPPANEL:SetConfig(config)
 	self.Config = config
 	if config then
-		self:SetImage(nzu.GetConfigThumbnail(config))
+		self:SetImage(nzu.GetConfigThumbnail(config), fallback)
 		self.Map:SetText(config.Map)
 		self.Map:SizeToContents()
 		self.Name:SetText(config.Name)
@@ -319,7 +319,7 @@ function MAPPANEL:SetConfig(config)
 		self.Authors:SetText(config.Authors)
 		self.Authors:SizeToContents()			
 	else
-		self:SetImage(self:GetNoConfigImage() or "vgui/black")
+		self:SetImage(self:GetNoConfigImage() or fallback, fallback)
 		self.Map:SetText(self:GetNoConfigMap() or "")
 		self.Map:SizeToContents()
 		self.Name:SetText(self:GetNoConfigName() or "No Config selected")

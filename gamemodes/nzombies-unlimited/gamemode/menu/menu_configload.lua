@@ -23,8 +23,8 @@ if CLIENT then
 		-- Access the config in Sandbox!
 		local sand = sub:GetTopBar():Add("DButton")
 		sand:Dock(RIGHT)
-		sand:SetText("Edit selected in Sandbox")
-		sand:SetWide(200)
+		sand:SetText("Edit Config in Sandbox")
+		sand:SetWide(150)
 		sand:DockMargin(0,10,0,0)
 		sand:SetEnabled(menu:GetConfig() and true or false)
 		sand.DoClick = function()
@@ -33,6 +33,16 @@ if CLIENT then
 					nzu.RequestEditConfig(menu:GetConfig())
 				end
 			end, "Cancel"):SetSkin("nZombies Unlimited")
+		end
+
+		-- Access the config in Sandbox!
+		local sand2 = sub:GetTopBar():Add("DButton")
+		sand2:Dock(RIGHT)
+		sand2:SetText("Switch to Sandbox")
+		sand2:SetWide(120)
+		sand2:DockMargin(0,10,10,0)
+		sand2.DoClick = function()
+			Derma_Query("Are you sure you want to change to SANDBOX?", "Mode change confirmation", "Change gamemode", nzu.RequestEditConfig, "Cancel"):SetSkin("nZombies Unlimited")
 		end
 
 		l.OnConfigClicked = function(s,cfg,pnl)

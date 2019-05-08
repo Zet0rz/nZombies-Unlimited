@@ -33,7 +33,8 @@ local configdirs = {
 }
 function nzu.GetConfigDir(ctype) return configdirs[ctype] end
 function nzu.GetConfigThumbnail(config)
-	return configdirs[config.Type] and "../"..configdirs[config.Type]..config.Codename.."/thumb.jpg"
+	--return configdirs[config.Type] and "../"..configdirs[config.Type]..config.Codename.."/thumb.jpg"
+	return config.Type == "Local" and "../data/nzombies-unlimited/localconfigs/"..config.Codename.."/"..config.Codename..".jpg" or "nzombies-unlimited/configthumbnails/"..config.Codename..".jpg"
 end
 
 -- Making this shared. It has little meaning clientside, but could be used to determine what configs the client may have locally saved
@@ -45,20 +46,30 @@ function nzu.GetConfigFromFolder(path, s)
 			print("nzu_saveload: Could not get config codename from path: "..path)
 		return end
 
-		local worked, info = pcall(util.JSONToTable, file.Read(path.."/info.txt", s))
+		local str = file.Read(path.."/info.lua", s) or file.Read(path.."/info.txt", s)
+		if not str then
+			print("nzu_saveload: No info file found for config '"..codename.."'")
+		return end
+
+		local str2 = file.Read(path.."/settings.lua", s) or file.Read(path.."/settings.txt", s)
+		if not str2 then
+			print("nzu_saveload: No settings file found for config '"..codename.."'")
+		return end
+
+		local worked, info = pcall(util.JSONToTable, str)
 		if not worked or not info then
-			print("nzu_saveload: Malformed info.txt from config '"..codename.."':\n", info or "Unable to parse any table.")
-			-- This should return nothing! It follows that the game also can't determine the map this config is played on!
+			print("nzu_saveload: Malformed info file for config '"..codename.."':\n", info or "Unable to parse any table.")
+			-- This should return nothing! The game cannot determine the map without this file!
 		return end
 
 		if not info.map then
 			print("nzu_saveload: No map found for config '"..codename.."'")
 		return end
 
-		local worked2, settings = pcall(util.JSONToTable, file.Read(path.."/settings.txt", s))
-		if not worked2 then
-			print("nzu_saveload: Malformed settings.txt from config '"..codename.."':\n"..settings)
-			-- This should return nothing! It follows that the game also can't determine what extensions to enable
+		local worked2, settings = pcall(util.JSONToTable, str2)
+		if not worked2 or not settings then
+			print("nzu_saveload: Malformed settings file for config '"..codename.."':\n", settings or "Unable to parse any table.")
+			-- This should return nothing! It follows that the game also can't determine what extensions to enable without this!
 		return end
 
 		local config = {}
@@ -263,16 +274,26 @@ if CLIENT then
 		-- Requesting to play in NZU
 		function nzu.RequestPlayConfig(config)
 			net.Start("nzu_loadconfig_mode")
-				net.WriteString(config.Codename)
-				net.WriteString(config.Type)
+				if config then
+					net.WriteBool(true)
+					net.WriteString(config.Codename)
+					net.WriteString(config.Type)
+				else
+					net.WriteBool(false)
+				end
 			net.SendToServer()
 		end
 	else
 		-- Requesting to edit in Sandbox
 		function nzu.RequestEditConfig(config)
 			net.Start("nzu_loadconfig_mode")
-				net.WriteString(config.Codename)
-				net.WriteString(config.Type)
+				if config then
+					net.WriteBool(true)
+					net.WriteString(config.Codename)
+					net.WriteString(config.Type)
+				else
+					net.WriteBool(false)
+				end
 			net.SendToServer()
 		end
 	end

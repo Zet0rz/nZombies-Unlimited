@@ -23,7 +23,7 @@ if SERVER then
 	AccessorFunc(ENT, "m_iMaxPlanks", "MaxPlanks", FORCE_NUMBER)
 	AccessorFunc(ENT, "m_fPlankRepairTime", "PlankRepairTime", FORCE_NUMBER)
 	AccessorFunc(ENT, "m_fPlankTearTime", "PlankTearTime", FORCE_NUMBER)
-	AccessorFunc(ENT, "m_bTriggerVault", "TriggerVault", FORCE_NUMBER)
+	AccessorFunc(ENT, "m_bTriggerVault", "TriggerVault", FORCE_BOOL)
 
 	-- Ignore these fields in saving
 	ENT.nzu_IgnoredFields = {
@@ -68,6 +68,7 @@ function ENT:Initialize()
 		if not self:GetMaxPlanks() then self:SetMaxPlanks(6) end
 		if not self:GetPlankRepairTime() then self:SetPlankRepairTime(1) end
 		if not self:GetPlankTearTime() then self:SetPlankTearTime(3) end
+		if self:GetTriggerVault() == nil then self:SetTriggerVault(true) end
 
 		for i = 1, self:GetMaxPlanks() do
 			timer.Simple(i * 0.1, function()
@@ -325,12 +326,30 @@ if SERVER then
 	end
 	ENT.VaultHandler = triggervault
 
+	-- Just a simple no-collided MoveToPos
+	local function passer(z,self)
+		local from,to = self:GetVaultPositions()
+		local target = z:GetPos():DistToSqr(from) < z:GetPos():DistToSqr(to) and to or from
+		z:SolidMaskDuringEvent(MASK_NPCSOLID_BRUSHONLY)
+		z:MoveToPos(target, {lookahead = 10, tolerance = 10, maxage = 3})
+		z:CollideWhenPossible()
+	end
+
 	function ENT:ZombieInteract(z)
-		if not self:GetIsClear() then
-			z:TriggerEvent("BarricadeTear", self.DefaultZombieHandler, self)
-		else
-			if z:IsMovingTowards(self:GetPos()) then
-				z:TriggerEvent("BarricadeVault", triggervault, self)
+		--debugoverlay.Line(z:GetPos(), self:GetPos(), 20, Color(255,0,0))
+		--debugoverlay.Line(z:GetPos(), z:GetPos() + z.loco:GetGroundMotionVector()*20, 20, Color(0,0,255))
+		--debugoverlay.Line(z:GetPos(), z:GetCurrentGoal().pos, 20, Color(0,255,0))
+		--print(z:GetPathPositionDot(self:GetPos()), (self:GetPos() - z:GetPos()):Dot(z.loco:GetGroundMotionVector()))
+
+		if z:GetMotionDot(self:GetPos()) > 0.25 then -- Stricter moving towards!
+			if not self:GetIsClear() then
+				z:TriggerEvent("BarricadeTear", self, self.DefaultZombieHandler)
+			else
+				if self:GetTriggerVault() then
+					z:TriggerEvent("BarricadeVault", self, self.VaultHandler)
+				else
+					z:TriggerEvent("BarricadePass", self, passer)
+				end
 			end
 		end
 	end
@@ -348,7 +367,7 @@ if SERVER then
 
 		-- We got a barricade position, move towards it
 		self:SolidMaskDuringEvent(MASK_NPCSOLID_BRUSHONLY)
-		local result = self:MoveToPos(pos, {lookahead = 20, tolerance = 20, maxage = 3, draw = true})
+		local result = self:MoveToPos(pos, {lookahead = 20, tolerance = 20, maxage = 3})
 		if result == "ok" and not self:ShouldEventTerminate() then
 			-- We're in position
 			self:FaceTowards(barricade:GetPos())
@@ -383,7 +402,11 @@ if SERVER then
 
 			if not self:ShouldEventTerminate() then
 				if barricade.m_tReservedSpots[pos] == self then barricade.m_tReservedSpots[pos] = NULL end
-				self:TriggerEvent("BarricadeVault", triggervault, self)
+				if self:GetTriggerVault() then
+					self:TriggerEvent("BarricadeVault", self, self.VaultHandler)
+				else
+					self:TriggerEvent("BarricadePass", self, passer)
+				end
 				return
 			end
 		else

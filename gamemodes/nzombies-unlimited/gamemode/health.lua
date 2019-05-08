@@ -37,7 +37,7 @@ function GM:EntityTakeDamage(ent, dmg)
 	})
 	-- Scale headshot damage!
 	if trace.HitGroup == HITGROUP_HEAD then
-		dmg:ScaleDamage(5)
+		dmg:ScaleDamage(4)
 	end
 	hook.Run("PostEntityTakeDamage", ent, dmg, trace.HitGroup or HITGROUP_GENERIC)
 end
@@ -59,3 +59,6 @@ end)
 
 -- This doesn't actually apply to Nextbots, but if anyone decides to use NPCs, we don't do damage scaling as that is done in GM:EntityTakeDamage
 function GM:ScaleNPCDamage(npc, hitgroup, dmginfo) end
+
+-- We don't do any killfeedin'
+function GM:OnNPCKilled() end

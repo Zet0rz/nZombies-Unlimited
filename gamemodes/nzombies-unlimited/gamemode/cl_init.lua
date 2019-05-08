@@ -11,3 +11,5 @@ function GM:HUDShouldDraw(name)
 	if hidden[name] then return false end
 	return true
 end
+
+function GM:DrawDeathNotice() end -- No killfeed here!

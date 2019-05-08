@@ -109,7 +109,6 @@ if SERVER then
 		else
 			wep.nzu_SecondaryAmmo = num
 		end
-		print("Networking", wep, num, wep.Owner)
 		net.Start("nzu_weaponammo")
 			net.WriteEntity(wep)
 			net.WriteBool(prim)
@@ -466,16 +465,14 @@ hook.Add("StartCommand", "nzu_WeaponSwitching", function(ply, cmd)
 		if not ply.nzu_DoSelectWeapon then
 			local m = cmd:GetMouseWheel()
 			if m ~= 0 then
-				if IsValid(wep) then
-					local slot = (wep:GetWeaponSlotNumber() or 0) + m
+				local slot = (IsValid(wep) and wep:GetWeaponSlotNumber() or 0) + m
 
-					local max = ply:GetMaxWeaponSlots()
-					if slot > max then slot = 1 elseif slot < 1 then slot = max end
+				local max = ply:GetMaxWeaponSlots()
+				if slot > max then slot = 1 elseif slot < 1 then slot = max end
 
-					local wep2 = ply:GetWeaponInSlot(slot)
-					if IsValid(wep2) then
-						ply:SelectWeaponPredicted(wep2)
-					end
+				local wep2 = ply:GetWeaponInSlot(slot)
+				if IsValid(wep2) then
+					ply:SelectWeaponPredicted(wep2)
 				end
 			end
 		end
@@ -541,6 +538,8 @@ if SERVER then
 			if new.nzu_SecondaryAmmo then ply:SetAmmo(new.nzu_SecondaryAmmo, new:GetSecondaryAmmoType()) end
 		end
 	end
+
+	hook.Add("PlayerSpawn", "nzu_Weapons_Unlock", function(ply) ply:SetWeaponLocked(false) end)
 else
 	-- Clients just need to predict their own values when holstered. They are only updated from the server when ammo is set while the weapon is already holstered
 	function GM:PostPlayerSwitchWeapon(ply, old, new)

@@ -45,15 +45,27 @@ local attack_walk_ad = {
 	{Sequence = "nz_attack_walk_ad_3", Impacts = {0.3}},
 	{Sequence = "nz_attack_walk_ad_4", Impacts = {0.1, 0.4}},
 }
-local vault_walk = {"nz_barricade_walk_1", "nz_barricade_walk_2", "nz_barricade_walk_3", "nz_barricade_walk_4"}
+local vault_walk = {
+	{Sequence = "nz_barricade_walk_1", Speed = 50},
+	{Sequence = "nz_barricade_walk_2", Speed = 50},
+	{Sequence = "nz_barricade_walk_3", Speed = 50},
+	{Sequence = "nz_barricade_walk_4", Speed = 50},
+}
 local attack_run_ad = {
 	{Sequence = "nz_attack_run_ad_1", Impacts = {0.6}},
 	{Sequence = "nz_attack_run_ad_2", Impacts = {0.2}},
 	{Sequence = "nz_attack_run_ad_3", Impacts = {0.6}},
 	{Sequence = "nz_attack_run_ad_4", Impacts = {0.5}},
 }
-local vault_run = {"nz_barricade_run_1"}
-local vault_sprint = {"nz_barricade_sprint_1", "nz_barricade_sprint_2", "nz_barricade_sprint_3", "nz_barricade_sprint_4"}
+local vault_run = {
+	{Sequence = "nz_barricade_run_1", Speed = 70}
+}
+local vault_sprint = {
+	{Sequence = "nz_barricade_sprint_1", Speed = 70},
+	{Sequence = "nz_barricade_sprint_2", Speed = 50},
+	{Sequence = "nz_barricade_sprint_3", Speed = 70},
+	{Sequence = "nz_barricade_sprint_4", Speed = 70},
+}
 local attack_walk_au = {
 	{Sequence = "nz_attack_walk_au_1", Impacts = {0.2}},
 	{Sequence = "nz_attack_walk_au_2", Impacts = {0.3, 0.6}},
@@ -227,10 +239,10 @@ ENT.AnimTables = {
 			MovementSequence = {
 				"nz_run_au1",
 				"nz_run_au2",
-				"nz_run_ad9",
-				"nz_run_ad11",
-				"nz_run_ad13",
-				"nz_run_ad21",
+				"nz_run_au9", -- This one is T-Pose
+				"nz_run_au11",
+				"nz_run_au13", -- This one too
+				"nz_run_au21",
 			},
 			AttackSequences = attack_run_au,
 			VaultSequence = vault_run,
@@ -271,7 +283,7 @@ ENT.AnimTables = {
 -- Poll all of them until we find one that we cross the threshold for
 -- Apply all fields of that onto ourselves
 function ENT:SpeedChanged(speed)
-	local tbl = self.AnimTables[math.random(#self.AnimTables)]
+	local tbl = self.AnimTables[2]--math.random(#self.AnimTables)]
 
 	local n = #tbl
 	local t
@@ -299,7 +311,8 @@ end
 
 -- Vault: Select from table
 function ENT:SelectVaultSequence(pos)
-	return self.VaultSequence[math.random(#self.VaultSequence)], self.VaultSpeed
+	local seq = self.VaultSequence[math.random(#self.VaultSequence)]
+	return seq.Sequence, seq.Speed
 end
 
 -- Spawn: Select from table
@@ -383,7 +396,6 @@ function ENT:Event_BarricadeTear(barricade)
 
 	-- We got a barricade position, move towards it
 	self:SolidMaskDuringEvent(MASK_NPCSOLID_BRUSHONLY)
-	self.loco:ClearStuck()
 	local result = self:MoveToPos(pos, {lookahead = 10, tolerance = 5, maxage = 3}) -- DEBUG (draw = true)
 	if result == "ok" and not self:ShouldEventTerminate() then
 		-- We're in position
@@ -436,7 +448,8 @@ function ENT:Event_BarricadeTear(barricade)
 
 		if not self:ShouldEventTerminate() then
 			if barricade.m_tReservedSpots[pos] == self then barricade.m_tReservedSpots[pos] = NULL end
-			self:TriggerEvent("BarricadeVault", barricade.VaultHandler, barricade)
+			self:SolidMaskDuringEvent() -- Remove the mask
+			self:TriggerEvent("BarricadeVault", barricade, barricade.VaultHandler)
 			return
 		end
 	else

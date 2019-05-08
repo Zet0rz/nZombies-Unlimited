@@ -23,6 +23,62 @@ function nzu.IsAdmin(ply) return ply:IsAdmin() end -- Replace this later
 NZU_SANDBOX = false
 NZU_NZOMBIES = true
 
+--[[-------------------------------------------------------------------------
+Hook prioritization! We overwrite hook functions to run our hooks first!
+This will apply only to files loaded from here as it is reverted at the end of this file!
+---------------------------------------------------------------------------]]
+
+local oldadd = hook.Add
+if hook.GetULibTable then -- ULib is installed which would break this hook system: We just gotta use their system with -1 as priority
+	function hook.Add(ev,name,func)
+		oldadd(ev,name,func,-1)
+	end
+else
+	-- We do our own pre-hook implementation: All hooks added by the gamemode (non-dynamically) are added to 'prehooks' and all Calls run through that first
+	local prehooks = {}
+	local isstring = isstring
+	local isfunction = isfunction
+	local IsValid = IsValid
+
+	local oldcall = hook.Call
+	function hook.Call(name, gm, ...)
+		local tbl = prehooks[name]
+		if tbl ~= nil then
+			local a,b,c,d,e,f
+			for k,v in pairs(tbl) do
+				if isstring(k) then
+					a,b,c,d,e,f = v(...)
+				else
+					if IsValid(k) then
+						a,b,c,d,e,f = v(k,...)
+					else
+						tbl[k] = nil
+					end
+				end
+
+				if a ~= nil then
+					return a,b,c,d,e,f
+				end
+			end
+		end
+		return oldcall(name, gm, ...) -- Call all other hooks and return their result
+	end
+
+	-- Same as hook.Add, but for 'prehooks' instead
+	function hook.Add(ev,name,func)
+		if not isfunction(func) then return end
+		if not isstring(ev) then return end
+
+		if prehooks[ev] == nil then prehooks[ev] = {} end
+		prehooks[ev][name] = func
+	end
+end
+
+--[[-------------------------------------------------------------------------
+File loading
+---------------------------------------------------------------------------]]
+
+
 loadfile_c("fonts.lua")
 loadfile("nzombies-unlimited/core/utils.lua")
 
@@ -87,7 +143,6 @@ Misc GM hooks
 function GM:PlayerNoClip(ply,on) return false end
 
 
-
 --[[-------------------------------------------------------------------------
 Sound play networking
 ---------------------------------------------------------------------------]]
@@ -104,3 +159,10 @@ else
 		surface.PlaySound(net.ReadString())
 	end)
 end
+
+--[[-------------------------------------------------------------------------
+Revert hook replacement
+---------------------------------------------------------------------------]]
+
+-- Restore the hook.Add function to whatever it was before
+hook.Add = oldadd
