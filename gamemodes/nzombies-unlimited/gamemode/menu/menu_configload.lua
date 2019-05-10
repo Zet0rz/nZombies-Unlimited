@@ -15,7 +15,7 @@ if CLIENT then
 		end
 		
 		local l = vgui.Create("nzu_ConfigList")
-		local sub = menu:AddPanel("Load Config ...", 3, l)
+		local sub = menu:AddPanel("Load Config ...", 3, l, true)
 		l:Dock(FILL)
 		l:SetPaintBackground(true)
 		l:SetSelectable(true)

@@ -4,11 +4,11 @@ local searchpath = "GAME"
 local prefix = "lua/"
 
 function nzu.IsValidExtension(name)
-	return file.Exists(prefix..extensionpath..name.."/extension.json", searchpath)
+	return file.Exists(prefix..extensionpath..name.."/info.lua", searchpath)
 end
 
 function nzu.GetExtensionDetails(name)
-	local str = file.Read(prefix..extensionpath..name.."/extension.json", searchpath)
+	local str = file.Read(prefix..extensionpath..name.."/info.lua", searchpath)
 	if str then
 		return util.JSONToTable(str)
 	end

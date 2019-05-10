@@ -37,6 +37,7 @@ end
 if NZU_NZOMBIES then
 	local selectedsets = {}
 	function nzu.GetResourceSet(id)
+		local id = string.lower(id)
 		if not selectedsets[id] then
 			selectedsets[id] = {} -- Kinda works like a pre-cache
 		end
@@ -64,6 +65,7 @@ if NZU_NZOMBIES then
 	if SERVER then
 		local networks = {}
 		function nzu.ClientResourceSet(id)
+			local id = string.lower(id)
 			networks[id] = true
 		end
 
@@ -76,7 +78,7 @@ if NZU_NZOMBIES then
 		end
 
 		local function readset(id, set)
-			if set == "None" or set == "" then return {} end
+			if not set or set == "none" or set == "" then return {} end
 
 			local tbl
 			if type(set) == "table" then tbl = set else
@@ -99,6 +101,8 @@ if NZU_NZOMBIES then
 		end
 
 		function nzu.SelectResourceSet(id, set)
+			local id = string.lower(id)
+			local set = string.lower(set)
 			local tbl = readset(id, set)
 
 			if not tbl or not tbl.Set then return end
@@ -150,17 +154,19 @@ if SERVER then
 			local data = file.Read(resourcesetpath..id.."/"..v, "DATA")
 			local json = util.JSONToTable(data)
 			if json and json.Name and json.Set then
-				table.insert(tbl, {string.StripExtension(v), json.Name})
-				found[v] = true
+				local id2 = string.StripExtension(v)
+				table.insert(tbl, {id2, json.Name})
+				found[id2] = true
 			end
 		end
 
 		for k,v in pairs(f2) do
-			if not found[v] then
+			local id2 = string.StripExtension(v)
+			if not found[id2] then
 				local data = file.Read(resourcesetpath..id.."/"..v, "LUA")
 				local json = util.JSONToTable(data)
 				if json and json.Name and json.Set then
-					table.insert(tbl, {string.StripExtension(v), json.Name})
+					table.insert(tbl, {id2, json.Name})
 				end
 			end
 		end
@@ -237,6 +243,7 @@ else
 	end)
 
 	local function populateoptions(p,id)
+		local id = string.lower(id)
 		if p.Setting ~= id then return end
 		p:Clear()
 		p:AddChoice("None", "")
@@ -344,7 +351,7 @@ else
 			-- It'll update itself with the hook right above (if we receive any)
 			if NZU_NZOMBIES then
 				net.Start("nzu_resourceset_options")
-					net.WriteString(setting)
+					net.WriteString(string.lower(setting))
 				net.SendToServer()
 			end
 

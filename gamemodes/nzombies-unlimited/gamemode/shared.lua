@@ -35,33 +35,36 @@ if hook.GetULibTable then -- ULib is installed which would break this hook syste
 	end
 else
 	-- We do our own pre-hook implementation: All hooks added by the gamemode (non-dynamically) are added to 'prehooks' and all Calls run through that first
-	local prehooks = {}
+	local prehooks = nzu.GetPrioritizedHooks and nzu.GetPrioritizedHooks()
 	local isstring = isstring
 	local isfunction = isfunction
-	local IsValid = IsValid
 
-	local oldcall = hook.Call
-	function hook.Call(name, gm, ...)
-		local tbl = prehooks[name]
-		if tbl ~= nil then
-			local a,b,c,d,e,f
-			for k,v in pairs(tbl) do
-				if isstring(k) then
-					a,b,c,d,e,f = v(...)
-				else
-					if IsValid(k) then
-						a,b,c,d,e,f = v(k,...)
+	if not prehooks then
+		prehooks = {}
+		local oldcall = hook.Call
+		local IsValid = IsValid
+		function hook.Call(name, gm, ...)
+			local tbl = prehooks[name]
+			if tbl ~= nil then
+				local a,b,c,d,e,f
+				for k,v in pairs(tbl) do
+					if isstring(k) then
+						a,b,c,d,e,f = v(...)
 					else
-						tbl[k] = nil
+						if IsValid(k) then
+							a,b,c,d,e,f = v(k,...)
+						else
+							tbl[k] = nil
+						end
+					end
+
+					if a ~= nil then
+						return a,b,c,d,e,f
 					end
 				end
-
-				if a ~= nil then
-					return a,b,c,d,e,f
-				end
 			end
+			return oldcall(name, gm, ...) -- Call all other hooks and return their result
 		end
-		return oldcall(name, gm, ...) -- Call all other hooks and return their result
 	end
 
 	-- Same as hook.Add, but for 'prehooks' instead
@@ -72,6 +75,8 @@ else
 		if prehooks[ev] == nil then prehooks[ev] = {} end
 		prehooks[ev][name] = func
 	end
+
+	function nzu.GetPrioritizedHooks() return prehooks end
 end
 
 --[[-------------------------------------------------------------------------

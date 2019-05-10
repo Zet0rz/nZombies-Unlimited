@@ -209,7 +209,7 @@ end
 local typecolors = {
 	Official = Color(255,0,0),
 	Local = Color(0,0,255),
-	Workshop = Color(150,0,255),
+	Workshop = Color(150,50,255),
 	Unsaved = Color(255,200,100),
 }
 local mapinstalled,mapnotinstalled = Color(100,255,100), Color(255,100,100)

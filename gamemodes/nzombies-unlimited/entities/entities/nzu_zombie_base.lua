@@ -34,12 +34,17 @@ Localization/optimization
 local nzu = nzu
 local getalltargetableplayers = nzu.GetAllTargetablePlayers
 local CurTime = CurTime
+local type = type
+local Path = Path
 
 local function validtarget(ent)
 	return IsValid(ent) and ent:IsTargetable()
 end
 
 local coroutine = coroutine
+local ents = ents
+local math = math
+local hook = hook
 
 --[[-------------------------------------------------------------------------
 Initialization
@@ -592,6 +597,8 @@ if SERVER then
 	--function ENT:EventEndFunction(f) self.TerminateEventFunction = f end
 	--function ENT:ExecuteEventEndFunction() if self.TerminateEventFunction then self:TerminateEventFunction() self.TerminateEventFunction = nil end
 
+	function ENT:InteractCooldown(time) self.NextInteract = CurTime() + time end -- Pauses Interaction for this zombie for a set time. It will still move, but won't trigger ZombieInteract's
+
 	------- Basic Events -------
 
 	-- Perform a basic attack on the given target
@@ -922,6 +929,8 @@ Below here is the base code that you shouldn't override
 ---------------------------------------------------------------------------]]
 function ENT:Initialize()
 	if SERVER then
+		self:SetLagCompensated(true)
+		
 		local m,fallback = self:SelectModel()
 
 		local models = m and nzu.GetResourceSet(m) or fallback
@@ -1046,71 +1055,77 @@ if SERVER then
 	local boxa,boxb = Vector(-16,-16,0), Vector(16,16,64)
 	function ENT:OnContact(ent)
 		if not self.ActiveEvent and IsValid(ent) then
-			local ent2 = ent.nzu_InteractTarget or ent -- Bumping into a proxy interactor
-			if ent2.ZombieInteract then
-				self.nzu_InteractTarget = ent2 -- Turn ourselves into a proxy for the duration of the interaction
-				ent2:ZombieInteract(self, ent)
+			local CT = CurTime()
 
-				-- Remove our proxy only if the interaction did not cause an event
-				-- Otherwise, the end of the event will remove the proxy
-				if not self.ActiveEvent then
-					self.nzu_InteractTarget = nil
-					if ent2.ZombieInteractEnd then ent2:ZombieInteractEnd(self) end
-				end
-				return
-			end
-			if ent2 == self.Target then self:InteractTarget(ent2, ent) return end
-			if ent2:IsPlayer() then self:InteractPlayer(ent2, ent) return end
+			if not self.NextInteract or self.NextInteract <= CT then
+				self.NextInteract = nil
 
-			-- The entity or its proxy did not pass any of the interactions
-			-- Attempt to find an interactable entity in a box 30 units ahead of us
-			if not self.NextBoxCheck or self.NextBoxCheck < CurTime() then
-				self.NextBoxCheck = CurTime() + self.CollisionBoxCheckInterval
+				local ent2 = ent.nzu_InteractTarget or ent -- Bumping into a proxy interactor
+				if ent2.ZombieInteract then
+					self.nzu_InteractTarget = ent2 -- Turn ourselves into a proxy for the duration of the interaction
+					ent2:ZombieInteract(self, ent)
 
-				-- TODO: Make this if-statement say only if static entity? Is that optimized? i.e. prevent this when bumping into moving zombies
-				--if self.loco:GetVelocity():Length2D() <= 10 then
-					local targetforward = self.loco:GetGroundMotionVector()
-
-					local p = self:GetPos() + targetforward*boxcheckrange
-					local tbl = ents.FindInBox(p+boxa,p+boxb)
-
-					--debugoverlay.Box(p,boxa,boxb,1,Color(255,255,255,50))
-					--debugoverlay.Line(self:GetPos(), p, 1, Color(0,0,255))
-					--debugoverlay.Sphere(goal.pos, 5, 2, Color(255,0,0), true)
-
-					for k,v in pairs(tbl) do
-						if v.ZombieInteract then -- This only works for entities with ZombieInteract
-							self.nzu_InteractTarget = v
-							v:ZombieInteract(self, ent)
-
-							if not self.ActiveEvent then
-								self.nzu_InteractTarget = nil
-								if v.ZombieInteractEnd then v:ZombieInteractEnd(self) end
-							end
-							return
-						end
+					-- Remove our proxy only if the interaction did not cause an event
+					-- Otherwise, the end of the event will remove the proxy
+					if not self.ActiveEvent then
+						self.nzu_InteractTarget = nil
+						if ent2.ZombieInteractEnd then ent2:ZombieInteractEnd(self) end
 					end
-				--end
-			end
+					return
+				end
+				if ent2 == self.Target then self:InteractTarget(ent2, ent) return end
+				if ent2:IsPlayer() then self:InteractPlayer(ent2, ent) return end
 
-			-- In the end, call our own Interact function on the initial (potentially proxied) entity we collided with
-			self:Interact(ent2)
+				-- The entity or its proxy did not pass any of the interactions
+				-- Attempt to find an interactable entity in a box 30 units ahead of us
+				if not self.NextBoxCheck or self.NextBoxCheck < CT then
+					self.NextBoxCheck = CT + self.CollisionBoxCheckInterval
+
+					-- TODO: Make this if-statement say only if static entity? Is that optimized? i.e. prevent this when bumping into moving zombies
+					--if self.loco:GetVelocity():Length2D() <= 10 then
+						local targetforward = self.loco:GetGroundMotionVector()
+
+						local p = self:GetPos() + targetforward*boxcheckrange
+						local tbl = ents.FindInBox(p+boxa,p+boxb)
+
+						--debugoverlay.Box(p,boxa,boxb,1,Color(255,255,255,50))
+						--debugoverlay.Line(self:GetPos(), p, 1, Color(0,0,255))
+						--debugoverlay.Sphere(goal.pos, 5, 2, Color(255,0,0), true)
+
+						for k,v in pairs(tbl) do
+							if v.ZombieInteract then -- This only works for entities with ZombieInteract
+								self.nzu_InteractTarget = v
+								v:ZombieInteract(self, ent)
+
+								if not self.ActiveEvent then
+									self.nzu_InteractTarget = nil
+									if v.ZombieInteractEnd then v:ZombieInteractEnd(self) end
+								end
+								return
+							end
+						end
+					--end
+				end
+
+				-- In the end, call our own Interact function on the initial (potentially proxied) entity we collided with
+				self:Interact(ent2)
+			end
 
 			-- Anti-stuck earlier! We can use this part of the function as it means we have collided with something that didn't trigger an event
 			-- Since we haven't returned, we know we haven't found any other entity
-			if not self.NextStuckCheck or self.NextStuckCheck < CurTime() then
+			if not self.NextStuckCheck or self.NextStuckCheck < CT then
 				if self.loco:IsAttemptingToMove() and self.loco:GetVelocity():LengthSqr() < 100 then -- sqrt(100) = 10
 					if not self.AboutToBeStuck then
-						self.AboutToBeStuck = CurTime() + self.StuckDelay
+						self.AboutToBeStuck = CT + self.StuckDelay
 					end
-					if self.AboutToBeStuck <= CurTime() then
+					if self.AboutToBeStuck <= CT then
 						if not self:IsStuck() then self:OnStuck()end -- Become stuck, but only once
 						self.CurrentlyStuckEntity = ent -- Update the stuck entity every time
-						self.AboutToBeUnStuck = CurTime() + self.UnStuckDelay
+						self.AboutToBeUnStuck = CT + self.UnStuckDelay
 					end
 				end
 
-				self.NextStuckCheck = CurTime() + self.StuckCheckInterval
+				self.NextStuckCheck = CT + self.StuckCheckInterval
 			end
 		end
 	end

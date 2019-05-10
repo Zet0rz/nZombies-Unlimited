@@ -501,7 +501,7 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 			description = nzu.CurrentConfig.Description,
 			workshopid = nzu.CurrentConfig.WorkshopID,
 			requiredaddons = nzu.CurrentConfig.RequiredAddons
-		})
+		}, true)
 	end
 
 	local loadparse = {
@@ -528,7 +528,7 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 				end				
 			end
 		end
-		return util.TableToJSON(tbl)
+		return util.TableToJSON(tbl, true)
 	end
 
 	local function checkdirs()

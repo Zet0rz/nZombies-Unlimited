@@ -351,6 +351,8 @@ if SERVER then
 					z:TriggerEvent("BarricadePass", self, passer)
 				end
 			end
+		else
+			z:InteractCooldown(0.5) -- Don't try interactions for half a second
 		end
 	end
 

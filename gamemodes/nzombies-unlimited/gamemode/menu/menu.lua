@@ -34,7 +34,7 @@ if CLIENT then
 			b:ClickFunction()
 		end
 	end
-	local function generatebutton(text,admin, parent)
+	local function generatebutton(text, admin, parent)
 		local b = vgui.Create("DButton", parent)
 		b:SetFont("DermaLarge")
 		b:SetText(text) -- Append spaces around to free from edges
@@ -45,6 +45,7 @@ if CLIENT then
 		b:SetTextInset(10,0)
 
 		b.AdminOnly = admin
+		if admin and not nzu.IsAdmin(LocalPlayer()) then b:SetDisabled(true) end
 
 		--b.Paint = paintfunc
 		b:SetSkin("nZombies Unlimited")
@@ -417,12 +418,50 @@ if CLIENT then
 	function PANEL:Init()
 		self:ParentToHUD()
 		self:Dock(FILL)
-		self.OpenTime = 0
 
 		self.LeftSide = self:Add("DDragBase") -- So buttons are clickable
 		self.LeftSide:Dock(LEFT)
 		self.LeftSide:SetWide(600)
 		self.LeftSide:DockMargin(100,100,50,50)
+
+		self.CloseButton = self:Add("DButton")
+		self.CloseButton:SetPos(50,25)
+		self.CloseButton:SetSize(120, 40)
+		self.CloseButton:SetText("")
+
+		self.CloseButton.F1 = self.CloseButton:Add("DLabel")
+		self.CloseButton.F1:Dock(LEFT)
+		self.CloseButton.F1:SetWide(self.CloseButton:GetTall())
+		self.CloseButton.F1:SetText("F1")
+		self.CloseButton.F1:SetFont("Trebuchet24")
+		self.CloseButton.F1:SetContentAlignment(5)
+
+		self.CloseButton.Text = self.CloseButton:Add("DLabel")
+		self.CloseButton.Text:Dock(FILL)
+		self.CloseButton.Text:SetText("Close")
+		self.CloseButton.Text:SetFont("Trebuchet24")
+		self.CloseButton.Text:SetContentAlignment(5)
+		self.CloseButton.Text:DockMargin(0,3,3,3)
+
+		self.CloseButton.F1.Paint = function(s,w,h)
+			surface.SetDrawColor(255,255,255,10)
+			surface.DrawRect(0,0,h,h)
+		end
+
+		self.CloseButton.Think = function(s)
+			if not s.CanClose or s.CanClose ~= self:CanClose() then
+				s:SetEnabled(self:CanClose())
+				s.CanClose = s:IsEnabled()
+			end
+		end
+		self.CloseButton.DoClick = function()
+			self:Toggle()
+		end
+
+		self.ConsoleClose = self:Add("DLabel")
+		self.ConsoleClose:SetPos(50,25 + self.CloseButton:GetTall())
+		self.ConsoleClose:SetText("Console: nzu_menu")
+		self.ConsoleClose:SetWide(self.CloseButton:GetWide())
 
 		-- The loaded config icon
 		self.ConfigPanel = self.LeftSide:Add("nzu_ConfigImagePanel")
@@ -543,7 +582,7 @@ if CLIENT then
 		self.Promo:SetZPos(-1)
 		self.Promo:DockMargin(0,5,0,0)
 
-		local link = ""
+		local link = "https://discord.gg/eJpVSqm"
 		self.Promo.DoClick = function()
 			local frame = vgui.Create("DFrame")
 			frame:SetSkin("nZombies Unlimited")
@@ -619,9 +658,13 @@ if CLIENT then
 		self.MenuRoot:Show()
 	end
 	--if not ConVarExists("nzu_menu_music") then CreateConVar("nzu_menu_music", 1, FCVAR_ARCHIVE, "Sets whether Music should play on the main menu of nZombies Unlimited.") end
+
+	function PANEL:CanClose()
+		return nzu.Round:GetState() ~= ROUND_WAITING or (IsValid(LocalPlayer()) and not LocalPlayer():IsUnspawned()) -- Can't close in waiting state, unless we're spawned
+	end
 	
 	function PANEL:Paint()
-		Derma_DrawBackgroundBlur(self, self.OpenTime)
+		Derma_DrawBackgroundBlur(self, 0)
 		surface.SetDrawColor(25,25,25,200)
 		self:DrawFilledRect()
 	end
@@ -650,29 +693,32 @@ if CLIENT then
 
 	function PANEL:Toggle()
 		if self:IsVisible() then
-			if nzu.Round:GetState() ~= ROUND_WAITING or (IsValid(LocalPlayer()) and not LocalPlayer():IsUnspawned()) then self:Close() end -- Can't close in waiting state
+			if self:CanClose() then self:Close() end
 		else
 			self:Open()
 		end
 	end
 	vgui.Register("nzu_MenuPanel", PANEL, "Panel")
 
+	local function createmenu()
+		if IsValid(nzu.Menu) then nzu.Menu:Remove() end
+		local mainmenu = vgui.Create("nzu_MenuPanel")
+		mainmenu:SetSkin("nZombies Unlimited")
+		nzu.Menu = mainmenu
+		hook.Run("nzu_MenuCreated", mainmenu)
+
+		return mainmenu
+	end
+
 	local function togglemenu()
 		local mainmenu = nzu.Menu
-		--if mainmenu then mainmenu:Remove() mainmenu = nil end -- DEBUG
 
 		if net.ReadBool() then
 			if net.ReadBool() then
-				if not mainmenu then
+				if not IsValid(mainmenu) then
 					if IsValid(LocalPlayer()) then
-						mainmenu = vgui.Create("nzu_MenuPanel")
-						mainmenu:SetSkin("nZombies Unlimited")
-						nzu.Menu = mainmenu
-						hook.Run("nzu_MenuCreated", mainmenu)
-					else
-						nzu.Menu = true
-						return
-					end
+						mainmenu = createmenu()
+					else return end
 				end
 				mainmenu:Open()
 			elseif mainmenu then
@@ -680,11 +726,7 @@ if CLIENT then
 			end
 		else
 			if not mainmenu then
-				mainmenu = vgui.Create("nzu_MenuPanel")
-				mainmenu:SetSkin("nZombies Unlimited")
-				nzu.Menu = mainmenu
-				hook.Run("nzu_MenuCreated", mainmenu)
-
+				createmenu()
 				mainmenu:Open()
 			else
 				mainmenu:Toggle()
@@ -695,14 +737,31 @@ if CLIENT then
 	net.Receive("nzu_OpenMenu", togglemenu)
 
 	hook.Add("InitPostEntity", "nzu_Menu_InitializeMenu", function()
-		if nzu.Menu == true or not IsValid(nzu.Menu) then
-			nzu.Menu = vgui.Create("nzu_MenuPanel")
-			nzu.Menu:SetSkin("nZombies Unlimited")
-			hook.Run("nzu_MenuCreated", nzu.Menu)
-
+		if not IsValid(nzu.Menu) then
+			createmenu()
 			nzu.Menu:Open()
 		end
 	end)
+
+	-- Console commands!
+	concommand.Add("nzu_menu", function()
+		if IsValid(nzu.Menu) then
+			nzu.Menu:Toggle()
+		elseif IsValid(LocalPlayer()) then
+			createmenu()
+			nzu.Menu:Open()
+		end
+	end, nil, "Toggles the Main Menu of nZombies Unlimited.")
+
+	concommand.Add("nzu_menu_reload", function()
+		if IsValid(nzu.Menu) then
+			nzu.Menu:Remove()
+		end
+		if IsValid(LocalPlayer()) then
+			createmenu()
+			nzu.Menu:Open()
+		end
+	end, nil, "Removes and re-creates the Main Menu of nZombies Unlimited.")
 
 else
 	util.AddNetworkString("nzu_OpenMenu")

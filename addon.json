@@ -1,0 +1,16 @@
+{
+	"title"		:	"nZombies Unlimited",
+	"type"		:	"gamemode",
+	"tags"		:	[ "build", "realism" ],
+	"ignore"	:
+	[
+		"*.psd",
+		"*.vcproj",
+		"*.svn*",
+		"*.tga",
+		"LICENSE",
+		"*.md",
+		"*.gitattributes",
+		".git/*"
+	]
+}

@@ -96,7 +96,9 @@ function SWEP:SwingAnimation()
 		self:EmitSound(misssound)
 		self:SendWeaponAnim(ACT_VM_MISSCENTER)
 	end
-	self.Owner:SetAnimation(PLAYER_ATTACK1)
+	
+	local ply = self.Owner
+	timer.Simple(0, function() if IsValid(ply) then ply:SetAnimation(PLAYER_ATTACK1) end end)
 end
 
 -- This lets you overwrite how damage is applied

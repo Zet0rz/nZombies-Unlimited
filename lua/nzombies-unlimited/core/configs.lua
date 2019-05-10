@@ -27,7 +27,7 @@
 ]]
 
 local configdirs = {
-	Official = "gamemodes/nzombies-unlimited/officialconfigs/",
+	Official = "gamemodes/nzombies-unlimited/gamemode/officialconfigs/",
 	Workshop = "lua/nzombies-unlimited/workshopconfigs/",
 	Local = "data/nzombies-unlimited/localconfigs/",
 }
@@ -39,60 +39,58 @@ end
 
 -- Making this shared. It has little meaning clientside, but could be used to determine what configs the client may have locally saved
 function nzu.GetConfigFromFolder(path, s)
+	local codename = string.match(path, ".+/(.+)")
+	if not codename then
+		print("nzu_saveload: Could not get config codename from path: "..path)
+	return end
+
 	local s = s or "GAME"
-	if file.IsDir(path, s) then
-		local codename = string.match(path, ".+/(.+)")
-		if not codename then
-			print("nzu_saveload: Could not get config codename from path: "..path)
-		return end
+	local str = file.Read(path.."/info.lua", s) or file.Read(path.."/info.txt", s)
+	if not str then
+		print("nzu_saveload: No info file found for config '"..codename.."'")
+	return end
 
-		local str = file.Read(path.."/info.lua", s) or file.Read(path.."/info.txt", s)
-		if not str then
-			print("nzu_saveload: No info file found for config '"..codename.."'")
-		return end
+	local str2 = file.Read(path.."/settings.lua", s) or file.Read(path.."/settings.txt", s)
+	if not str2 then
+		print("nzu_saveload: No settings file found for config '"..codename.."'")
+	return end
 
-		local str2 = file.Read(path.."/settings.lua", s) or file.Read(path.."/settings.txt", s)
-		if not str2 then
-			print("nzu_saveload: No settings file found for config '"..codename.."'")
-		return end
+	local worked, info = pcall(util.JSONToTable, str)
+	if not worked or not info then
+		print("nzu_saveload: Malformed info file for config '"..codename.."':\n", info or "Unable to parse any table.")
+		-- This should return nothing! The game cannot determine the map without this file!
+	return end
 
-		local worked, info = pcall(util.JSONToTable, str)
-		if not worked or not info then
-			print("nzu_saveload: Malformed info file for config '"..codename.."':\n", info or "Unable to parse any table.")
-			-- This should return nothing! The game cannot determine the map without this file!
-		return end
+	if not info.map then
+		print("nzu_saveload: No map found for config '"..codename.."'")
+	return end
 
-		if not info.map then
-			print("nzu_saveload: No map found for config '"..codename.."'")
-		return end
+	local worked2, settings = pcall(util.JSONToTable, str2)
+	if not worked2 or not settings then
+		print("nzu_saveload: Malformed settings file for config '"..codename.."':\n", settings or "Unable to parse any table.")
+		-- This should return nothing! It follows that the game also can't determine what extensions to enable without this!
+	return end
 
-		local worked2, settings = pcall(util.JSONToTable, str2)
-		if not worked2 or not settings then
-			print("nzu_saveload: Malformed settings file for config '"..codename.."':\n", settings or "Unable to parse any table.")
-			-- This should return nothing! It follows that the game also can't determine what extensions to enable without this!
-		return end
+	local config = {}
+	config.Codename = codename
+	config.Map = info.map
+	config.Name = info.name or codename
+	config.Authors = info.authors
+	config.Description = info.description
+	config.WorkshopID = info.workshopid
+	config.Extensions = settings
+	config.RequiredAddons = info.requiredaddons
 
-		local config = {}
-		config.Codename = codename
-		config.Map = info.map
-		config.Name = info.name or codename
-		config.Authors = info.authors
-		config.Description = info.description
-		config.WorkshopID = info.workshopid
-		config.Extensions = settings
-		config.RequiredAddons = info.requiredaddons
-
-		config.Path = (s == "LUA" and "lua/" or s == "DATA" and "data/" or "")..path
-		for k,v in pairs(configdirs) do
-			if config.Path == v..codename then
-				config.Type = k
-				break
-			end
+	config.Path = (s == "LUA" and "lua/" or s == "DATA" and "data/" or "")..path
+	for k,v in pairs(configdirs) do
+		if config.Path == v..codename then
+			config.Type = k
+			break
 		end
-		if not config.Type then config.Type = "Unknown" end
-
-		return config
 	end
+	if not config.Type then config.Type = "Unknown" end
+
+	return config
 end
 
 --[[-------------------------------------------------------------------------

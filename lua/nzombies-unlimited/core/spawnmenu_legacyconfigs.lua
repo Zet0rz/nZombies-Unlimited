@@ -309,28 +309,31 @@ end
 --[[-------------------------------------------------------------------------
 Project Information
 ---------------------------------------------------------------------------]]
-local projectlink = "https://github.com/Zet0rz/nZombies-Unlimited/projects/4"
-local cur = "Version 0.0: Framework"
-local current = {
-	"Sandbox Tools",
-	"Config System",
+local projectlink = "https://github.com/Zet0rz/nZombies-Unlimited/projects/5"
+local basevers = "Version 1.0: Barebones"
+local basevers2 = {
+	"Sandbox System",
 	"Main Gamemode",
 	"Round System",
+	"HUD",
+	"Revive System",
+	"Stamina System",
+	"Weapon Slot System",
+	"Mismatch System",
 	"Zombie NPCs",
 	"Zombie Models and Sounds",
 	"Barricades",
 	"Wall Buys",
-	"Doors",
+	"Doors & Rooms Systems",
 	"Nav Locks",
+	"Nav Editor",
+	"[Config] Permafrost 1.0",
+	"Legacy Config Loader",
 }
 
-local upc = "Version 1.0: Barebones"
-local upcs = {
-	"Workshop Release",
-	"Small Official Config",
-	"Discord Server",
+local projects = {
+	"https://github.com/Zet0rz/nZombies-Unlimited/projects/5",
 }
-
 
 --[[-------------------------------------------------------------------------
 Panel
@@ -462,7 +465,7 @@ nzu.AddSpawnmenuTab("Version/Legacy", "DPanel", function(panel)
 		disc:SetPos(w/2 - 300, 0)
 	end
 
-	local link = ""
+	local link = "https://discord.gg/eJpVSqm"
 	disc.DoClick = function()
 		local frame = vgui.Create("DFrame")
 		frame:SetSkin("nZombies Unlimited")
@@ -521,7 +524,7 @@ nzu.AddSpawnmenuTab("Version/Legacy", "DPanel", function(panel)
 	dev:SizeToContentsY()
 	dev:SetTextColor(Color(255,50,50))
 	local upcoming = bot:Add("DLabel")
-	upcoming:SetText(upc)
+	upcoming:SetText("Loading next project...")
 	upcoming:Dock(TOP)
 	upcoming:SetContentAlignment(5)
 	upcoming:SetFont("Trebuchet24")
@@ -544,6 +547,9 @@ nzu.AddSpawnmenuTab("Version/Legacy", "DPanel", function(panel)
 	local frac1 = 0
 	local frac2 = 0
 	http.Fetch(projectlink, function(body, size, headers, code)
+		local _,_,str = string.find(body, "<title>(.+) · GitHub</title>")
+		if str then upcoming:SetText(str) else upcoming:SetText("Couldn't load version name") end
+
 		if not IsValid(txt) then return end
 
 		local f1 = tonumber(string.match(body, '<span class="progress d%-inline%-block bg%-green" style="width: (%d*%.?%d+)%%">'))
@@ -601,42 +607,37 @@ nzu.AddSpawnmenuTab("Version/Legacy", "DPanel", function(panel)
 	--[[-------------------------------------------------------------------------
 	The content lists
 	---------------------------------------------------------------------------]]
-	local versholder = bot:Add("Panel")
-	versholder:Dock(FILL)
-	versholder:DockMargin(0,0,0,20)
-	local currentvers = versholder:Add("DPanel")
-	--currentvers:Dock(LEFT)
-	currentvers:DockPadding(10,10,10,10)
-	currentvers.m_bDrawCorners = true
-	local nextvers = versholder:Add("DPanel")
-	--nextvers:Dock(RIGHT)
-	nextvers:DockPadding(10,10,10,10)
-	nextvers.m_bDrawCorners = true
+	local versions = bot:Add("DHorizontalScroller")
+	versions:Dock(FILL)
 
-	function versholder:PerformLayout(w,h)
-		local wid = math.Min(w/2, 250)
-		local p = w/4
-		currentvers:SetSize(wid,h)
-		nextvers:SetSize(wid,h)
+	local current
 
-		currentvers:SetPos(p - wid/2,0)
-		nextvers:SetPos(p*3 - wid/2,0)
-	end
+	-- The base version
+	local lastmade = vgui.Create("DPanel", versions)
+	lastmade:SetWide(250 + 85*2)
+	lastmade:SetPaintBackground(false)
 
-	local cv = currentvers:Add("DLabel")
-	cv:SetText("Current Version")
-	cv:Dock(TOP)
-	cv:SetFont("Trebuchet24")
-	cv:SizeToContentsY()
-	local cv2 = currentvers:Add("DLabel")
-	cv2:SetText(cur)
-	cv2:Dock(TOP)
-	cv2:DockMargin(0,-5,0,5)
+	local box = vgui.Create("DPanel", lastmade)
+	box:DockPadding(10,10,10,10)
+	box:DockMargin(85,0,85,0)
+	box.m_bDrawCorners = true
 
-	local scr = currentvers:Add("DScrollPanel")
+	local name = box:Add("DLabel")
+	name:SetText(basevers)
+	name:Dock(TOP)
+	name:SetFont("HudHintTextLarge")
+	name:SizeToContentsY()
+	name:DockMargin(0,0,0,5)
+
+	local scr = box:Add("DScrollPanel")
 	scr:Dock(FILL)
+	--scr:SetPaintBackground(true)
 
-	for k,v in pairs(current) do
+	box:Dock(LEFT)
+	box:SetWide(250)
+	versions:AddPanel(lastmade)
+
+	for k,v in pairs(basevers2) do
 		local chk = scr:Add("DCheckBoxLabel")
 		chk:SetText(v)
 		chk:SetChecked(true)
@@ -646,30 +647,126 @@ nzu.AddSpawnmenuTab("Version/Legacy", "DPanel", function(panel)
 		chk:DockMargin(0,0,0,2)
 	end
 
-	local nv = nextvers:Add("DLabel")
-	nv:SetText("Upcoming Version")
-	nv:Dock(TOP)
-	nv:SetFont("Trebuchet24")
-	nv:SizeToContentsY()
-	local nv2 = nextvers:Add("DLabel")
-	nv2:SetText(upc)
-	nv2:Dock(TOP)
-	nv2:DockMargin(0,-5,0,5)
+	for k,v in pairs(projects) do
+		local holder = vgui.Create("DPanel", versions)
+		holder:SetWide(250 + 85*2)
+		holder:SetPaintBackground(false)
 
-	local scr2 = nextvers:Add("DScrollPanel")
-	scr2:Dock(FILL)
+		local box = vgui.Create("DPanel", holder)
+		box:DockPadding(10,10,10,10)
+		box:DockMargin(85,0,85,0)
+		box.m_bDrawCorners = true
 
-	for k,v in pairs(upcs) do
-		local chk = scr2:Add("DCheckBoxLabel")
-		chk:SetText(v)
-		chk:SetChecked(false)
-		chk:SetMouseInputEnabled(false)
-		chk:SetKeyboardInputEnabled(false)
-		chk:Dock(TOP)
-		chk:DockMargin(0,0,0,2)
+		local name = box:Add("DLabel")
+		name:SetText("Loading version info ...")
+		name:Dock(TOP)
+		name:SetFont("HudHintTextLarge")
+		name:SizeToContentsY()
+		name:DockMargin(0,0,0,5)
+
+		local scr = box:Add("DScrollPanel")
+		scr:Dock(FILL)
+		--scr:SetPaintBackground(true)
+
+		box:Dock(LEFT)
+		box:SetWide(250)
+		versions:AddPanel(holder)
+
+		http.Fetch(v, function(body)
+			local _,_,str = string.find(body, "<title>(.+) · GitHub</title>")
+			if str then name:SetText(str) else name:SetText("Couldn't load version name") end
+
+			local _,_,numtodo = string.find(body, "To do</span>%s*<span class=\"Counter js%-column%-nav%-card%-count\" aria%-label=\"Contains (%d+) items\"")
+			local _,_,numdone = string.find(body, "Done</span>%s*<span class=\"Counter js%-column%-nav%-card%-count\" aria%-label=\"Contains (%d+) items\"")
+
+			local completes = {}
+			local incompletes = {}
+
+			local function applyinfo()
+				for k,v in pairs(completes) do
+					local chk = scr:Add("DCheckBoxLabel")
+					chk:SetText(v)
+					chk:SetChecked(true)
+					chk:SetMouseInputEnabled(false)
+					chk:SetKeyboardInputEnabled(false)
+					chk:Dock(TOP)
+					chk:DockMargin(0,0,0,2)
+				end
+
+				for k,v in pairs(incompletes) do
+					local chk = scr:Add("DCheckBoxLabel")
+					chk:SetText(v)
+					chk:SetChecked(false)
+					chk:SetMouseInputEnabled(false)
+					chk:SetKeyboardInputEnabled(false)
+					chk:Dock(TOP)
+					chk:DockMargin(0,0,0,2)
+				end
+
+				if numtodo or numdone then
+					local lbl = scr:Add("DLabel")
+					local str = "Other > "
+					if numtodo then
+						str = str .. "To do: "..numtodo
+						if numdone then
+							str = str .." || Done: "..numdone
+						end
+					else
+						str = str .. "Done: "..numdone
+					end
+					lbl:SetText(str)
+					lbl:Dock(TOP)
+					lbl:DockMargin(0,5,0,0)
+				end
+			end
+
+			local done1,done2
+			local _,_,id = string.find(body, "<a data%-column%-id=\"(%d+)\" data%-column%-name=\"Major Features Done\"")
+			if id then
+				http.Fetch(v.."/columns/"..id.."/cards", function(body2)
+					for s in string.gmatch(body2, "<div class=\"js%-comment%-body\">%s*<p>([%w%s]+)</p>") do
+						table.insert(completes, s)
+					end
+
+					for s in string.gmatch(body2, "href=\"/Zet0rz/nZombies%-Unlimited/issues/%d+\">([%w%s]+)</a>") do
+						table.insert(completes, s)
+					end
+					done1 = true
+					if done2 then
+						applyinfo()
+					end
+				end, function() if done2 then applyinfo() end end)
+			end
+
+			
+			local _,_,id = string.find(body, "<a data%-column%-id=\"(%d+)\" data%-column%-name=\"Major Features\"")
+			if id then
+				http.Fetch(v.."/columns/"..id.."/cards", function(body2)
+					for s in string.gmatch(body2, "<div class=\"js%-comment%-body\">%s*<p>([%w%s]+)</p>") do
+						table.insert(incompletes, s)
+					end
+
+					for s in string.gmatch(body2, "href=\"/Zet0rz/nZombies%-Unlimited/issues/%d+\">([%w%s]+)</a>") do
+						table.insert(incompletes, s)
+					end
+					done2 = true
+					if done1 then
+						applyinfo()
+					end
+				end, function() if done1 then applyinfo() end end)
+			end
+		end, function() name:SetText("Couldn't load version") end)
+
+		if v == projectlink then
+			current = lastmade
+			name:SetTextColor(Color(255,100,100))
+		end
+		lastmade = holder
 	end
 
-
+	if IsValid(current) then
+		versions:ScrollToChild(current)
+	end
 
 	--[[-------------------------------------------------------------------------
 	Legacy Config info
