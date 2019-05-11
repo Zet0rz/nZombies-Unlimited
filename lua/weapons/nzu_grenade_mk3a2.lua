@@ -38,7 +38,7 @@ SWEP.ThrowForce = 1000
 
 SWEP.GrenadeCanCook = true
 SWEP.GrenadeTime = 3
-SWEP.GrenadeDamage = 150
+SWEP.GrenadeDamage = 500
 SWEP.GrenadeDamageRadius = 250
 SWEP.GrenadeMax = 4
 SWEP.AmmoPerRound = 2

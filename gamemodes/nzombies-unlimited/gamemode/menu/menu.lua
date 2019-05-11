@@ -121,11 +121,11 @@ if CLIENT then
 		self.TopBar:Dock(TOP)
 		self.TopBar:SetTall(40)
 
-		self.BackButton = generatebutton(" < Back")
+		self.BackButton = generatebutton("< Back")
 		self.BackButton:SetParent(self.TopBar)
 		self.BackButton:SizeToContents()
 		self.BackButton:Dock(LEFT)
-		self.BackButton:SetContentAlignment(4)
+		self.BackButton:SetContentAlignment(5)
 		self.BackButton.DoClick = submenuclick
 		self.BackButton.SubMenu = self
 		self.BackButton:Hide()
@@ -419,9 +419,11 @@ if CLIENT then
 		self:ParentToHUD()
 		self:Dock(FILL)
 
+		local w = ScrW()/3.2
+
 		self.LeftSide = self:Add("DDragBase") -- So buttons are clickable
 		self.LeftSide:Dock(LEFT)
-		self.LeftSide:SetWide(600)
+		self.LeftSide:SetWide(w)
 		self.LeftSide:DockMargin(100,100,50,50)
 
 		self.CloseButton = self:Add("DButton")
@@ -472,7 +474,7 @@ if CLIENT then
 
 		self.RightSide = self:Add("DDragBase")
 		self.RightSide:Dock(RIGHT)
-		self.RightSide:SetWide(600)
+		self.RightSide:SetWide(w)
 		self.RightSide:DockMargin(50,100,100,50)
 
 		self.PlayerIndicator = self.RightSide:Add("DPanel")
@@ -519,7 +521,7 @@ if CLIENT then
 
 		-- The menu list
 		self.MenuRoot = self.LeftSide:Add("nzu_MenuPanel_SubMenu")
-		self.MenuRoot:DockMargin(0,0,0,50)
+		self.MenuRoot:DockMargin(0,0,0,0)
 		self.MenuRoot:Dock(FILL)
 		self.MenuRoot.Menu = self
 
@@ -577,7 +579,7 @@ if CLIENT then
 		-- TODO: Add the link and uncomment this section when the server is open
 		self.Promo = self.LeftSide:Add("DImageButton")
 		self.Promo:Dock(BOTTOM)
-		self.Promo:SetTall(75)
+		self.Promo:SetTall(w/8)
 		self.Promo:SetImage("nzombies-unlimited/menu/discord-promo.png")
 		self.Promo:SetZPos(-1)
 		self.Promo:DockMargin(0,5,0,0)

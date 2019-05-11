@@ -20,11 +20,13 @@ if CLIENT then
 		l:SetPaintBackground(true)
 		l:SetSelectable(true)
 
+		sub.BackButton:SetWide(math.Min(sub.BackButton:GetWide(), ScrW()/3.2 - 250))
+
 		-- Access the config in Sandbox!
 		local sand = sub:GetTopBar():Add("DButton")
 		sand:Dock(RIGHT)
 		sand:SetText("Edit Config in Sandbox")
-		sand:SetWide(150)
+		sand:SetWide(120)
 		sand:DockMargin(0,10,0,0)
 		sand:SetEnabled(menu:GetConfig() and true or false)
 		sand.DoClick = function()
@@ -39,7 +41,7 @@ if CLIENT then
 		local sand2 = sub:GetTopBar():Add("DButton")
 		sand2:Dock(RIGHT)
 		sand2:SetText("Switch to Sandbox")
-		sand2:SetWide(120)
+		sand2:SetWide(100)
 		sand2:DockMargin(0,10,10,0)
 		sand2.DoClick = function()
 			Derma_Query("Are you sure you want to change to SANDBOX?", "Mode change confirmation", "Change gamemode", nzu.RequestEditConfig, "Cancel"):SetSkin("nZombies Unlimited")

@@ -156,7 +156,7 @@ if SERVER then
 			if self.Owner:GetActiveWeapon() == self then
 				self.Owner:GiveAmmo(diff, ammo)
 			else
-				doholsteredammo(self, self.nzu_PrimaryAmmo + diff, true)
+				doholsteredammo(self, self:Ammo1() + diff, true)
 			end
 		end
 	end
@@ -167,7 +167,7 @@ if SERVER then
 			if self.Owner:GetActiveWeapon() == self then
 				self.Owner:GiveAmmo(diff, ammo)
 			else
-				doholsteredammo(self, self.nzu_SecondaryAmmo + diff, false)
+				doholsteredammo(self, self:Ammo2() + diff, false)
 			end
 		end
 	end

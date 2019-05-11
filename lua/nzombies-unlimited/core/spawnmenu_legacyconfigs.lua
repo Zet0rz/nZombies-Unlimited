@@ -677,10 +677,12 @@ nzu.AddSpawnmenuTab("Version/Legacy", "DPanel", function(panel)
 			if str then name:SetText(str) else name:SetText("Couldn't load version name") end
 
 			local _,_,numtodo = string.find(body, "To do</span>%s*<span class=\"Counter js%-column%-nav%-card%-count\" aria%-label=\"Contains (%d+) items\"")
+			local _,_,numprogress = string.find(body, "In progress</span>%s*<span class=\"Counter js%-column%-nav%-card%-count\" aria%-label=\"Contains (%d+) items\"")
 			local _,_,numdone = string.find(body, "Done</span>%s*<span class=\"Counter js%-column%-nav%-card%-count\" aria%-label=\"Contains (%d+) items\"")
 
 			local completes = {}
 			local incompletes = {}
+			local progresses = {}
 
 			local function applyinfo()
 				for k,v in pairs(completes) do
@@ -693,6 +695,21 @@ nzu.AddSpawnmenuTab("Version/Legacy", "DPanel", function(panel)
 					chk:DockMargin(0,0,0,2)
 				end
 
+				for k,v in pairs(progresses) do
+					local chk = scr:Add("DCheckBoxLabel")
+					chk:SetText(v)
+					chk:SetMouseInputEnabled(false)
+					chk:SetKeyboardInputEnabled(false)
+					chk:Dock(TOP)
+					chk:DockMargin(0,0,0,2)
+					chk.Button.PaintOver = function(s,w,h)
+						surface.SetDrawColor(255,255,255)
+						local tall = h/5
+						local widegap = w/5
+						surface.DrawRect(widegap, h/2 - tall/2, w - widegap*2, tall)
+					end
+				end
+
 				for k,v in pairs(incompletes) do
 					local chk = scr:Add("DCheckBoxLabel")
 					chk:SetText(v)
@@ -703,25 +720,15 @@ nzu.AddSpawnmenuTab("Version/Legacy", "DPanel", function(panel)
 					chk:DockMargin(0,0,0,2)
 				end
 
-				if numtodo or numdone then
-					local lbl = scr:Add("DLabel")
-					local str = "Other > "
-					if numtodo then
-						str = str .. "To do: "..numtodo
-						if numdone then
-							str = str .." || Done: "..numdone
-						end
-					else
-						str = str .. "Done: "..numdone
-					end
-					lbl:SetText(str)
-					lbl:Dock(TOP)
-					lbl:DockMargin(0,5,0,0)
-				end
+				local lbl = scr:Add("DLabel")
+				local str = "To do: "..(numtodo or "??").." || In progress: "..(numprogress or "??").." || Done: "..(numdone or "??")
+				lbl:SetText(str)
+				lbl:Dock(TOP)
+				lbl:DockMargin(0,5,0,0)
 			end
 
-			local done1,done2
-			local _,_,id = string.find(body, "<a data%-column%-id=\"(%d+)\" data%-column%-name=\"Major Features Done\"")
+			local done1,done2,done3
+			local _,_,id = string.find(body, "<a data%-column%-id=\"(%d+)\" data%-column%-name=\"Done\"")
 			if id then
 				http.Fetch(v.."/columns/"..id.."/cards", function(body2)
 					for s in string.gmatch(body2, "<div class=\"js%-comment%-body\">%s*<p>([%w%s]+)</p>") do
@@ -732,28 +739,44 @@ nzu.AddSpawnmenuTab("Version/Legacy", "DPanel", function(panel)
 						table.insert(completes, s)
 					end
 					done1 = true
-					if done2 then
+					if done2 and done3 then
 						applyinfo()
 					end
-				end, function() if done2 then applyinfo() end end)
+				end, function() done1 = true if done2 and done3 then applyinfo() end end)
 			end
 
-			
-			local _,_,id = string.find(body, "<a data%-column%-id=\"(%d+)\" data%-column%-name=\"Major Features\"")
+			local _,_,id = string.find(body, "<a data%-column%-id=\"(%d+)\" data%-column%-name=\"In progress\"")
 			if id then
 				http.Fetch(v.."/columns/"..id.."/cards", function(body2)
-					for s in string.gmatch(body2, "<div class=\"js%-comment%-body\">%s*<p>([%w%s]+)</p>") do
+					for s in string.gmatch(body2, "<div class=\"js%-comment%-body\">%s*<p><em><strong>([%*%w%s]+)</strong></em></p>") do
+						table.insert(progresses, s)
+					end
+
+					for s in string.gmatch(body2, "href=\"/Zet0rz/nZombies%-Unlimited/issues/%d+\">([%w%s]+)</a>") do
+						table.insert(progresses, s)
+					end
+					done2 = true
+					if done1 and done3 then
+						applyinfo()
+					end
+				end, function() done2 = true if done1 and done3 then applyinfo() end end)
+			end
+			
+			local _,_,id = string.find(body, "<a data%-column%-id=\"(%d+)\" data%-column%-name=\"To do\"")
+			if id then
+				http.Fetch(v.."/columns/"..id.."/cards", function(body2)
+					for s in string.gmatch(body2, "<div class=\"js%-comment%-body\">%s*<p><em><strong>([%*%w%s]+)</strong></em></p>") do
 						table.insert(incompletes, s)
 					end
 
 					for s in string.gmatch(body2, "href=\"/Zet0rz/nZombies%-Unlimited/issues/%d+\">([%w%s]+)</a>") do
 						table.insert(incompletes, s)
 					end
-					done2 = true
-					if done1 then
+					done3 = true
+					if done1 and done2 then
 						applyinfo()
 					end
-				end, function() if done1 then applyinfo() end end)
+				end, function() done3 = true if done1 and done2 then applyinfo() end end)
 			end
 		end, function() name:SetText("Couldn't load version") end)
 
