@@ -47,6 +47,22 @@ function nzu.RegisterTool(id, TOOL, nobuild)
 						--g_SpawnMenu.ToolMenu.ToolPanels = {}
 						--g_SpawnMenu.ToolMenu:LoadTools() -- Rebuild
 					end
+
+					local wep = LocalPlayer():GetWeapon("gmod_tool")
+					if IsValid(wep) and wep.Tool then
+						o.SWEP = wep
+						wep.Tool[mode] = o
+					end
+				end
+
+				if SERVER then -- A sort of Refresh support
+					for k,v in pairs(player.GetAll()) do
+						local wep = v:GetWeapon("gmod_tool")
+						if IsValid(wep) and wep.Tool then
+							o.SWEP = wep
+							wep.Tool[mode] = o
+						end
+					end
 				end
 			end
 			return

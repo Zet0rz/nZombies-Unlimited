@@ -273,9 +273,9 @@ Player Buy shortcut function
 ---------------------------------------------------------------------------]]
 local buysound = Sound("nzu/purchase/accept.wav")
 local denysound = Sound("nzu/purchase/deny.wav")
-function PLAYER:Buy(cost, func, args)
+function PLAYER:Buy(cost, func, ...)
 	if self:CanAfford(cost) then
-		local b = func and func(self, args) -- If the function returns false, it blocked the purchase
+		local b = func and func(self, ...) -- If the function returns false, it blocked the purchase
 		if b ~= false then
 			self:TakePoints(cost)
 			self:EmitSound(buysound)
