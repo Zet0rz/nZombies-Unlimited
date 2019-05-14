@@ -14,6 +14,7 @@ function nzu.GetExtensionDetails(name)
 	end
 end
 
+local torefresh = nzu.Extensions and true or false
 local loaded_extensions = nzu.Extensions or {}
 nzu.Extensions = loaded_extensions
 function nzu.GetLoadedExtensionList() return loaded_extensions end
@@ -312,6 +313,45 @@ function nzu.IsExtensionLoaded(name) return loaded_extensions[name] and true or 
 --[[-------------------------------------------------------------------------
 Loading Extensions
 ---------------------------------------------------------------------------]]
+function nzu.ResolveExtensionLoadOrder(extlist)
+	local ordered = {"core"}
+	local preqs = {}
+	for k,v in pairs(extlist) do
+		if v ~= "core" then
+			local det = nzu.GetExtensionDetails(v)
+			if det.Prerequisites then
+				preqs[k] = det.Prerequisites
+			else
+				table.insert(ordered, v)
+			end
+		end
+	end
+
+	while not table.IsEmpty(preqs) do
+		local difference = false
+		for k,v in pairs(preqs) do
+			for k2,v2 in pairs(v) do
+				if preqs[v2] then
+					break
+				end
+				table.insert(ordered, k)
+				preqs[k] = nil
+				difference = true
+			end
+		end
+
+		if not difference then
+			-- Can't resolve the last ones, just load them all!
+			for k,v in pairs(preqs) do
+				table.insert(ordered, k)
+			end
+			break
+		end
+	end
+
+	return ordered
+end
+
 if SERVER then
 	util.AddNetworkString("nzu_extension_load") -- SERVER: Make clients load extension files/Full sync all settings || CLIENT: Request loading of extension (Sandbox), Request full setting sync (nZombies)
 
@@ -340,7 +380,7 @@ if SERVER then
 	-- This lets us ensure prerequisite loading properly by remembering load order - since clients can only load them in order of prerequisites
 	local load_order
 	if NZU_SANDBOX then
-		load_order = {[1] = "Core"}
+		load_order = {[1] = "core"}
 		function nzu.GetLoadedExtensionOrder() return load_order end
 	end
 
@@ -584,4 +624,16 @@ include("hudmanagement.lua")
 
 
 
-loadextension(loadextensionprepare("Core", true))
+loadextension(loadextensionprepare("core", true))
+
+
+--[[-------------------------------------------------------------------------
+Extension Lua Refresh
+---------------------------------------------------------------------------]]
+if SERVER and torefresh then
+	local ordered = nzu.ResolveExtensionLoadOrder(table.GetKeys(nzu.GetLoadedExtensionList()))
+	for k,v in pairs(ordered) do
+		print("Refreshing Extension:", v)
+		nzu.LoadExtension(v, nzu.GetExtension(v).Settings, true)
+	end
+end

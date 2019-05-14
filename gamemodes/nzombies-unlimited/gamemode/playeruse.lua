@@ -215,39 +215,41 @@ if SERVER then
 			if IsValid(ent) and (not ent.nzu_UseCooldown or ent.nzu_UseCooldown < CurTime()) then
 				hook.Run("nzu_PlayerStartUse", ply, ent)
 
-				-- Buy functions!
-				local data = ent:GetBuyFunction()
-				if data then
+				-- Buy functions! But only for the first initial press!
+				if ply:KeyPressed(IN_USE) then
+					local data = ent:GetBuyFunction()
+					if data then
 
-					-- Can't use entities that require electricity it doesn't have!
-					-- Allow use however if the FailFunction exists and returns true
-					if data.Electricity and not ent:HasElectricity() then return data.FailFunction and data.FailFunction(ply, ent) or false end
+						-- Can't use entities that require electricity it doesn't have!
+						-- Allow use however if the FailFunction exists and returns true
+						if data.Electricity and not ent:HasElectricity() then return data.FailFunction and data.FailFunction(ply, ent) or false end
 
-					-- Free buy functions don't go through Buy - We don't want sounds
-					if data.Price == 0 then
-						local b = data.Function(ply, ent) -- Get the return of the function that would've been bought
-						if b ~= false then -- If it didn't return false, it succeeded
-							if not data.Rebuyable then ent:SetBuyFunction(nil) end
+						-- Free buy functions don't go through Buy - We don't want sounds
+						if data.Price == 0 then
+							local b = data.Function(ply, ent) -- Get the return of the function that would've been bought
+							if b ~= false then -- If it didn't return false, it succeeded
+								if not data.Rebuyable then ent:SetBuyFunction(nil) end
 
-							-- Return only if the function explicitly returned something. Otherwise false (blocks use)
-							return b ~= nil and b
+								-- Return only if the function explicitly returned something. Otherwise false (blocks use)
+								return b ~= nil and b
+							end
+
+							-- Otherwise allowing use only if the FailFunction exists and returns true
+							return data.FailFunction and data.FailFunction(ply, ent) or false
+						else
+
+							-- It has a cost, so we want to buy!
+							local success,ret = ply:Buy(data.Price, data.Function, ent)
+							if success then -- If the purchase was successful
+								if not data.Rebuyable then ent:SetBuyFunction(nil) end  -- Remove buy function from non-rebuyables
+
+								-- Return only if the result is not explicitly nil
+								return ret ~= nil and ret
+							end
+
+							-- Otherwise, same as before: Let fail function determine outcome
+							return data.FailFunction and data.FailFunction(ply, ent) or false
 						end
-
-						-- Otherwise allowing use only if the FailFunction exists and returns true
-						return data.FailFunction and data.FailFunction(ply, ent) or false
-					else
-
-						-- It has a cost, so we want to buy!
-						local success,ret = ply:Buy(data.Price, data.Function, ent)
-						if success then -- If the purchase was successful
-							if not data.Rebuyable then ent:SetBuyFunction(nil) end  -- Remove buy function from non-rebuyables
-
-							-- Return only if the result is not explicitly nil
-							return ret ~= nil and ret
-						end
-
-						-- Otherwise, same as before: Let fail function determine outcome
-						return data.FailFunction and data.FailFunction(ply, ent) or false
 					end
 				end
 			end

@@ -48,6 +48,7 @@ Force the weapon to always be loaded into the Knife slot (unless otherwise speci
 ---------------------------------------------------------------------------]]
 SWEP.nzu_DefaultWeaponSlot = "Knife"
 SWEP.nzu_InstantDeploy = true -- Ignore Holster functions when deploying this weapon
+SWEP.nzu_PreventBox = true -- Do not put in the box by default
 
 -- We do our own logic for special deploying this weapon if it is in the knife slot
 -- This function replaces SWEP:Deploy() on creation when given into a Knife slot

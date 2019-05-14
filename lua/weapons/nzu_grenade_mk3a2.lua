@@ -49,6 +49,7 @@ if CLIENT then SWEP.HUDIcon = Material("nzombies-unlimited/hud/mk3a2_icon.png", 
 Force the weapon to always be loaded into the Grenade slot (unless otherwise specified)
 ---------------------------------------------------------------------------]]
 SWEP.nzu_DefaultWeaponSlot = "Grenade"
+SWEP.nzu_PreventBox = true
 
 -- We do our own logic for special deploying this weapon if it is in the knife slot
 -- This function replaces SWEP:Deploy() on creation when given into a Knife slot

@@ -5,10 +5,8 @@ Generic Setting Type panel creation, for utility
 function nzu.ExtensionSettingTypePanel(typ, parent)
 	local build = typ and nzu.GetExtensionSettingType(typ)
 	if build and build.Panel then
-		local pnl = build.Panel.Create(parent)
+		local pnl = build.Panel(parent)
 		if IsValid(pnl) then
-			pnl.Set = build.Panel.Set
-			pnl.Get = build.Panel.Get
 			pnl.Send = function() end -- You can override this after receiving the panel if you want
 			return pnl
 		end
@@ -21,7 +19,7 @@ Networked Extension Panel
 ---------------------------------------------------------------------------]]
 local function sendnetwork(p, v)
 	local val = v
-	if val == nil then val = p:_GetValue() end
+	if val == nil then val = p:GetValue() end
 	nzu.RequestExtensionSetting(p._ExtensionID, p._ExtensionSetting, val)
 end
 
@@ -31,11 +29,8 @@ local function nwpanel(id, parent)
 	if setting then
 		local build = setting.Panel
 		if build then
-			local p = build.Create(parent, bext, id, setting)
-			p._SetValue = build.Set
-			p._GetValue = build.Get
-
-			p._SetValue(p, bext.Settings[id])
+			local p = build(parent, bext, id, setting)
+			p.SetValue(p, bext.Settings[id])
 			p._ExtensionID = bext.ID
 			p._ExtensionSetting = id
 
@@ -50,7 +45,7 @@ end
 local PANEL = {}
 function PANEL:_HookUpdate(setting, value)
 	if self.SettingPanels[setting] then
-		self.SettingPanels[setting]:_SetValue(value)
+		self.SettingPanels[setting]:SetValue(value)
 	end
 end
 

@@ -265,7 +265,7 @@ nzu.RegisterMismatch("Wall Buys", {
 		for k,v in pairs(t) do
 			local ent = Entity(k)
 			local pnl = nzu.ExtensionSettingTypePanel("Weapon", parent)
-			pnl:Set(v)
+			pnl:SetValue(v)
 			dlist:AddLine(v .. " (".. (IsValid(ent) and ent:GetPrice() or "Can't get Price")..")", pnl):SetTall(100)
 
 			weps[k] = pnl
@@ -275,7 +275,7 @@ nzu.RegisterMismatch("Wall Buys", {
 		function dlist:GetMismatch()
 			local tbl = {}
 			for k,v in pairs(weps) do
-				tbl[k] = v:Get()
+				tbl[k] = v:GetValue()
 			end
 			return tbl
 		end
