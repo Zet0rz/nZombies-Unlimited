@@ -2,10 +2,24 @@
 --[[-------------------------------------------------------------------------
 Generic Setting Type panel creation, for utility
 ---------------------------------------------------------------------------]]
-function nzu.ExtensionSettingTypePanel(typ, parent)
-	local build = typ and nzu.GetExtensionSettingType(typ)
+function nzu.ExtensionSettingTypePanel(typ, parent, parent2)
+	local build,toparent
+	if parent2 then -- 3 arguments passed, meaning first is Extension ID, second is Setting Key, third is Paren
+		local ext = nzu.GetExtension(typ)
+		if ext then
+			local m = ext.GetSettingsMeta()
+			if m and m[parent] then
+				build = m[parent]
+			end
+		end
+		toparent = parent2
+	else
+		build = typ and nzu.GetExtensionSettingType(typ)
+		toparent = parent
+	end
+
 	if build and build.Panel then
-		local pnl = build.Panel(parent)
+		local pnl = build.Panel(toparent)
 		if IsValid(pnl) then
 			pnl.Send = function() end -- You can override this after receiving the panel if you want
 			return pnl
@@ -66,11 +80,13 @@ function PANEL:Rebuild()
 	bext = ext
 	bset = ext.GetSettingsMeta()
 	bsetpnl = {}
-	pf(self, nwpanel)
+	local tall = pf(self, nwpanel)
 	self.SettingPanels = bsetpnl -- Store this so hooks can access them by ID
 	bext = nil
 	bset = nil
 	bsetpnl = nil
+
+	if tall then self:SetTall(tall) else self:SizeToChildren(false, true) end
 
 	self:Highlight()
 end

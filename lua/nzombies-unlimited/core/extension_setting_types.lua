@@ -8,7 +8,7 @@ nzu.AddExtensionSettingType("String", {
 		p:SetTall(40)
 
 		function p:OnFocusChanged(b)
-			if not b then p:Send() end -- Trigger networking on text field focus lost
+			if not b then self:Send() end -- Trigger networking on text field focus lost
 		end
 		function p:GetValue() return self:GetText() end
 
@@ -48,9 +48,9 @@ nzu.AddExtensionSettingType("Boolean", {
 		p:SetTall(15)
 		p:SetTextColor(color_black)
 
-		function p:OnChange(b) p:Send() end
-		function p:SetValue(v) p:SetChecked(v) end
-		function p:GetValue() return p:GetChecked() end
+		function p:OnChange(b) self:Send() end
+		function p:SetValue(v) self:SetChecked(v) end
+		function p:GetValue() return self:GetChecked() end
 
 		return p
 	end

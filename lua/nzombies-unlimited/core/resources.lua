@@ -332,49 +332,49 @@ else
 	end
 	nzu.SetCreator = setcreator -- DEBUG]]
 
-	customtype.Panel = {
-		Create = function(parent, ext, setting)
-			local p = vgui.Create("DComboBox", parent)
-			function p:OnSelect(index, value, data)
-				if value == "Create new set ..." then
-					--setcreator(setting, ext)
-				else
-					self:Send(data or value)
-				end
+	customtype.Panel = function(parent, ext, setting)
+		local p = vgui.Create("DComboBox", parent)
+		function p:OnSelect(index, value, data)
+			if value == "Create new set ..." then
+				--setcreator(setting, ext)
+			else
+				self:Send(data or value)
 			end
+		end
 
-			p.Setting = setting
-			populateoptions(p,setting)
-			hook.Add("nzu_ResourceSetOptionsUpdated", p, populateoptions)
+		p.Setting = setting
+		populateoptions(p,setting)
+		hook.Add("nzu_ResourceSetOptionsUpdated", p, populateoptions)
 
-			-- Request options if the panel was created in nZombies
-			-- It'll update itself with the hook right above (if we receive any)
-			if NZU_NZOMBIES then
-				net.Start("nzu_resourceset_options")
-					net.WriteString(string.lower(setting))
-				net.SendToServer()
+		-- Request options if the panel was created in nZombies
+		-- It'll update itself with the hook right above (if we receive any)
+		if NZU_NZOMBIES then
+			net.Start("nzu_resourceset_options")
+				net.WriteString(string.lower(setting))
+			net.SendToServer()
+		end
+
+		function p:SetValue(v)
+		for k,data in pairs(self.Data) do
+			if data == v then
+				self:SetText(self:GetOptionText(k))
+				self.selected = k
+				return
 			end
+		end
 
-			return p
-		end,
-		Set = function(p,v)
-			for k,data in pairs(p.Data) do
-				if data == v then
-					p:SetText(p:GetOptionText(k))
-					p.selected = k
-					return
-				end
-			end
+		self.Choices[0] = v
+		self.Data[0] = v
+		self.selected = 0
+		self:SetText(v)
+	end
 
-			p.Choices[0] = v
-			p.Data[0] = v
-			p.selected = 0
-			p:SetText(v)
-		end,
-		Get = function(p)
-			return p:GetSelected()
-		end,
-	}
+	function p:GetValue()
+		local str,data = self:GetSelected()
+		return data
+	end
+		return p
+	end
 end
 
 nzu.AddExtensionSettingType("ResourceSet", customtype)

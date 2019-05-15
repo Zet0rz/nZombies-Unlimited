@@ -190,7 +190,7 @@ nzu.AddSpawnmenuTab("Extension Settings", "DPanel", function(panel)
 		
 		
 		checkbox.Extension = k
-		if k ~= "Core" and nzu.IsAdmin(LocalPlayer()) then
+		if k ~= "core" and nzu.IsAdmin(LocalPlayer()) then
 			checkbox.SaveButton = save
 			checkbox.OnChange = checkboxchange
 			checkbox:SetDisabled(false)

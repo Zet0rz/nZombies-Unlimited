@@ -253,7 +253,7 @@ local modules = {
 	["MapSettings"] = {
 		Label = "Map Settings (Start weapon and Points)", -- TODO: Add support for Special and Boss rounds when implemented
 		Load = function(data)
-			local ext = nzu.GetExtension("Core")
+			local ext = nzu.GetExtension("core")
 			if data.startpoints then ext.Settings("StartPoints", data.startpoints) end
 			if data.startwep then ext.Settings("StartWeapon", data.startwep) end
 		end,

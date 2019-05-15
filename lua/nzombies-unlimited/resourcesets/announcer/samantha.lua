@@ -1,0 +1,32 @@
+{
+	"Name":"Samantha",
+	"Set":{
+		"MysteryBox_Laugh":[
+			"nzu/mysterybox/disappear_flux.wav"
+		],
+		"MysteryBox_Leave":[
+			"nzu/announcer/samantha/byebye.wav"
+		],
+		"Round_SpecialStart":[
+			"nzu/announcer/samantha/dogstart.wav"
+		],
+		"PowerUps_MaxAmmo":[
+			"nzu/announcer/samantha/powerups/maxammo.wav"
+		],
+		"PowerUps_Carpenter":[
+			"nzu/announcer/samantha/powerups/carpenter.wav"
+		],
+		"PowerUps_DoublePoints":[
+			"nzu/announcer/samantha/powerups/doublepoints.wav"
+		],
+		"PowerUps_Nuke":[
+			"nzu/announcer/samantha/powerups/nuke.wav"
+		],
+		"PowerUps_InstaKill":[
+			"nzu/announcer/samantha/powerups/instakill.wav"
+		],
+		"PowerUps_FireSale":[
+			"nzu/announcer/samantha/powerups/firesale.wav"
+		]
+	}
+}

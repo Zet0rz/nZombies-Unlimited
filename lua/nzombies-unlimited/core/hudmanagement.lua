@@ -94,50 +94,50 @@ net.Receive("nzu_hud_options", function()
 	hook.Run("nzu_HUDListUpdated", tbl)
 end)
 
-settingtbl.Panel = {
-	Create = function(parent, ext, setting)
-		local p = vgui.Create("DComboBox", parent)
+settingtbl.Panel = function(parent, ext, setting)
+	local p = vgui.Create("DComboBox", parent)
 
-		function p:Populate(tbl)
-			self:Clear()
-			for k,v in pairs(tbl) do
-				self:AddChoice(v[2], v[1])
-			end
+	function p:Populate(tbl)
+		self:Clear()
+		for k,v in pairs(tbl) do
+			self:AddChoice(v[2], v[1])
 		end
+	end
 
-		if NZU_SANDBOX then
-			if sets then p:Populate(sets) end
-		else
-			-- Request options
-			net.Start("nzu_hud_options")
-			net.SendToServer()
-		end
-		hook.Add("nzu_HUDListUpdated", p, p.Populate)
+	if NZU_SANDBOX then
+		if sets then p:Populate(sets) end
+	else
+		-- Request options
+		net.Start("nzu_hud_options")
+		net.SendToServer()
+	end
+	hook.Add("nzu_HUDListUpdated", p, p.Populate)
 
-		function p:OnSelect(index, value, data)
-			self:Send()
-		end
-		return p
-	end,
-	Set = function(p,v)
-		for k,data in pairs(p.Data) do
+	function p:OnSelect(index, value, data)
+		self:Send()
+	end
+
+	function p:SetValue(v)
+		for k,data in pairs(self.Data) do
 			if data == v then
-				p:SetText(p:GetOptionText(k))
-				p.selected = k
+				self:SetText(self:GetOptionText(k))
+				self.selected = k
 				return
 			end
 		end
 
-		p.Choices[0] = v
-		p.Data[0] = v
-		p.selected = 0
-		p:SetText(v)
-	end,
-	Get = function(p)
-		local str,data = p:GetSelected()
+		self.Choices[0] = v
+		self.Data[0] = v
+		self.selected = 0
+		self:SetText(v)
+	end
+
+	function p:GetValue()
+		local str,data = self:GetSelected()
 		return data
-	end,
-}
+	end
+	return p
+end
 
 --[[-------------------------------------------------------------------------
 Loading HUD Objects and activating them

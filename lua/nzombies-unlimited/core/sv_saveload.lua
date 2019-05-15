@@ -111,10 +111,11 @@ local function loadconfig(config)
 				-- Load extensions with specified settings (rather than defaults)
 				-- These are loaded in the order they were saved (unless the .txt was modified)
 
-				if nzu.GetExtension(v.ID) then
-					nzu.UpdateExtension(v.ID, v.Settings) -- Update if already loaded (Core)
+				local id = string.lower(v.ID)
+				if nzu.GetExtension(id) then
+					nzu.UpdateExtension(id, v.Settings) -- Update if already loaded (Core)
 				else
-					nzu.LoadExtension(v.ID, v.Settings)
+					nzu.LoadExtension(id, v.Settings)
 				end
 			end
 		end

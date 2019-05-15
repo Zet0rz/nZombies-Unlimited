@@ -128,6 +128,8 @@ loadfile("menu/menu.lua")
 loadfile("menu/menu_configload.lua")
 loadfile_c("menu/menu_mismatch.lua")
 
+loadfile("announcer.lua")
+
 --[[-------------------------------------------------------------------------
 Gamemode modules
 ---------------------------------------------------------------------------]]

@@ -118,7 +118,7 @@ if SERVER then
 	hook.Add("PostEntityTakeDamage", "nzu_Points_ZombieDamage", dopoints)
 
 	hook.Add("nzu_PlayerInitialSpawned", "nzu_Points_StartPoints", function(ply)
-		local s = nzu.GetExtension("Core")
+		local s = nzu.GetExtension("core")
 		ply:SetPoints(s and s.Settings and s.Settings.StartPoints or 500)
 	end)
 end

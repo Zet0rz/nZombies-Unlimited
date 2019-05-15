@@ -1,5 +1,4 @@
 
-print("This is running")
 --[[-------------------------------------------------------------------------
 The Fake Box (spawnpoint)
 ---------------------------------------------------------------------------]]
@@ -175,7 +174,8 @@ if SERVER then
 		self.RemoveTime = CurTime() + dur
 		self.Weapon = nil -- So it doesn't close us on its own removal
 
-		-- TODO: When announcer is implemented, play box leave sound
+		timer.Simple(3, function() nzu.Announcer("MysteryBox_Laugh") end)
+		timer.Simple(5, function() nzu.Announcer("MysteryBox_Leave") end)
 		self:OnDisappeared(dur)
 	end
 
@@ -199,6 +199,7 @@ if SERVER then
 		self:ResetSequence(seq)
 		self:EmitSound(self.AppearSound)
 		self.ReadyTime = CurTime() + dur
+		self.FirstReady = true
 
 		self:OnAppeared(dur)
 	end
@@ -215,10 +216,19 @@ if SERVER then
 		end)
 	end
 
+	function ENT:CreateBeam()
+		-- TODO: Particle Effect Beam here
+		-- Perhaps make it adjustable so that you can easily modify the color without creating a whole new effect?
+	end
+
 	function ENT:Think()
 		if self.ReadyTime and self.ReadyTime < CurTime() then
 			self:SetIsReady(true)
 			self.ReadyTime = nil
+			if self.FirstReady then
+				self:CreateBeam()
+				self.FirstReady = nil
+			end
 		end
 
 		if self.RemoveTime and self.RemoveTime < CurTime() then

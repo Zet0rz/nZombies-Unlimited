@@ -26,7 +26,12 @@ local settings = {
 	
 	["RoundSounds"] = {
 		Type = "ResourceSet",
-		Default = "classic", -- classic.lua, as found in lua/nzombies-unlimited/resourcesets/RoundSounds/classic.lua. It's a lua file extension, but not actual code (it's JSON). Lua is just necessary for Workshop
+		Default = "classic", -- classic.lua, as found in lua/nzombies-unlimited/resourcesets/roundsounds/classic.lua. It's a lua file extension, but not actual code (it's JSON). Lua is just necessary for Workshop
+	},
+
+	["Announcer"] = {
+		Type = "ResourceSet",
+		Default = "samantha",
 	},
 }
 
@@ -73,6 +78,13 @@ if CLIENT then
 		local roundsounds = SettingPanel("RoundSounds", p)
 		roundsounds:SetTall(25)
 		roundsounds:Dock(TOP)
+
+		local lbl_ann = p:Add("DLabel")
+		lbl_ann:SetText("Announcer")
+		lbl_ann:Dock(TOP)
+		local ann = SettingPanel("Announcer", p)
+		ann:SetTall(25)
+		ann:Dock(TOP)
 
 		return p
 	end

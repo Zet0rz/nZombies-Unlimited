@@ -8,6 +8,6 @@
 			"HUD": "unlimited",
 			"StartKnife": "nzu_knife_crowbar"
 		},
-		"ID": "Core"
+		"ID": "core"
 	}
 ]
