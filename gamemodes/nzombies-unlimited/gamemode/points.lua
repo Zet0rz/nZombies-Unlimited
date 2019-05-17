@@ -21,7 +21,7 @@ if SERVER then
 
 	function PLAYER:GivePoints(n, type, ent)
 		local tbl = {Points = n}
-		hook.Run("nzu_PlayerGivePoints", self, tbl, type, ent)
+		hook.Run("nzu_PlayerGivePoints", self, tbl, n, type, ent)
 		local n = tbl.Points
 		if n ~= 0 then
 			self:SetPoints(self:GetPoints() + n)
@@ -31,7 +31,7 @@ if SERVER then
 
 	function PLAYER:TakePoints(n, type, ent)
 		local tbl = {Points = n}
-		hook.Run("nzu_PlayerTakePoints", self, tbl, type, ent)
+		hook.Run("nzu_PlayerTakePoints", self, tbl, n, type, ent)
 		local n = tbl.Points
 		if n ~= 0 then
 			self:SetPoints(self:GetPoints() - n)

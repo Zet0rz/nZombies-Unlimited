@@ -70,11 +70,7 @@ function ENT:Initialize()
 		if not self:GetPlankTearTime() then self:SetPlankTearTime(3) end
 		if self:GetTriggerVault() == nil then self:SetTriggerVault(true) end
 
-		for i = 1, self:GetMaxPlanks() do
-			timer.Simple(i * 0.1, function()
-				if IsValid(self) then self:RepairPlank() end
-			end)
-		end
+		self:FullRepair()
 
 		self:SetCanBeRepaired(false)
 		self:SetIsClear(self:GetPlankCount() == 0)
@@ -153,6 +149,14 @@ if SERVER then
 		if IsValid(plank) and plank:GetBarricade() == self then
 			plank:Repair(ply)
 			return plank
+		end
+	end
+
+	function ENT:FullRepair()
+		for i = 1, self:GetMaxPlanks() do
+			timer.Simple(i * 0.1, function()
+				if IsValid(self) then self:RepairPlank() end
+			end)
 		end
 	end
 

@@ -32,6 +32,7 @@ local settings = {
 	["Announcer"] = {
 		Type = "ResourceSet",
 		Default = "samantha",
+		Client = true,
 	},
 }
 
