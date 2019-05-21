@@ -143,6 +143,7 @@ end
 Loading HUD Objects and activating them
 ---------------------------------------------------------------------------]]
 if NZU_NZOMBIES then
+	local argfuncs = {}
 	local paints = {}
 	local removals = {}
 	local fallbacks = {}
@@ -160,23 +161,36 @@ if NZU_NZOMBIES then
 		deployed = false
 	end
 
-	local function handlefunc(k,v,hud)
-		if type(v) == "function" and string.sub(k, 1, 1) ~= "_" and string.sub(k, 1, 5) ~= "Draw_" then -- Draw_ functions are manually drawn through nzu library, _ functions are internals (ignored)
-			local rem = v(hud)
-			if rem then
-				removals[k] = rem -- A function returned means something was created, and this it not a paint
+	local function handlefunc(k,hud)
+		local f = hud[k] or fallbacks[k] -- Get the function from the HUD object
+		if f == nil then f = fallbacks[k] end -- If it is NOT nil, then it is the fallback function (You can set HUD.Func = false to block components)
+		if f then
+			local args = argfuncs[k] -- If we have an argument function, use that
+			if type(args) == "function" then
+				local rem = f(hud, args())
+				if rem then
+					removals[k] = rem -- The function returned something which means something was created, and this is not a paint
+				else
+					paints[k] = function() f(hud, args()) end -- Otherwise, wrap it using the HUD object itself (to allow 'self') and the arguments from argfunc
+				end
 			else
-				paints[k] = function() v(hud) end -- Wrap it to emulate HUD: call (allowing subclasses to override HUD fields)
+				local rem = f(hud) -- Same, but without arguments
+				if rem then
+					removals[k] = rem
+				else
+					paints[k] = function() f(hud) end
+				end
 			end
 		end
 	end
 
 	local function deploy(hud)
-		for k,v in pairs(hud) do handlefunc(k,v,hud) end
-
-		for k,v in pairs(fallbacks) do
-			if not paints[k] and not removals[k] then
-				handlefunc(k,v,hud) -- Deploy any fallbacks that aren't already made
+		for k,v in pairs(argfuncs) do
+			handlefunc(k,hud)
+		end
+		for k,v in pairs(hud) do
+			if string.sub(k, 1, 6) == "Paint_" then -- Paint_ functions are custom hooked by the HUD itself
+				handlefunc(k,hud)
 			end
 		end
 
@@ -247,15 +261,33 @@ if NZU_NZOMBIES then
 	function nzu.GetActiveHUD() return activehud end
 
 	--[[-------------------------------------------------------------------------
-	Individual Component fallback creation
-	This can be used for "augmentations" - i.e. adding a HUD element to any HUD object
-	so long as this object doesn't implement it itself
+	Registering a HUD Component
+	This will cause the associated key in the HUD object to be deployed. If 'argfunc' is passed
+	this function will return the arguments that the HUD object will receive.
+	If this is nil, no arguments. If this is false, it is equivalent of un-registering the Component again
 
-	If a HUD wants to block it, it should implement it as an empty function that returns true
+	Supports adding a fallback function in case the HUD does not implement this Component.
+	If a HUD wants to block it, it should implement it as a field with the value 'false'
 	---------------------------------------------------------------------------]]
-	function nzu.HUDComponent(key, func)
-		fallbacks[key] = func
-		if deployed and not paints[key] and not removals[key] then handlefunc(key, func, activehud) end -- Deploy it if there isn't another one in its slot
+	function nzu.HUDComponent(key, argfunc, fallbackfunc)
+		fallbacks[key] = fallbackfunc
+
+		if string.sub(key, 1, 5) ~= "Draw_" then -- Using Draw_'s will just assign a fallback to these functions without hooking
+			local enable = argfunc ~= false
+			argfuncs[key] = enable and (argfunc or true) or nil
+
+			if deployed then
+				if enable then
+					handlefunc(key, activehud)
+				else
+					paints[key] = nil
+					if removals[key] and type(removals[key]) == "function" then
+						removals[key]()
+					end
+					removals[key] = nil
+				end
+			end
+		end
 	end
 end
 nzu.HUDSetting = settingtbl

@@ -107,6 +107,10 @@ function PLAYER:IsUnspawned()
 	return self:Team() == TEAM_UNASSIGNED or self:Team() == TEAM_CONNECTING
 end
 
+function nzu.GetSpawnedPlayers()
+	return team.GetPlayers(1)
+end
+
 if SERVER then
 	util.AddNetworkString("nzu_playerunspawn")
 	function PLAYER:Unspawn()

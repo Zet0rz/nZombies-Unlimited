@@ -82,6 +82,8 @@ if SERVER then
 			ROUND.Zombies[z] = nil
 			ROUND.NumberZombies = ROUND.NumberZombies - 1
 
+			hook.Run("nzu_ZombieKilled", z)
+
 			if ROUND:GetRemainingZombies() <= 0 then
 				ROUND:Progress()
 			end
@@ -340,6 +342,11 @@ if CLIENT then
 			local h = net.ReadBool() and "nzu_GameOverSequence" or "nzu_GameOver"
 			hook.Run(h, net.ReadFloat())
 		end
+	end)
+
+	-- Let's activate the HUD Component!
+	nzu.HUDComponent("Round", function()
+		return ROUND.Round, ROUND.State
 	end)
 end
 

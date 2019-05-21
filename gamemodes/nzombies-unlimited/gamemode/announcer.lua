@@ -9,12 +9,12 @@ IDs are typically prefixed by the extension they come from
 i.e. "PowerUps_MaxAmmo" or "MysteryBox_BoxLeave"
 ---------------------------------------------------------------------------]]
 local res = nzu.GetResourceSet("announcer")
-function nzu.GetAnnouncerSounds(id)
-	return res[id]
+function nzu.GetAnnouncerSounds(cat, id)
+	return res[cat] and res[cat][id]
 end
 
-function nzu.GetRandomAnnouncerSound(id)
-	local tbl = res[id]
+function nzu.GetRandomAnnouncerSound(cat, id)
+	local tbl = res[cat] and res[cat][id]
 	if tbl then
 		return tbl[math.random(#tbl)]
 	end

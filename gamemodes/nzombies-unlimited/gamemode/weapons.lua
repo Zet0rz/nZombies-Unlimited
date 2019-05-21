@@ -11,10 +11,6 @@ local function doinitialize(ply)
 		["Primary"] = primary,
 		["Secondary"] = secondary
 	}
-
-	if CLIENT then
-		ply.nzu_HUDWeapons = {}
-	end
 end
 if SERVER then
 	hook.Add("PlayerInitialSpawn", "nzu_WeaponSlotsInit", doinitialize)
@@ -569,6 +565,7 @@ end
 
 -- HUD registration
 if CLIENT then
+	local hudweapons = {}
 	hook.Add("nzu_WeaponEquippedInSlot", "nzu_Weapons_HUDWeapon", function(ply, wep, slot)
 		local bind
 		for k,v in pairs(keybinds) do
@@ -578,17 +575,19 @@ if CLIENT then
 			end
 		end
 
-		if wep.DrawHUDIcon then table.insert(ply.nzu_HUDWeapons, {Weapon = wep, Bind = bind}) end
+		if wep.DrawHUDIcon then table.insert(hudweapons, {Weapon = wep, Bind = bind}) end
 	end)
 
 	hook.Add("nzu_WeaponRemovedFromSlot", "nzu_Weapons_HUDWeapon", function(ply, wep, slot)
-		for k,v in pairs(ply.nzu_HUDWeapons) do
+		for k,v in pairs(hudweapons) do
 			if v.Weapon == wep then
-				table.remove(ply.nzu_HUDWeapons, k)
+				table.remove(hudweapons, k)
 				return
 			end
 		end
 	end)
+
+	nzu.HUDComponent("Weapons", function() return hudweapons end)
 end
 
 --[[-------------------------------------------------------------------------

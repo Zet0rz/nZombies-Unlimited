@@ -120,6 +120,12 @@ loadfile("points.lua")
 loadfile_s("targeting.lua")
 loadfile("weapons.lua")
 loadfile_s("health.lua")
+if CLIENT then -- Just movin' the HUD Component out here, so we don't have to AddCSLuaFile a whole file for just 1 line
+	nzu.HUDComponent("Health", function()
+		local lp = LocalPlayer() -- TODO: Move to spectated player when spectating is implemented
+		return lp:Health(), lp:GetMaxHealth()
+	end)
+end
 loadfile("stamina.lua")
 
 loadfile_c("ragdoll_cleanup.lua")

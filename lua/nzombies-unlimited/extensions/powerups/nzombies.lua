@@ -9,6 +9,15 @@ function EXT.AddPowerup(id, tbl)
 	EXT.Powerups[id] = tbl
 end
 function EXT.GetPowerup(id) return EXT.Powerups[id] end
+function EXT.GetAllPowerups() return EXT.Powerups end
+function EXT.GetDroppablePowerups()
+	local tbl = {}
+	for k,v in pairs(EXT.Powerups) do
+		if not v.Undroppable then
+			table.insert(tbl, k)
+		end
+	end
+end
 
 -------------------------
 -- Localize
@@ -16,11 +25,19 @@ local Powerups = EXT.Powerups
 local pairs = pairs
 local IsValid = IsValid
 local math = math
-local getplayers = nzu.Round.GetPlayers
+local getplayers = nzu.GetSpawnedPlayers
 -----------------
 
 -- Load all base powerups
 include("base_powerups.lua")
+
+-- Powerups with appended _negative are negative variants
+-- This function returns the original id if the passed is negative
+local function determineneg(k)
+	if string.sub(k, #k-8) == "_negative" then
+		return string.sub(k, 0, #k-9)
+	end
+end
 
 if SERVER then
 	include("powerupsystem.lua")
@@ -223,12 +240,6 @@ if SERVER then
 	--[[-------------------------------------------------------------------------
 	Hooks and Control of powerup durations and players
 	---------------------------------------------------------------------------]]
-	local function determineneg(k)
-		if string.sub(k, #k-8) == "_negative" then
-			return string.sub(k, 0, #k-9)
-		end
-	end
-
 	hook.Add("Think", "nzu_Powerups_TimerControl", function()
 		local CT = CurTime()
 		for k,v in pairs(globalactives) do
@@ -303,19 +314,20 @@ else
 	---------------------------------------------------------------------------]]
 	local activepowerups = {}
 	local function activate(id, powerup, endtime, neg, forced)
-		local t2 = activepowerups[id]
-		if endtime and (forced or not t2 or t2 < endtime) then -- Apply the time if and only if it is greater than whatever was active, or nothing was active
-			activepowerups[id] = endtime
-
-			if powerup.LoopSound then
-				local lp = LocalPlayer()
-				if not lp["nzu_PowerupSound_"..id] then
-					local s = CreateSound(lp, powerup.LoopSound)
-					s:PlayEx(1, neg and 50 or 100)
-					lp["nzu_PowerupSound_"..id] = s
-				end
+		for k,v in pairs(activepowerups) do
+			if v.ID == id and v.Negative == neg then
+				if forced or v.Time < endtime then v.Time = endtime end
+				return
 			end
 		end
+
+		local t = {ID = id, Negative = neg, Time = endtime, Name = powerup.Name}
+		if powerup.LoopSound then
+			local s = CreateSound(LocalPlayer(), powerup.LoopSound)
+			s:PlayEx(0.5, neg and 50 or 100)
+			t.Sound = s
+		end
+		table.insert(activepowerups, t)
 
 		hook.Run("nzu_Powerups_PowerupActivated", id, endtime and endtime - CurTime(), neg)
 	end
@@ -327,20 +339,15 @@ else
 
 		local isneg
 		if powerup.Negative then isneg = net.ReadBool() end
-		local id2 = isneg and id.."_negative" or id
 
 		if not net.ReadBool() then
-			if activepowerups[id2] then
-				if powerup and powerup.EndSound then surface.PlaySound(powerup.EndSound) end
-
-				activepowerups[id2] = nil
-				hook.Run("nzu_Powerups_PowerupEnded", id, neg)
-			end
-
-			local s = LocalPlayer()["nzu_PowerupSound_"..id]
-			if s then
-				s:Stop()
-				LocalPlayer()["nzu_PowerupSound_"..id] = nil
+			for k,v in pairs(activepowerups) do
+				if v.ID == id and v.Negative == isneg then
+					if v.Sound then v.Sound:Stop() end
+					table.remove(activepowerups, k)
+					if powerup and powerup.EndSound then surface.PlaySound(powerup.EndSound) end
+					break
+				end
 			end
 		else
 			local endtime
@@ -361,7 +368,7 @@ else
 		local pitch = isneg and 50 or 100
 		if powerup.Sound then sound.Play(powerup.Sound, LocalPlayer():GetPos(), 0, pitch, 1) end
 
-		local ann = nzu.GetRandomAnnouncerSound("Powerups_"..id)
+		local ann = nzu.GetRandomAnnouncerSound("Powerups", id)
 		if ann then sound.Play(ann, LocalPlayer():GetPos(), 0, pitch, 1) end
 	end)
 	
@@ -379,6 +386,20 @@ else
 
 	hook.Add("nzu_PlayerUnspawned", "nzu_Powerups_UnspawnPowerups", function(ply)
 		if ply == LocalPlayer() then activepowerups = {} end
+	end)
+
+	--[[-------------------------------------------------------------------------
+	HUD Components + Fallback function
+	---------------------------------------------------------------------------]]
+	local font = "nzu_Font_Bloody_Large"
+	local col_pos = color_white
+	local col_neg = Color(255,150,150)
+	nzu.HUDComponent("Powerups", function() return activepowerups end, function(hud, ups)
+		local w = ScrW()/2
+		for k,v in pairs(ups) do
+			draw.SimpleText(v.Name .. ": " .. math.ceil(v.Time - CurTime()), font, w, ScrH()*0.85 - k*50, v.Negative and col_neg or col_pos, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		end
+		draw.SimpleText("Hello", font, w, ScrH()*0.85, col_pos, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	end)
 end
 

@@ -11,6 +11,7 @@ The Powerup Structure:
 	Duration = Number/nil,
 	PlayerBased = true/nil,
 	DefaultPersonal = true/nil,
+	Undroppable = true/nil,
 	Sound = Sound/nil,
 	LoopSound = Sound/nil,
 	Function = function(pos[, ply, neg]) end,
@@ -35,6 +36,9 @@ Negative: If true, the Powerup supports existing as Negative (red) with a bad ef
 
 DefaultPersonal: All drops can be global, and all PlayerBased can also be personal. If this is true,
 	then this drop is by default Personal (but can still be spawned or activated global)
+
+Undroppable: If set, this powerup cannot be enabled through settings to be part of the drop cycle. Instead, it can only
+	be dropped by code. Example of this is Widows Wine drops, which always drop by code through the Perks system.
 
 Sound: If set, will play this sound on activation, globally for all players
 LoopSound: If set, will play this looping sound for the duration of the powerup. Only applies to those with Durations.
@@ -70,7 +74,7 @@ EndFunction: The function that runs when the Powerup ends. Only automatically ca
 	Note: This function is prematurely called when the game ends or is reset, if it was about to be called
 ---------------------------------------------------------------------------]]
 
-EXT.AddPowerup("maxammo", {
+EXT.AddPowerup("MaxAmmo", {
 	Name = "Max Ammo",
 	Model = Model("models/nzu/powerups/maxammo.mdl"),
 	Color = Color(255,255,100),
@@ -88,7 +92,7 @@ EXT.AddPowerup("maxammo", {
 	end,
 })
 
-EXT.AddPowerup("capenter", {
+EXT.AddPowerup("Carpenter", {
 	Name = "Carpenter",
 	Model = Model("models/nzu/powerups/carpenter.mdl"),
 	Color = Color(255,255,100),
@@ -125,7 +129,7 @@ EXT.AddPowerup("capenter", {
 	end,
 })
 
-EXT.AddPowerup("nuke", {
+EXT.AddPowerup("Nuke", {
 	Name = "Nuke",
 	Model = Model("models/nzu/powerups/nuke.mdl"),
 	Color = Color(255,255,100),
@@ -164,7 +168,7 @@ EXT.AddPowerup("nuke", {
 	end,
 })
 
-EXT.AddPowerup("doublepoints", {
+EXT.AddPowerup("DoublePoints", {
 	Name = "Double Points",
 	Model = Model("models/nzu/powerups/doublepoints.mdl"),
 	Color = Color(255,255,100),
@@ -177,12 +181,12 @@ EXT.AddPowerup("doublepoints", {
 
 -- TODO: Add and remove this hook through Function and EndFunction to optimize?
 hook.Add("nzu_PlayerGivePoints", "DoublePoints", function(ply, tbl, n)
-	if EXT.PlayerHasPowerup(ply, "doublepoints") then -- Global = true for all players, personal = true only for that player (PlayerBased)
+	if EXT.PlayerHasPowerup(ply, "DoublePoints") then -- Global = true for all players, personal = true only for that player (PlayerBased)
 		tbl.Points = tbl.Points + n -- Just plus the original, disregarding other mods
 	end
 end)
 
-EXT.AddPowerup("instakill", {
+EXT.AddPowerup("InstaKill", {
 	Name = "Insta-Kill",
 	Model = Model("models/nzu/powerups/instakill.mdl"),
 	Color = Color(255,255,100),
@@ -195,7 +199,7 @@ EXT.AddPowerup("instakill", {
 
 hook.Add("EntityTakeDamage", "InstaKill", function(ent, dmg)
 	local att = dmg:GetAttacker()
-	if IsValid(att) and att:IsPlayer() and EXT.PlayerHasPowerup(att, "instakill") then -- and ent:IsZombie() -- TODO: Add this function!
+	if IsValid(att) and att:IsPlayer() and EXT.PlayerHasPowerup(att, "InstaKill") then -- and ent:IsZombie() -- TODO: Add this function!
 		dmg:SetDamage(ent:Health()) -- Instantly kill
 	end
 end)

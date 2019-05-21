@@ -68,10 +68,10 @@ local initialcounter
 
 local ROUND = nzu.Round
 
-function HUD:RoundIndicator()
+function HUD:Round(r, state)
 	local CT = CurTime()
-	local r = ROUND:GetRound()
-	local state = ROUND:GetState()
+	--local r = ROUND:GetRound()
+	--local state = ROUND:GetState()
 
 	if riser or state == ROUND_PREPARING and r ~= 1 then
 		if not riser then riser = 0 end
@@ -441,10 +441,10 @@ local pulse_time = 1
 local pulse_base = 0.75 -- How much of the full overlay is contributed by the base health (the rest is added by the pulse)
 
 HUD.DamageOverlayMaterial = Material("materials/nzombies-unlimited/hud/overlay_low_health.png", "unlitgeneric smooth")
-function HUD:DamageOverlay()
-	local ply = LocalPlayer() -- TODO: When spectating exists, replace this with view target
-	local health = ply:Health()
-	local max = ply:GetMaxHealth()
+function HUD:Health(health, max)
+	--local ply = LocalPlayer() -- TODO: When spectating exists, replace this with view target
+	--local health = ply:Health()
+	--local max = ply:GetMaxHealth()
 
 	local pct = health/max
 	if pct < min_threshold then
@@ -477,7 +477,7 @@ local weaponfont_name = "nzu_Font_Bloody_Medium"
 
 local equipmentfont = "nzu_Font_Bloody_Small"
 
-function HUD:Weapons()
+function HUD:Weapons(hudweapons)
 	local ply = LocalPlayer() -- TODO: Update to spectator when implemented
 
 	local w,h = ScrW(),ScrH()
@@ -556,7 +556,7 @@ function HUD:Weapons()
 	local y = h - 122
 	local iconsize = 30
 
-	for k,v in pairs(ply.nzu_HUDWeapons) do
+	for k,v in pairs(hudweapons) do
 		local wep = v.Weapon
 		if IsValid(wep) then
 			local todrawammo = true
