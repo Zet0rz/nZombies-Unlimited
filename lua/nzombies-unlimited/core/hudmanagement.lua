@@ -148,7 +148,7 @@ if NZU_NZOMBIES then
 	local removals = {}
 	local fallbacks = {}
 
-	local activehud
+	local activehud = nzu.ActiveHUD
 	local deployed = false
 	local function undeploy()
 		for k,v in pairs(removals) do
@@ -207,6 +207,7 @@ if NZU_NZOMBIES then
 			local HUD = loadhud(class)
 			activehud = HUD
 			if not LocalPlayer():IsUnspawned() then deploy(HUD) end
+			nzu.ActiveHUD = HUD
 		end
 		--nzu.SetHUD("Unlimited") -- DEBUG
 	else
@@ -223,6 +224,7 @@ if NZU_NZOMBIES then
 				local HUD = loadhud(class)
 				activehud = HUD
 				if not LocalPlayer():IsUnspawned() then deploy(HUD) end
+				nzu.ActiveHUD = HUD
 			end
 			nzu.SetHUD(activehud)
 		end)

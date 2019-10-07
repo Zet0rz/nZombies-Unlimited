@@ -198,7 +198,7 @@ local function loadextensionprepare(name, hassettings)
 					local s = settings[k]
 					if s.Parse then v = s.Parse(v) end
 					tbl[k] = v -- Actually set the value of course
-					if s.Notify then s.Notify(k,v) end
+					if s.Notify then s.Notify(k,v,loadingextension) end
 
 					net.Start("nzu_extension_setting")
 						net.WriteString(loadingextension.ID)
@@ -213,7 +213,7 @@ local function loadextensionprepare(name, hassettings)
 					local s = settings[k]
 					if s.Parse then v = s.Parse(v) end
 					tbl[k] = v
-					if s.Notify then s.Notify(k,v) end
+					if s.Notify then s.Notify(k,v,loadingextension) end
 
 					if s.Client then
 						net.Start("nzu_extension_setting")
@@ -289,7 +289,7 @@ local function loadextension(loadingextension, st)
 
 	if notifies then
 		for k,v in pairs(notifies) do
-			v[1](v[2],k)
+			v[1](v[2],k,loadingextension)
 		end
 	end
 
@@ -298,7 +298,7 @@ local function loadextension(loadingextension, st)
 
 	hook.Run("nzu_ExtensionLoaded", name)
 
-	return loaded_extensions[name]
+	return loadingextension
 end
 function nzu.GetExtension(name) return loaded_extensions[name] end
 function nzu.IsExtensionLoaded(name) return loaded_extensions[name] and true or false end
@@ -528,7 +528,7 @@ else
 			local v = netreadsetting(s)
 			ext.Settings[k] = v
 
-			if s.Notify then s.Notify(v,k) end
+			if s.Notify then s.Notify(v,k,ext) end
 
 			hook.Run("nzu_ExtensionSettingChanged", ext.ID, k, v)
 		end

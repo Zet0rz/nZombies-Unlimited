@@ -64,6 +64,7 @@ ENT.PrintName = "Mystery Box"
 ENT.Author = "Zet0r"
 
 ENT.AutomaticFrameAdvance = true
+ENT.RenderGroup = RENDERGROUP_OPAQUE
 
 ENT.Model = Model("models/nzu/mysterybox/nzu_mystery_box.mdl")
 ENT.TeddyModel = Model("models/weapons/w_rif_m4a1.mdl")
@@ -75,6 +76,7 @@ ENT.JingleSound = Sound("nzu/mysterybox/music_box.wav")
 ENT.DisappearSound = Sound("nzu/mysterybox/disappear.wav")
 ENT.AppearSound = Sound("nzu/mysterybox/land_flux.wav")
 ENT.PoofSound = Sound("nzu/mysterybox/poof.wav")
+ENT.BeamColor = Color(150, 200, 255)
 
 if SERVER then
 	-- Only server needs to know sequences
@@ -100,16 +102,24 @@ function ENT:Initialize()
 		self:SetPrice(950)
 		self:SetTimesUsed(0)
 	end
+
+	if not self:GetIsReady() then
+		self.FirstReady = true
+	else
+		self:CreateBeam()
+	end
 end
 
 function ENT:SetupDataTables()
 	self:NetworkVar("Bool", 0, "IsReady")
 	self:NetworkVar("Int", 0, "Price")
+	self:NetworkVar("Bool", 1, "IsOpen")
 end
 
 if SERVER then
 	AccessorFunc(ENT, "m_iTimesUsed", "TimesUsed", FORCE_NUMBER)
 	AccessorFunc(ENT, "m_eUser", "CurrentUser")
+	AccessorFunc(ENT, "m_eSpawnpoint", "Spawnpoint")
 
 	function ENT:Use(activator)
 		if self:GetIsReady() then
@@ -150,6 +160,9 @@ if SERVER then
 		wep:EmitSound(self.JingleSound)
 
 		self.Weapon = wep
+
+		self:SetIsOpen(true) -- This also triggers CreateOpenEffects on clients
+		self:CreateOpenEffect()
 	end
 
 	function ENT:Close()
@@ -160,6 +173,9 @@ if SERVER then
 		self:ResetSequence(seq)
 		self:EmitSound(self.CloseSound)
 		self.ReadyTime = CurTime() + dur
+
+		self:SetIsOpen(false)
+		self:RemoveOpenEffect()
 	end
 
 	function ENT:OnTeddy(ply)
@@ -167,6 +183,7 @@ if SERVER then
 	end
 
 	function ENT:Disappear()
+		self:SetIsOpen(false)
 		local seq,dur = self:LookupSequence(self.DisappearAnimation)
 		self:ResetSequence(seq)
 		self:EmitSound(self.DisappearSound)
@@ -187,7 +204,7 @@ if SERVER then
 			pos:SetMysteryBox(self)
 			pos:OnBoxAppear(self)
 
-			self.Spawnpoint = pos
+			self:SetSpawnpoint(pos)
 		else
 			self:SetPos(pos)
 			self:SetAngles(ang)
@@ -199,7 +216,6 @@ if SERVER then
 		self:ResetSequence(seq)
 		self:EmitSound(self.AppearSound)
 		self.ReadyTime = CurTime() + dur
-		self.FirstReady = true
 
 		self:OnAppeared(dur)
 	end
@@ -211,14 +227,8 @@ if SERVER then
 	end
 
 	function ENT:OnDisappeared(dur)
-		timer.Simple(4.5, function()
-			if IsValid(self) then self:EmitSound("nzu/mysterybox/whoosh.wav") end
-		end)
-	end
-
-	function ENT:CreateBeam()
-		-- TODO: Particle Effect Beam here
-		-- Perhaps make it adjustable so that you can easily modify the color without creating a whole new effect?
+		local pos = self:GetPos()
+		timer.Simple(4.5, function() sound.Play("nzu/mysterybox/whoosh.wav", pos, 100, 100, 1) end)
 	end
 
 	function ENT:Think()
@@ -232,8 +242,7 @@ if SERVER then
 		end
 
 		if self.RemoveTime and self.RemoveTime < CurTime() then
-			--EXT.OnMysteryBoxDisappeared(self)
-			self:Remove()
+			EXT.MoveMysteryBox(self)
 		end
 
 		self:NextThink(CurTime())
@@ -241,29 +250,115 @@ if SERVER then
 	end
 
 	function ENT:OnRemove()
-		if IsValid(self.Spawnpoint) and self.Spawnpoint:GetMysteryBox() == self then
-			self.Spawnpoint:OnBoxDisappear(self)
-			self.Spawnpoint:EmitSound(self.PoofSound)
-			self.Spawnpoint:SetMysteryBox(nil)
+		local point = self:GetSpawnpoint()
+		if IsValid(point) and point:GetMysteryBox() == self then
+			point:OnBoxDisappear(self)
+			point:EmitSound(self.PoofSound)
+			point:SetMysteryBox(nil)
 
 			if IsValid(self.Weapon) then self.Weapon:Remove() end
+			self:RemoveBeam()
 		end
 	end
+
+	function ENT:UpdateTransmitState() return TRANSMIT_ALWAYS end -- Always be valid on clients
 else
 	function ENT:Think()
+		if self.FirstReady then
+			if self:GetIsReady() then
+				self:CreateBeam()
+				self.FirstReady = nil
+			end
+		end
+
+		if self:GetIsOpen() ~= self.IsOpen then
+			self.IsOpen = self:GetIsOpen()
+			if self.IsOpen then
+				self:CreateOpenEffect()
+			else
+				self:RemoveOpenEffect()
+			end
+		end
+
 		self:NextThink(CurTime())
 		return true
 	end
 
 	function ENT:Draw()
 		self:DrawModel()
+
+		if self:GetIsOpen() then
+			self:DrawBoxOpenFill() -- You can override the effect here
+		end
 	end
-	ENT.DrawTranslucent = ENT.Draw
+	function ENT:DrawTranslucent() end
 
 	ENT.TargetIDTextType = "MysteryBox" -- HUDs can check against this instead, but still default to TARGETID_TYPE_BUY if not implemented
 	function ENT:GetTargetIDText()
 		if self:GetIsReady() then
 			return " random weapon ", TARGETID_TYPE_BUY, self:GetPrice()
+		end
+	end
+
+	function ENT:OnRemove()
+		self:RemoveBeam()
+	end
+
+	local m = Material("nzombies-unlimited/particle/light_glow_square")
+	local w,h = 92, 26 -- The width and height of the box's light area
+	function ENT:DrawBoxOpenFill()
+		local x = -h/2
+		local y = -w/2
+		local h2 = h/2
+		for i = 1,5 do
+			cam.Start3D2D(self:GetPos() + self:GetUp() * (10 + i), self:GetAngles(), 1)
+				surface.SetMaterial(m)
+				surface.SetDrawColor(self.BeamColor.r, self.BeamColor.g, self.BeamColor.b, 150)
+				--surface.DrawRect(-10,-44,20,88)
+				--surface.SetDrawColor(255,255,255)
+				surface.DrawTexturedRectUV(x,y, h, h2, 0,0,1,0.5)
+				surface.DrawTexturedRectUV(x,y + h2, h, w - h, 0,0.5,1,0.5)
+				surface.DrawTexturedRectUV(x,w - w/2 - h2, h, h2, 0,0.5,1,1)
+			cam.End3D2D()
+		end
+	end
+end
+
+-- These two functions are shared, as the beam could be initialized by the Server if a subclass chooses to
+-- Override these two functions if you want your box to have its own Beam effect
+-- Override ENT.BeamColor to just change the color
+function ENT:CreateBeam()
+	if CLIENT then
+		local p = CreateParticleSystem(self, "mysterybox_beam", PATTACH_ABSORIGIN_FOLLOW)
+		p:SetControlPoint(2, Vector(self.BeamColor.r/255, self.BeamColor.g/255, self.BeamColor.b/255)) -- Color
+		p:SetControlPoint(0, self:GetPos()) -- Bottom position
+		p:SetControlPoint(1, self:GetPos() + Vector(0,0,4000)) -- Top position
+		self.Beam = p
+	end
+end
+
+function ENT:RemoveBeam()
+	if CLIENT then
+		if IsValid(self.Beam) then
+			self.Beam:StopEmission(false, true)
+			self.Beam = nil
+		end
+	end
+end
+
+function ENT:CreateOpenEffect()
+	if CLIENT then
+		local p = CreateParticleSystem(self, "mysterybox_roll", PATTACH_ABSORIGIN_FOLLOW)
+		p:SetControlPoint(2, Vector(self.BeamColor.r/255, self.BeamColor.g/255, self.BeamColor.b/255)) -- Color
+		self.OpenEffect = p
+	end
+end
+
+function ENT:RemoveOpenEffect()
+	if CLIENT then
+		if IsValid(self.OpenEffect) then
+			self.OpenEffect:StopEmission(false, true)
+			self.OpenEffect = nil
 		end
 	end
 end
@@ -421,7 +516,7 @@ else
 	function ENT:Draw()
 		self:DrawModel()
 	end
-	ENT.DrawTranslucent = ENT.Draw
+	function ENT:DrawTranslucent() end
 
 	function ENT:GetTargetIDText()
 		if self.SavedClass ~= self:GetWeaponClass() then

@@ -188,7 +188,6 @@ nzu.AddSpawnmenuTab("Extension Settings", "DPanel", function(panel)
 		checkbox:SetWide(20)
 		checkbox:SetChecked(nzu.IsExtensionLoaded(k))
 		
-		
 		checkbox.Extension = k
 		if k ~= "core" and nzu.IsAdmin(LocalPlayer()) then
 			checkbox.SaveButton = save
@@ -207,7 +206,7 @@ nzu.AddSpawnmenuTab("Extension Settings", "DPanel", function(panel)
 		end
 
 		loadedexts = loadedexts < columns and loadedexts + 1 or 1
-		panel.ExtensionPanels[v] = f
+		panel.ExtensionPanels[k] = f
 	end
 
 	hook.Add("nzu_ExtensionLoaded", panel, function(s, ext)
@@ -216,7 +215,7 @@ nzu.AddSpawnmenuTab("Extension Settings", "DPanel", function(panel)
 			pnl.LoadedCheckbox:SetChecked(true)
 			
 			if pnl.Contents then pnl.Contents:Remove() end
-			local p = generatesettingspanel(ext)
+			local p = generatesettingspanel(ext, pnl)
 			pnl:SetContents(p)
 		end
 	end)

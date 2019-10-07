@@ -1,5 +1,3 @@
-local EXTENSION = nzu.Extension()
-
 local settings = {
 	["WeaponList"] = {
 		Default = {}, -- Default is empty = use all installed weapons (that are valid)
@@ -22,8 +20,11 @@ local settings = {
 				net.WriteUInt(t[class], 16)
 			end
 		end,
+		Notify = function(val, key, ext)
+			ext.ReloadModelsList()
+		end,
 		Panel = function(parent, ext)
-			local p = vgui.Create("Panel", parent)
+			local p = parent:Add("Panel")
 			p:SetTall(350)
 			p:DockMargin(10,10,10,10)
 

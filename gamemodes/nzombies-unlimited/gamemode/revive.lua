@@ -180,7 +180,7 @@ end
 Revive Handling
 ---------------------------------------------------------------------------]]
 function PLAYER:GetReviveTime()
-	return 5 -- Change this to hook later? Or some system to change player revive times (for perks, powerups, etc)
+	return 4 -- Change this to hook later? Or some system to change player revive times (for perks, powerups, etc)
 end
 
 if SERVER then

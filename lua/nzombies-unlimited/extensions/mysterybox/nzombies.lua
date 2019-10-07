@@ -4,6 +4,10 @@ include("mysterybox_entities.lua")
 local EXT = nzu.Extension()
 local Settings = EXT.Settings
 
+game.AddParticles("particles/mysterybox.pcf")
+PrecacheParticleSystem("mysterybox_beam")
+PrecacheParticleSystem("mysterybox_roll")
+
 if SERVER then
 	function EXT.GetBaseWeaponsTable()
 		if table.IsEmpty(Settings.WeaponList) then
@@ -25,12 +29,15 @@ if SERVER then
 
 	local modelslist = {}
 	function EXT.ReloadModelsList()
-		local weps = EXT.GetWeaponsTable()
+		local weps = EXT.GetBaseWeaponsTable()
 		for k,v in pairs(weps) do
 			local wep = weapons.GetStored(k)
 			if wep then
 				local model = wep.WM or wep.WorldModel
-				if model and model ~= "" then table.insert(modelslist, model) end
+				if model and model ~= "" then
+					table.insert(modelslist, model)
+					util.PrecacheModel(model)
+				end
 			end
 		end
 	end
@@ -44,7 +51,6 @@ if SERVER then
 		for k,v in pairs(weps) do
 			if not IsValid(ply:GetWeapon(k)) then
 				possible[k] = v
-				total = total + v
 			end
 		end
 
@@ -72,20 +78,48 @@ if SERVER then
 
 	function EXT.ShouldGiveTeddy(box, ply)
 		local b = hook.Run("nzu_MysteryBox_OverrideTeddy", box, ply)
-		if b ~= nil then return b end
+		if b == nil then
+			local r = math.random()
+			local t = box:GetTimesUsed()
+			local ch = t > 12 and 0.5 or t > 8 and 0.3 or 0.15 -- 50% over 12 uses, 30% 8-12 uses, 15% under 8 uses
 
-		local r = math.random()
-		local t = box:GetTimesUsed()
-		local ch = t > 12 and 0.5 or t > 8 and 0.3 or 0.15 -- 50% over 12 uses, 30% 8-12 uses, 15% under 8 uses
-		return r < ch
+			b = r < ch
+		end
+		
+		-- If teddy was rolled, first check if a valid different box spawnpoint exists
+		if b then
+			local p = EXT.DecideSpawnpoint(box:GetSpawnpoint())
+			if IsValid(p) then -- If it exists, then yes, we give teddy
+				p.ReservedBox = box -- Reserve this point for this box to move to
+				box.ReservedSpawnpoint = p
+				return true
+			end
+		end
+		return false
 	end
 
-	function EXT.SpawnMysteryBox(spawnpoint)
+	function EXT.SpawnMysteryBox(spawnpoint, ang)
 		local point = spawnpoint or EXT.DecideSpawnpoint()
 		if not IsValid(point) then return end
 
 		local e = ents.Create("nzu_mysterybox")
-		e:Appear(point)
+		e:Appear(point, ang) -- Pass ang if you want to spawn it on a position (which also then needs an angle)
+	end
+
+	function EXT.MoveMysteryBox(box, newpoint)
+		local point = newpoint
+
+		-- If the box was set to move to some specific point, given through the Teddy roll logic
+		if box.ReservedSpawnpoint then
+			if not IsValid(point) then -- Only if "newpoint" wasn't forced though
+				point = box.ReservedSpawnpoint -- Chosen point will be the reserved one
+			end
+			box.ReservedSpawnpoint.ReservedBox = nil -- Un-reserve
+		end
+
+		if not IsValid(point) then point = EXT.DecideSpawnpoint(box:GetSpawnpoint()) end -- If box doesn't have reserved, and no forced point, calculate a random one
+		if IsValid(point) then EXT.SpawnMysteryBox(point) end -- If the final point is valid, spawn a new box there
+		box:Remove() -- Remove the old box
 	end
 
 	function EXT.GetAllSpawnpoints()
@@ -112,7 +146,7 @@ if SERVER then
 
 		local points = EXT.GetAllSpawnpoints()
 		for k,v in pairs(points) do
-			if not blocks[v] and not IsValid(v:GetMysteryBox()) then
+			if not blocks[v] and not IsValid(v:GetMysteryBox()) and not IsValid(v.ReservedBox) then -- All spawnpoints not blocked, not having a box currently, and not being reserved
 				table.insert(available, v)
 			end
 		end
