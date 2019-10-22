@@ -163,6 +163,7 @@ end
 -- To use defaults, these can just be chained [loadextension(loadextensionprepare(name))]
 local function loadextensionprepare(name, hassettings)
 	local loadingextension = loaded_extensions[name] or {ID = name}
+	loadingextension2 = loadingextension -- Allow nzu.Extension() to work when called from settings.lua too, even if it isn't populated yet
 	local settings, panelfunc
 	
 	if hassettings then

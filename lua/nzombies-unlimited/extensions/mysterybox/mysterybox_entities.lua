@@ -378,7 +378,7 @@ ENT.Author = "Zet0r"
 
 if SERVER then
 	ENT.WindupTime = 4.5
-	ENT.WindupMovement = Vector(0,0,40)
+	ENT.WindupMovement = Vector(0,0,30)
 	ENT.TeddyVelocity = Vector(0,0,50)
 
 	AccessorFunc(ENT, "m_iLifetime", "TimeAvailable", FORCE_NUMBER)
@@ -431,7 +431,11 @@ if SERVER then
 
 		local model
 		if num > 0 then
-			model = models[math.random(num)]
+			local ran = math.random(num)
+			model = models[ran]
+			if model == self:GetModel() then
+				model = models[ran < num and ran + 1 or 1]
+			end
 		end
 
 		self:SetModel(model or defaultmodels[math.random(#defaultmodels)])
@@ -450,11 +454,12 @@ if SERVER then
 	function ENT:Think()
 		if self.WindingTime > CurTime() then
 			-- We're winding up
-			if self.NextModel < CurTime() then
+			--if self.NextModel < CurTime() then
 				self:RandomizeModel()
-				self.NextModel = CurTime() + 0.5/(self.WindingTime - CurTime())
-			end
-		return end
+				--self.NextModel = CurTime() + 0.5/(self.WindingTime - CurTime())
+				self:NextThink(CurTime() + 0.30/(self.WindingTime - CurTime()))
+			--end
+		return true end
 
 		if not self.Finalized then
 			if not self:GetChosenWeapon() or self:GetChosenWeapon() == "" then
@@ -516,7 +521,8 @@ else
 	function ENT:Draw()
 		self:DrawModel()
 	end
-	function ENT:DrawTranslucent() end
+	--function ENT:DrawTranslucent() end
+	ENT.DrawTranslucent = ENT.Draw
 
 	function ENT:GetTargetIDText()
 		if self.SavedClass ~= self:GetWeaponClass() then

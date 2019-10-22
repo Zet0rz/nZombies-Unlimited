@@ -21,7 +21,7 @@ local settings = {
 			end
 		end,
 		Notify = function(val, key, ext)
-			ext.ReloadModelsList()
+			if NZU_NZOMBIES then timer.Simple(0.1, function() ext.ReloadModelsList() end) end
 		end,
 		Panel = function(parent, ext)
 			local p = parent:Add("Panel")

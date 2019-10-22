@@ -74,6 +74,19 @@ function ENT:Initialize()
 		self:EnableMatrix("RenderMultiply", matrix)
 	end
 	self:DrawShadow(false)
+
+	self:Precache()
+end
+
+function ENT:Precache()
+	local class = self:GetWeaponClass()
+	if class then
+		local wep = weapons.GetStored(class)
+		if wep then
+			util.PrecacheModel(wep.WM or wep.WorldModel)
+			if CLIENT then util.PrecacheModel(wep.VM or wep.ViewModel) end
+		end
+	end
 end
 
 if SERVER then

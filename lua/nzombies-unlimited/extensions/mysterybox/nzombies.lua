@@ -27,8 +27,22 @@ if SERVER then
 		return Settings.WeaponList
 	end
 
+	util.AddNetworkString("nzu_MysteryBox_PrecacheWeapons")
+	local function networkweaponsprecache(ply)
+		net.Start("nzu_MysteryBox_PrecacheWeapons")
+			local weps = EXT.GetBaseWeaponsTable()
+			local num = table.Count(weps)
+			net.WriteUInt(num, 16)
+			for k,v in pairs(weps) do
+				net.WriteString(k)
+			end
+		if ply then net.Send(ply) else net.Broadcast() end
+	end
+	hook.Add("PlayerInitialSpawn", "nzu_MysteryBox_PrecacheWeapons", networkweaponsprecache)
+
 	local modelslist = {}
 	function EXT.ReloadModelsList()
+		modelslist = {}
 		local weps = EXT.GetBaseWeaponsTable()
 		for k,v in pairs(weps) do
 			local wep = weapons.GetStored(k)
@@ -40,9 +54,12 @@ if SERVER then
 				end
 			end
 		end
+
+		-- Update all players' caches (this is expensive, but this function shouldn't happen unless the weapons are changed anyway)
+		networkweaponsprecache()
 	end
 	function EXT.GetModelsList() return modelslist end
-	EXT.ReloadModelsList()
+	--EXT.ReloadModelsList()
 
 	function EXT.GetWeaponsTableFor(ply)
 		local weps = EXT.GetBaseWeaponsTable()
@@ -170,5 +187,38 @@ if SERVER then
 		if IsValid(point) then
 			EXT.SpawnMysteryBox(point)
 		end
+	end)
+end
+
+-- Weapon precaching logic
+if CLIENT then
+	net.Receive("nzu_MysteryBox_PrecacheWeapons", function()
+		local t = {}
+		local num = net.ReadUInt(16)
+		for i = 1,num do
+			table.insert(t, net.ReadString())
+		end
+
+		local cmodel
+		for k,v in pairs(t) do
+			local wep = weapons.GetStored(v)
+			if wep then
+				local model = wep.WM or wep.WorldModel
+				if model and model ~= "" then
+					util.PrecacheModel(model)
+					if not cmodel then cmodel = ClientsideModel(model) else cmodel:SetModel(model) end
+					--print("Precaching:", model)
+					cmodel:DrawModel()
+				end
+				local model2 = wep.VM or wep.ViewModel
+				if model2 and model2 ~= "" then
+					util.PrecacheModel(model2)
+					if not cmodel then cmodel = ClientsideModel(model2) else cmodel:SetModel(model2) end
+					--print("Precaching:", model2)
+					cmodel:DrawModel()
+				end
+			end
+		end
+		if cmodel then cmodel:Remove() end
 	end)
 end

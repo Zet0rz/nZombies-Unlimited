@@ -731,7 +731,7 @@ nzu.AddSpawnmenuTab("Version/Legacy", "DPanel", function(panel)
 			local _,_,id = string.find(body, "<a data%-column%-id=\"(%d+)\" data%-column%-name=\"Done\"")
 			if id then
 				http.Fetch(v.."/columns/"..id.."/cards", function(body2)
-					for s in string.gmatch(body2, "<div class=\"js%-comment%-body\">%s*<p>([%w%s]+)</p>") do
+					for s in string.gmatch(body2, "<div class=\"js%-comment%-body\">%s*<p><em><strong>([%*%w%s]+)</strong></em></p>") do
 						table.insert(completes, s)
 					end
 
