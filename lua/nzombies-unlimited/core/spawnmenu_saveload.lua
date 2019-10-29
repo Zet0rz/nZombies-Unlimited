@@ -7,6 +7,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	--panel:SetSkin("nZombies Unlimited")
 	--panel:SetBackgroundColor(Color(150,150,150))
 	local editedconfig
+	local editsmade = {}
 	
 	local configpanel = panel:Add("DPanel")
 	configpanel:SetWidth(400)
@@ -109,153 +110,282 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	
 	local editpanel = infopanel:Add("Panel")
 	editpanel:Dock(FILL)
-	
+
+	-- The addon panel needs special construction
 	local addonarea = editpanel:Add("Panel")
 	addonarea:DockMargin(15,0,0,0)
 	addonarea:Dock(RIGHT)
 	addonarea:SetWide(200)
-	
-	wid = addonarea:Add("Panel")
-	wid:DockMargin(0,0,0,0)
-	wid:Dock(TOP)
-	local widheader = wid:Add("DLabel")
-	widheader:SetText("Config Workshop ID")
-	widheader:SetFont(headerfont)
-	widheader:Dock(FILL)
-	local widinfo = wid:Add("DImage")
-	widinfo:SetImage("icon16/information.png")
-	widinfo:Dock(RIGHT)
-	widinfo:DockMargin(0,5,5,5)
-	function widinfo:PerformLayout()
-		local t = self:GetTall()
-		self:SetWide(t)
-	end
-	widinfo:SetTooltip("Fill this field with the numeric ID of this Config's Workshop addon after it has been uploaded.\nThis will allow users to view your Config's Workshop page from in-game.")
-	widinfo:SetMouseInputEnabled(true)
 
-	local widentry = addonarea:Add("DTextEntry")
-	widentry:SetPlaceholderText("123456789")
-	widentry:SetPlaceholderColor(Color(75,75,75))
-	widentry:SetFont(namefont)
-	widentry:SetTall(35)
-	widentry:Dock(TOP)
-	widentry:SetNumeric(true)
-	
-	local addoncontrol = addonarea:Add("Panel")
-	addoncontrol:Dock(TOP)
-	addoncontrol:DockMargin(0,15,0,0)
-	
-	local addonscroll = addonarea:Add("DScrollPanel")
-	addonscroll:Dock(FILL)
-	addonscroll:SetPaintBackground(true)
-	--addonscroll:SetBackgroundColor(Color(50,50,50))
-	local addonlist = addonscroll:Add("DListLayout")
-	addonlist:Dock(FILL)
-	function addonlist:Refresh()
+	-- Top two fields are merged, so we make a new panel to dock them into
+	local topfields = editpanel:Add("Panel")
+	topfields:Dock(TOP)
+	topfields:SetTall(50)
+	topfields:DockMargin(0,0,0,5)
+
+	local editfields = {
+		{
+			Key = "Name",
+			Header = "Config Name",
+			Placeholder = "Display name...",
+			Parent = topfields,
+			Dock = FILL
+		},
+
+		{
+			Key = "WorkshopID",
+			Header = "Workshop ID",
+			Placeholder = "123456789",
+			Parent = addonarea,
+			Dock = TOP,
+			--Width = 165,
+		},
+
+
+		{
+			Key = "Authors",
+			Header = "Authors",
+			Placeholder = "Author list..."
+		},
+		{
+			Key = "Description",
+			Header = "Description",
+			Placeholder = "Config description...",
+			Dock = FILL
+		},
+	}
+
+	-- Create the addon field panel
+	local addon_panel = addonarea:Add("DPanel")
+	addon_panel:Dock(FILL)
+	local addon_filter = addon_panel:Add("DTextEntry")
+	addon_filter:Dock(BOTTOM)
+	addon_filter:SetPlaceholderText("Filter addons ...")
+	addon_filter:SetUpdateOnType(true)
+	local addon_scroll = addon_panel:Add("DScrollPanel")
+	addon_scroll:Dock(FILL)
+
+	addon_panel.List = addon_scroll
+	addon_panel.FilterField = addon_filter
+	addon_panel.Addons = {}
+	addon_panel.RequiredAddons = {}
+	addon_panel.Panels = {}
+
+	-- The automated system uses SetEnabled, SetValue, and GetValue, and the callback OnValueChange
+	-- We must populate our custom panel with these functions so that they work naturally with the system
+	function addon_panel:SetEnabled(b)
+		self.FilterField:SetVisible(b)
+		self.Enabled = b
+		self:Refresh()
+		self:Filter(b and self.FilterField:GetValue() or "")
+	end
+
+	function addon_panel:SetText(t) -- The table of items enabled, same format as config: {[wsid] = addon title, ...}
+		if t == nil or t == "" then t = {} end
+		self.RequiredAddons = t
+
+		if self.Enabled then
+			for k,v in pairs(self.Panels) do
+				v.Checkbox:SetChecked(self.RequiredAddons[k] and true or false)
+			end
+		else
+			self:Filter("") -- Causes rebuild + sorting
+		end
+	end
+
+	function addon_panel:GetValue()
+		return self.RequiredAddons
+	end
+
+	-- Refresh what addons are available. This should be invoked whenever the (unfiltered) list's options should be changed
+	function addon_panel:Refresh()
 		self.Addons = {}
 		for k,v in pairs(engine.GetAddons()) do
-			if v.downloaded and v.wsid then
-				local p = vgui.Create("Panel")
-				p:DockPadding(2,2,2,2)
-				local c = p:Add("DCheckBox")
-				c:Dock(LEFT)
-				c:DockMargin(0,0,5,0)
-				c:SetChecked(selected and selected.RequiredAddons[v.wsid] or false)
-				function c:PerformLayout()
-					self:SetWide(self:GetTall())
-				end
-				
-				local l = p:Add("DLabel")
-				l:SetText(v.title)
-				l:SetTextColor(Color(200,200,200))
-				l:Dock(FILL)
-				l:SetContentAlignment(4)
-				
-				addonlist:Add(p)
-				p:Dock(TOP)
-				
-				p.CheckBox = c
-				self.Addons[v.wsid] = {v.title, c}
+			if v.downloaded and v.wsid and v.mounted then
+				self.Addons[v.wsid] = v.title
 			end
 		end
 	end
-	addonlist:Refresh()
-	
-	local addons = addoncontrol:Add("DLabel")
-	addons:SetText("Required Addons")
-	addons:SetFont(headerfont)
-	addons:Dock(FILL)
-	
-	--local namearea = editpanel:Add("Panel")
-	--namearea:SetBackgroundColor(Color(50,255,100))
-	--namearea:Dock(TOP)
-	
-	local nameheader = editpanel:Add("Panel")
-	nameheader:Dock(TOP)
-	local nhh = nameheader:Add("DLabel")
-	nhh:SetFont(headerfont)
-	nhh:SetText("Config name")
-	nhh:SizeToContents()
-	nhh:Dock(LEFT)
-	nhh:DockMargin(3,0,0,0)
-	
-	local mapname = nameheader:Add("DLabel")
+
+	function addon_panel:Filter(str)
+		self.List:Clear()
+		self.Panels = {}
+
+		local filtered
+		if not str or str == "" then
+			filtered = self.Enabled and self.Addons or self.RequiredAddons
+		else
+			filtered = {}
+			for k,v in pairs(self.Enabled and self.Addons or self.RequiredAddons) do
+				if string.find(v:lower(), str:lower()) then
+					filtered[k] = v
+				end
+			end
+		end
+
+		if self.Enabled then
+			-- Enabled: Checkboxes, no color on URL labels
+			for k,v in SortedPairsByValue(filtered) do
+				local p = self.List:Add("Panel")
+				p:DockPadding(2,2,2,2)
+
+				local c = p:Add("DCheckBox")
+				c:Dock(LEFT)
+				c:DockMargin(0,0,5,0)
+				c:SetChecked(self.RequiredAddons[k] and true or false)
+				function c:PerformLayout()
+					self:SetWide(self:GetTall())
+				end
+
+				function c.OnChange(s,b)
+					if b then
+						self.RequiredAddons[k] = v
+					else
+						self.RequiredAddons[k] = nil
+					end
+					self:OnValueChange(self.RequiredAddons) -- Fire the callback!
+				end
+				
+				local l = p:Add("DLabelURL")
+				l:SetText(v)
+				l:SetTextColor(Color(200,200,200))
+				l:Dock(FILL)
+				l:SetContentAlignment(4)
+				l:SetURL("https://steamcommunity.com/sharedfiles/filedetails/?id="..k)
+				
+				self.List:Add(p)
+				p:Dock(TOP)
+				p:SetTall(24)
+
+				self.Panels[k] = p
+				p.Checkbox = c
+			end
+		else
+			-- Disabled: No checkboxes, URL label colors
+			for k,v in SortedPairsByValue(filtered) do
+				local l = self.List:Add("DButton")
+				l:SetText(v)
+				l:SetContentAlignment(5)
+				l.DoClick = function() gui.OpenURL("https://steamcommunity.com/sharedfiles/filedetails/?id="..k) end
+				l:SetTextColor(steamworks.ShouldMountAddon(k) and Color(0,255,0) or Color(255,0,0))
+				
+				self.List:Add(l)
+				l:Dock(TOP)
+
+				self.Panels[k] = l
+			end
+		end
+	end
+
+	addon_panel.Enabled = true
+	addon_panel:Refresh()
+	addon_panel:Filter()
+
+	addon_filter.OnValueChange = function(s,str)
+		addon_panel:Filter(str)
+	end
+
+	-- Add it to the constructor!
+	table.insert(editfields, {
+		Key = "RequiredAddons",
+		Header = "Addons",
+		Parent = addonarea,
+		Panel = addon_panel,
+		Dock = FILL,
+	})
+
+	-- Whenever a field is edited, store its results in another table
+	local editpanels = {}
+	local function valuechange(s,v)
+		editsmade[s.Key] = v
+		editpanels[s.Key].Revert:SetEnabled(true)
+
+		-- Modify the loaded panel
+		local c = loadedcfg.Config
+		if not c or c.Type ~= "Unsaved" then
+			loadedcfg:SetConfig({
+				Name = editsmade.Name or editedconfig.Name,
+				Map = editedconfig.Map,
+				Type = "Unsaved",
+				Codename = editedconfig.Codename
+			})
+		elseif s.Key == "Name" then
+			loadedcfg.Config.Name = v
+			loadedcfg:SetName(v)
+		end
+	end
+	local function revertfunc(s)
+		editsmade[s.Key] = nil
+		if editedconfig then editpanels[s.Key].Contents:SetText(editedconfig[s.Key]) end
+		s:SetEnabled(false)
+
+		if table.IsEmpty(editsmade) then
+			loadedcfg:SetConfig(editedconfig)
+		end
+	end
+
+	-- Build the panels!
+	local placeholdcol = Color(75,75,75)
+	for k,v in pairs(editfields) do
+		local parent = v.Parent or editpanel
+		local p = parent:Add("Panel")
+
+		local header = p:Add("Panel")
+		header:Dock(TOP)
+		header:DockMargin(0,0,0,3)
+
+		local lbl = header:Add("DLabel")
+		lbl:Dock(LEFT)
+		lbl:SetFont(headerfont)
+		lbl:SetText(v.Header)
+		lbl:SizeToContents()
+		header:SetTall(lbl:GetTall())
+
+		local revert = header:Add("DButton")
+		revert:SetText("Revert")
+		revert:Dock(RIGHT)
+		revert:SetWide(50)
+		revert:DockMargin(0,3,0,0)
+		revert:SetEnabled(false)
+		revert.Key = v.Key
+		revert.DoClick = revertfunc
+
+		local field = v.Panel
+		if not IsValid(field) then
+			field = p:Add("DTextEntry")
+			field:Dock(FILL)
+			field:SetFont(namefont)
+			field:SetPlaceholderText(v.Placeholder)
+			field:SetPlaceholderColor(placeholdcol)
+			field:SetUpdateOnType(true)
+		else
+			field:SetParent(p)
+		end
+
+		p:Dock(v.Dock or TOP)
+		if v.Width then p:SetWide(v.Width) end
+		p:SetTall(v.Height or 50)
+
+		-- Now implement their functionality!
+		field.Key = v.Key
+		field.OnValueChange = valuechange
+
+		editpanels[v.Key] = {Panel = p, Contents = field, Header = header, Revert = revert}
+	end
+
+	editpanels.Authors.Panel:DockMargin(0,0,0,5)
+	editpanels.Description.Contents:SetMultiline(true)
+	editpanels.Description.Contents:SetFont(textfont)
+	editpanels.Description.Panel:DockMargin(0,0,0,0)
+	editpanels.WorkshopID.Panel:DockMargin(0,0,0,5)
+
+	local mapname = editpanels.Name.Header:Add("DLabel")
 	mapname:SetText("File:          || Map: ")
 	mapname:SetFont(textfont)
 	mapname:Dock(FILL)
 	mapname:DockMargin(10,0,0,0)
 	mapname:SizeToContents()
 	mapname:SetContentAlignment(1)
-	
-	local configname = editpanel:Add("DTextEntry")
-	configname:Dock(TOP)
-	configname:SetEnabled(true)
-	configname:SetFont(namefont)
-	configname:SetPlaceholderText("Config name...")
-	configname:SetPlaceholderColor(Color(75,75,75))
-	configname:SetTall(35)
-	
-	local ap = editpanel:Add("Panel")
-	ap:DockMargin(0,15,0,0)
-	ap:Dock(TOP)
-	local ab = ap:Add("DButton")
-	ab:SetText("Set to current players")
-	ab:Dock(RIGHT)
-	ab:SizeToContents()
-	
-	local authorheader = ap:Add("DLabel")
-	authorheader:DockMargin(3,0,0,0)
-	authorheader:SetText("Author(s)")
-	authorheader:SetFont(headerfont)
-	authorheader:Dock(FILL)
-	
-	local authors = editpanel:Add("DTextEntry")
-	authors:SetPlaceholderText("Author(s)...")
-	authors:SetPlaceholderColor(Color(75,75,75))
-	authors:SetFont(namefont)
-	authors:Dock(TOP)
-	authors:SetTall(30)
-	function ab:DoClick()
-		local str = ""
-		for k,v in pairs(player.GetHumans()) do
-			str = str .. v:Nick()..", "
-		end
-		str = string.sub(str, 0, #str - 2)
-		authors:SetText(str)
-	end
-	
-	local descheader = editpanel:Add("DLabel")
-	descheader:DockMargin(3,15,0,0)
-	descheader:SetText("Description")
-	descheader:SetFont(headerfont)
-	descheader:Dock(TOP)
-	
-	local desc = editpanel:Add("DTextEntry")
-	desc:SetMultiline(true)
-	desc:SetFont(textfont)
-	desc:SetPlaceholderText("Config Description...")
-	desc:SetPlaceholderColor(Color(75,75,75))
-	desc:Dock(FILL)
 
 	local playbutton = infopanel:Add("DButton")
 	playbutton:Dock(BOTTOM)
@@ -314,79 +444,46 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	noshow:SetFont(headerfont)
 	noshow:SetText("<-- Click a Config to display.")
 
-	local addonlist2_Scroll = addonarea:Add("DScrollPanel")
-	addonlist2_Scroll:Dock(FILL)
-	local addonlist2 = addonlist2_Scroll:Add("DListLayout")
-	addonlist2:Dock(FILL)
-
 	-- Control selecting configs
-	local function doconfigclick(pnl)
-		if not IsValid(pnl) or not pnl.Config then infopanel:SetVisible(false) infopanel.Config = nil return end
+	local function displayconfig(cfg)
+		infopanel.Config = cfg
+		if not cfg then infopanel:SetVisible(false) return end
 		infopanel:SetVisible(true)
 
-		local cfg = pnl.Config
-		infopanel.Config = cfg
-		configname:SetText(cfg.Name)
-		authors:SetText(cfg.Authors)
-		desc:SetText(cfg.Description)
-		mapname:SetText("File: " .. cfg.Codename .. " || Map: "..cfg.Map)
-		widentry:SetText(cfg.WorkshopID or "")
-
-		img:SetImage(nzu.GetConfigThumbnail(cfg) or "vgui/black.png")
-
-		-- Edits and stuff
-		if nzu.IsAdmin(LocalPlayer()) and cfg == editedconfig and (cfg.Type == "Local" or cfg.Type == "Unsaved") then
-			addonscroll:SetVisible(true)
-			addonlist2_Scroll:SetVisible(false)
-
-			save:SetEnabled(true)
-			reload:SetText("Reload last saved version")
-			reload:SetEnabled(true)
-			savemeta:SetEnabled(true)
-			delete:SetEnabled(true)
-
-			configname:SetEnabled(true)
-			authors:SetEnabled(true)
-			desc:SetEnabled(true)
-			widentry:SetEnabled(true)
-			ab:SetEnabled(true)
-			playbutton:SetText("Save and Play")
-		else
-			addonscroll:SetVisible(false)
-			addonlist2_Scroll:SetVisible(true)
-
-			save:SetEnabled(false)
-			reload:SetText(cfg == nzu.CurrentConfig and "Reload Config" or "Load Config")
-			reload:SetEnabled(nzu.IsAdmin(LocalPlayer()))
-			savemeta:SetEnabled(false)
-			delete:SetEnabled(cfg.Type == "Local" and nzu.IsAdmin(LocalPlayer()))
-
-			addonlist2:Clear()
-			for k,v in pairs(cfg.RequiredAddons) do
-				local lbl = addonlist2:Add("DLabelURL")
-				lbl:SetText(v)
-				lbl:SetURL("https://steamcommunity.com/sharedfiles/filedetails/?id="..k)
-				lbl:SetTextColor(steamworks.ShouldMountAddon(k) and Color(0,255,0) or Color(255,0,0))
-			end
-
-			configname:SetEnabled(false)
-			authors:SetEnabled(false)
-			desc:SetEnabled(false)
-			widentry:SetEnabled(false)
-			ab:SetEnabled(false)
-
-			playbutton:SetText("Load and Play")
+		local iseditedconfig = infopanel.IsEditedConfig
+		for k,v in pairs(editpanels) do
+			v.Contents:SetText(iseditedconfig and editsmade[k] or cfg[k] or "")
 		end
+		img:SetImage(nzu.GetConfigThumbnail(cfg) or "vgui/black.png")
+		mapname:SetText("File: " .. cfg.Codename .. " || Map: "..cfg.Map)
+
+		-- Editing
+		local canedit = iseditedconfig and nzu.IsAdmin(LocalPlayer()) and (cfg.Type == "Local" or cfg.Type == "Unsaved")
+		for k,v in pairs(editpanels) do
+			v.Contents:SetEnabled(canedit)
+		end
+
+		save:SetEnabled(canedit)
+		reload:SetText(canedit and "Reload last saved version" or cfg == nzu.CurrentConfig and "Reload Config" or "Load Config")
+		reload:SetEnabled(canedit or nzu.IsAdmin(LocalPlayer()))
+		savemeta:SetEnabled(canedit)
+		delete:SetEnabled(canedit or (cfg.Type == "Local" and nzu.IsAdmin(LocalPlayer())))
+		playbutton:SetText(canedit and "Save and Play" or "Load and Play")
+
 	end
 	configlist.OnConfigClicked = function(s,cfg,pnl)
-		loadedcfg:SetSelected(loadedcfg:GetConfig() == cfg)
-		doconfigclick(pnl)
+		infopanel.IsEditedConfig = false -- Clicking from the list means it's a non-edited one
+		displayconfig(cfg)
+		loadedcfg:SetSelected(false)
 	end
 
 	-- Update through hook if the config updated is the currently viewed one
 	hook.Add("nzu_ConfigInfoSaved", infopanel, function(self, config)
 		if self.Config == config then
-			doconfigclick(self) -- Kinda a fun way to make it update itself, since self.Config is the same
+			displayconfig(config) -- Update it! :D
+		end
+		if config.Codename == editedconfig.Codename and not table.IsEmpty(editsmade) and not editsmade.Name then
+			loadedcfg:SetName(config.Name)
 		end
 	end)
 
@@ -488,25 +585,19 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 		entry:RequestFocus()
 	end
 	loadedcfg.DoClick = function(s)
-		configlist:SelectConfig(s:GetConfig()) -- Update the selected list
 		s:SetSelected(true)
-		doconfigclick(s)
+		infopanel.IsEditedConfig = true
+		displayconfig(editedconfig)
+		configlist:SelectConfig()
 	end
 
 	local function applyinfo()
-		if editedconfig then
-			editedconfig.Name = configname:GetValue()
-			editedconfig.Description = desc:GetValue()
-			editedconfig.Authors = authors:GetValue()
-			editedconfig.WorkshopID = widentry:GetValue()
-			
-			editedconfig.RequiredAddons = {}
-			for k,v in pairs(addonlist.Addons) do
-				if v[2]:GetChecked() then
-					editedconfig.RequiredAddons[k] = v[1]
-				end
-			end
+		for k,v in pairs(editsmade) do
+			editedconfig[k] = v
+			editpanels[k].Revert:SetEnabled(false)
 		end
+		editsmade = {}
+		loadedcfg:SetConfig(editedconfig)
 	end
 
 	save.DoClick = function()

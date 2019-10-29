@@ -217,18 +217,26 @@ local fallback = "vgui/black.png"
 function CONFIGPANEL:Update(config)
 	--print(self, config.Name, self.Config.Name)
 	if self.Config == config then
-		self.Name:SetText(config.Name or "")
+		self:SetName(config.Name)
 		self.Map:SetText(config.Codename .. " || " .. config.Map)
 
 		local status = file.Find("maps/"..config.Map..".bsp", "GAME")[1] and true or false
 		self.MapStatus:SetText(status and "Map installed" or "Map not installed")
 		self.MapStatus:SetTextColor(status and mapinstalled or mapnotinstalled)
 
-		self.Type:SetText(config.Type)
-		self.Type:SetTextColor(typecolors[config.Type] or color_white)
-		
+		self:SetType(config.Type)		
 		self.Thumbnail:SetImage(nzu.GetConfigThumbnail(config), fallback)
 	end
+end
+
+-- Allow manual adjustments
+function CONFIGPANEL:SetType(type)
+	self.Type:SetText(type)
+	self.Type:SetTextColor(typecolors[type] or color_white)
+end
+
+function CONFIGPANEL:SetName(name)
+	self.Name:SetText(name or "")
 end
 
 function CONFIGPANEL:SetConfig(config)
@@ -260,6 +268,10 @@ function CONFIGPANEL:SetSelected(b)
 	self.Selected = b
 end
 function CONFIGPANEL:GetSelected() return self.Selected end
+
+function CONFIGPANEL:SetAutoUpdate(b)
+	
+end
 vgui.Register("nzu_ConfigPanel", CONFIGPANEL, "DPanel")
 
 
