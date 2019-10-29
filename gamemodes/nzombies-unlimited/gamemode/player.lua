@@ -159,6 +159,7 @@ if SERVER then
 				hook.Run("nzu_PlayerUnspawned", ply)
 			end
 		end)
+		ply:AllowFlashlight(true)
 	end
 
 	function GM:PlayerDeathThink() end -- Don't allow button press respawns

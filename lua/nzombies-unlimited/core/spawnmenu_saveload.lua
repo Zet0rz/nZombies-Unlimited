@@ -379,6 +379,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	editpanels.Description.Panel:DockMargin(0,0,0,0)
 	editpanels.WorkshopID.Panel:DockMargin(0,0,0,5)
 
+	-- Add the additional controls
 	local mapname = editpanels.Name.Header:Add("DLabel")
 	mapname:SetText("File:          || Map: ")
 	mapname:SetFont(textfont)
@@ -387,6 +388,38 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 	mapname:SizeToContents()
 	mapname:SetContentAlignment(1)
 
+	local widinfo = editpanels.WorkshopID.Header:Add("DImage")
+	widinfo:SetImage("icon16/information.png")
+	widinfo:Dock(LEFT)
+	widinfo:DockMargin(5,5,0,5)
+	widinfo:SetMouseInputEnabled(true)
+	widinfo:SetTooltip("Enter the numerical ID of this Config's Workshop addon after it has been uploaded.\nThis allows players to view your Config's Workshop page from in-game.")
+	function widinfo:PerformLayout()
+		self:SetWide(self:GetTall())
+	end
+
+	local authorstoplayers = editpanels.Authors.Header:Add("DButton")
+	authorstoplayers:SetText("Set to current players")
+	authorstoplayers:Dock(LEFT)
+	authorstoplayers:SetWide(130)
+	authorstoplayers:DockMargin(10,2,0,2)
+	-- Hook it in so it disables with the text field
+	local oldenable = editpanels.Authors.Contents.SetEnabled
+	function editpanels.Authors.Contents:SetEnabled(b)
+		oldenable(self, b)
+		authorstoplayers:SetEnabled(b)
+	end
+	-- Add its function
+	function authorstoplayers:DoClick()
+		local str = ""
+		for k,v in pairs(player.GetHumans()) do
+			str = str .. v:Nick() .. ", "
+		end
+		str = string.sub(str, 0, #str - 2)
+		editpanels.Authors.Contents:SetValue(str)
+	end
+
+	-- The bottom save/load controls
 	local playbutton = infopanel:Add("DButton")
 	playbutton:Dock(BOTTOM)
 	playbutton:SetText("Save and Play")
@@ -482,7 +515,7 @@ nzu.AddSpawnmenuTab("Save/Load", "DPanel", function(panel)
 		if self.Config == config then
 			displayconfig(config) -- Update it! :D
 		end
-		if config.Codename == editedconfig.Codename and not table.IsEmpty(editsmade) and not editsmade.Name then
+		if editedconfig and config.Codename == editedconfig.Codename and not table.IsEmpty(editsmade) and not editsmade.Name then
 			loadedcfg:SetName(config.Name)
 		end
 	end)

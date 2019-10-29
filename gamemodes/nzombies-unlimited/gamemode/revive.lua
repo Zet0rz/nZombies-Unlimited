@@ -155,6 +155,7 @@ if SERVER then
 				net.WriteBool(false)
 				net.WriteBool(false)
 			net.Broadcast()
+			hook.Run("nzu_PlayerBledOut", ply)
 		end
 	end)
 
@@ -345,7 +346,9 @@ end
 if CLIENT then
 	-- CalcViews
 	local rotang = Angle(0,0,20)
-	hook.Add("CalcView", "nzu_Revive_DownedView", function(ply, pos, ang, fov, znear, zfar)
+	hook.Add("CalcView", "nzu_Revive_DownedView", function(pl, pos, ang, fov, znear, zfar)
+		local ply = pl:GetObserverTarget()
+		if not IsValid(ply) then ply = pl end
 		if ply:GetIsDowned() then
 			local view = {fov = fov, znear = znear, zfar = zfar}
 			view.origin = pos + visionlowered
@@ -356,7 +359,9 @@ if CLIENT then
 	end)
 
 	hook.Add("CalcViewModelView", "nzu_Revive_DownedViewmodel", function(wep, vm, oldp, olda, pos, ang)
-		if LocalPlayer():GetIsDowned() then
+		local ply = LocalPlayer():GetObserverTarget()
+		if not IsValid(ply) then ply = LocalPlayer() end
+		if ply:GetIsDowned() then
 			return pos + visionlowered, ang + rotang
 		end
 	end)
@@ -481,8 +486,6 @@ if CLIENT then
 					end
 				end
 			end
-
-			--print(revivor)
 
 			if IsValid(revivor) then -- Someone's reviving us
 				localplayer = revivor

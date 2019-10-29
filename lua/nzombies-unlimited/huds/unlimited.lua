@@ -68,7 +68,7 @@ local initialcounter
 
 local ROUND = nzu.Round
 
-function HUD:Round(r, state)
+function HUD:Round(ply, r, state)
 	local CT = CurTime()
 	--local r = ROUND:GetRound()
 	--local state = ROUND:GetState()
@@ -424,11 +424,8 @@ function HUD:Points()
 		end
 	end)
 
-	-- The returned function cleans up what this function created
-	return function()
-		hook.Remove("nzu_PlayerPointNotify", pnl)
-		pnl:Remove()
-	end
+	-- Return the panel so the HUD can remove it when it should be cleaned up
+	return pnl
 end
 
 --[[-------------------------------------------------------------------------
@@ -441,10 +438,9 @@ local pulse_time = 1
 local pulse_base = 0.75 -- How much of the full overlay is contributed by the base health (the rest is added by the pulse)
 
 HUD.DamageOverlayMaterial = Material("materials/nzombies-unlimited/hud/overlay_low_health.png", "unlitgeneric smooth")
-function HUD:Health(health, max)
-	--local ply = LocalPlayer() -- TODO: When spectating exists, replace this with view target
-	--local health = ply:Health()
-	--local max = ply:GetMaxHealth()
+function HUD:Paint_Health(ply) -- Paint_ function: It is hooked without needing to be nzu.HUDComponent-registered. Use this for anything you just always wanna draw with your HUD.
+	local health = ply:Health()
+	local max = ply:GetMaxHealth()
 
 	local pct = health/max
 	if pct < min_threshold then
@@ -477,9 +473,7 @@ local weaponfont_name = "nzu_Font_Bloody_Medium"
 
 local equipmentfont = "nzu_Font_Bloody_Small"
 
-function HUD:Weapons(hudweapons)
-	local ply = LocalPlayer() -- TODO: Update to spectator when implemented
-
+function HUD:Weapons(ply, hudweapons)
 	local w,h = ScrW(),ScrH()
 
 	local nameposh = h - 185
@@ -605,7 +599,7 @@ function HUD:_GetDownedIndicatorPosition(ply)
 	end
 end
 
-function HUD:Draw_DownedIndicator(ply, revivor)
+function HUD:Draw_DownedIndicator(_, ply, revivor)
 	local x,y = self:_GetDownedIndicatorPosition(ply)
 	if x then
 		surface.SetFont(REVIVEfont)
@@ -650,7 +644,7 @@ end
 --[[-------------------------------------------------------------------------
 Revive Progress
 ---------------------------------------------------------------------------]]
-function HUD:Draw_ReviveProgress(ply, isbeingrevived)
+function HUD:Draw_ReviveProgress(_, ply, isbeingrevived)
 	local lp = LocalPlayer()
 	local w,h = ScrW()/2 ,ScrH()
 	local revivor = isbeingrevived and ply or LocalPlayer()
@@ -686,7 +680,7 @@ local colmod = {
 	["$pp_colour_mulg"] = 0,
 	["$pp_colour_mulb"] = 0
 }
-function HUD:Draw_BleedoutScreenspaceEffects(downtime, deathtime) -- Deathtime will be added later when variable down times is supported and networked
+function HUD:Draw_BleedoutScreenspaceEffects(ply, downtime, deathtime) -- Deathtime will be added later when variable down times is supported and networked
 	local pct = (CurTime() - downtime)/bleedouttime -- For now we just use the static 45 second variable
 	colmod["$pp_colour_colour"] = 1 - pct
 	colmod["$pp_colour_addr"] = pct*0.5
@@ -708,7 +702,7 @@ local typeformats = {
 	[TARGETID_TYPE_ELECTRICITY] = function(text) return text end,
 }
 
-function HUD:Draw_TargetID(text, typ, data, ent)
+function HUD:Draw_TargetID(ply, text, typ, data, ent)
 	local x,y = ScrW()/2, ScrH()/2 + 100
 	local str = typeformats[typ] and typeformats[typ](text, data, ent) or text
 

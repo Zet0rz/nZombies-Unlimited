@@ -321,6 +321,7 @@ if SERVER then
 		if IsValid(wep) and not noammo then
 			wep:SetMaxAmmo()
 		end
+		return wep
 	end
 
 	function PLAYER:StripWeaponSlot(slot)
@@ -332,7 +333,7 @@ if SERVER then
 
 	local function doweaponslotnetwork(ply, wep, slot)
 		wep.nzu_OldWeight = wep.Weight
-		wep.Weight = 10000 -- Ensure this weapon is always selected!
+		wep.Weight = math.huge -- Ensure this weapon is always selected!
 		ply:StripWeaponSlot(slot)
 		doweaponslot(ply, wep, slot)
 
@@ -360,6 +361,7 @@ if SERVER then
 	function PLAYER:GiveWeaponInSlot(class, slot, noammo)
 		local wep = self:Give(class, noammo)
 		if IsValid(wep) then doweaponslotnetwork(self, wep, slot) end
+		return wep
 	end
 
 	hook.Add("WeaponEquip", "nzu_WeaponPickedUp", function(wep, ply)
@@ -435,9 +437,7 @@ hook.Add("PlayerButtonDown", "nzu_WeaponSwitching_Keybinds", function(ply, but)
 		end
 	end]]
 
-	if but == KEY_Q then
-		ply:SelectPreviousWeapon()
-	elseif slot then
+	if slot then
 		local wep = ply:GetWeaponInSlot(slot)
 		if IsValid(wep) then
 			ply:SelectWeaponPredicted(wep)

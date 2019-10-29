@@ -244,7 +244,7 @@ else
 
 	local function populateoptions(p,id)
 		local id = string.lower(id)
-		if p.Setting ~= id then return end
+		if string.lower(p.Setting) ~= string.lower(id) then return end
 		p:Clear()
 		p:AddChoice("None", "")
 

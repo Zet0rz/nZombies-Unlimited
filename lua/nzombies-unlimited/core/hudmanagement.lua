@@ -145,40 +145,75 @@ Loading HUD Objects and activating them
 if NZU_NZOMBIES then
 	local argfuncs = {}
 	local paints = {}
-	local removals = {}
+	local panels = {}
 	local fallbacks = {}
 
 	local activehud = nzu.ActiveHUD
 	local deployed = false
 	local function undeploy()
-		for k,v in pairs(removals) do
-			if type(v) == "function" then v() end
+		for k,v in pairs(panels) do
+			v:Remove()
 		end
 		paints = {}
-		removals = {}
+		panels = {}
 
 		if deployed and activehud and activehud.OnUndeployed then activehud:OnUndeployed() end
 		deployed = false
 	end
 
+	--[[-------------------------------------------------------------------------
+	Observed player system
+	This system controls which player the HUD draws for. When spectating, this changes
+	to the spectated player. It is LocalPlayer() all other times.
+	---------------------------------------------------------------------------]]
+	local observedplayer
+	local function changeobservedplayer(new)
+		observedplayer = new
+		for k,v in pairs(panels) do
+			if v.UpdateObservedTarget then
+				local replacement = v:UpdateObservedTarget(new)
+				if IsValid(replacement) then panels[k] = replacement end -- You can replace it by returning a new panel; though you SHOULD just update the panel
+			end
+		end
+
+		if activehud then
+			activehud.Player = new
+			if activehud.OnPlayerChanged then activehud:OnPlayerChanged(new) end
+		end
+	end
+
+	hook.Add("Think", "nzu_HUD_ObservedTargetChange", function()
+		local lp = LocalPlayer()
+		local obs = lp:GetObserverTarget()
+		local target = IsValid(obs) and obs or lp
+		if observedplayer ~= target then
+			changeobservedplayer(target)
+		end
+	end)
+
+	function nzu.GetObservedPlayer() return observedplayer end
+
+	--[[-------------------------------------------------------------------------
+	Deployment & Function handling
+	---------------------------------------------------------------------------]]
 	local function handlefunc(k,hud)
-		local f = hud[k] or fallbacks[k] -- Get the function from the HUD object
+		local f = hud[k] -- Get the function from the HUD object
 		if f == nil then f = fallbacks[k] end -- If it is NOT nil, then it is the fallback function (You can set HUD.Func = false to block components)
 		if f then
 			local args = argfuncs[k] -- If we have an argument function, use that
 			if type(args) == "function" then
-				local rem = f(hud, args())
-				if rem then
-					removals[k] = rem -- The function returned something which means something was created, and this is not a paint
+				local pnl = f(hud, observedplayer, args(observedplayer))
+				if pnl then
+					panels[k] = pnl -- The function returned something which means something was created, and this is not a paint
 				else
-					paints[k] = function() f(hud, args()) end -- Otherwise, wrap it using the HUD object itself (to allow 'self') and the arguments from argfunc
+					paints[k] = function() f(hud, observedplayer, args(observedplayer)) end -- Otherwise, wrap it using the HUD object itself (to allow 'self') and the arguments from argfunc
 				end
 			else
-				local rem = f(hud) -- Same, but without arguments
-				if rem then
-					removals[k] = rem
+				local pnl = f(hud, observedplayer) -- Same, but without arguments
+				if pnl then
+					panels[k] = pnl
 				else
-					paints[k] = function() f(hud) end
+					paints[k] = function() f(hud, observedplayer) end
 				end
 			end
 		end
@@ -194,6 +229,7 @@ if NZU_NZOMBIES then
 			end
 		end
 
+		hud.Player = observedplayer
 		if hud.OnDeployed then hud:OnDeployed() end
 		deployed = true
 	end
@@ -256,11 +292,27 @@ if NZU_NZOMBIES then
 		local name = "Draw_"..id
 		local func = activehud[name] or fallbacks[name]
 		if func then
-			func(activehud, a,b,c,d,e)
+			func(activehud, observedplayer, a,b,c,d,e)
 		end
 	end
 
 	function nzu.GetActiveHUD() return activehud end
+
+	--[[-------------------------------------------------------------------------
+	Drawing Effects
+	---------------------------------------------------------------------------]]
+	function nzu.HUDEffect(id, a,b,c,d,e)
+		local name = "Effect_"..id
+		local func = activehud[name] or fallbacks[name]
+
+		if func then
+			hook.Add("HUDPaint", "nzu_HUD_Effect_"..id, function()
+				if func(activehud, observedplayer, a,b,c,d,e) then
+					hook.Remove("HUDPaint", "nzu_HUD_Effect_"..id)
+				end
+			end)
+		end
+	end
 
 	--[[-------------------------------------------------------------------------
 	Registering a HUD Component
@@ -274,7 +326,7 @@ if NZU_NZOMBIES then
 	function nzu.HUDComponent(key, argfunc, fallbackfunc)
 		fallbacks[key] = fallbackfunc
 
-		if string.sub(key, 1, 5) ~= "Draw_" then -- Using Draw_'s will just assign a fallback to these functions without hooking
+		if string.sub(key, 1, 5) ~= "Draw_" and string.sub(key, 1, 7) ~= "Effect_" then -- Using Draw_'s and Effect_'s will just assign a fallback to these functions without hooking
 			local enable = argfunc ~= false
 			argfuncs[key] = enable and (argfunc or true) or nil
 
@@ -283,10 +335,10 @@ if NZU_NZOMBIES then
 					handlefunc(key, activehud)
 				else
 					paints[key] = nil
-					if removals[key] and type(removals[key]) == "function" then
-						removals[key]()
+					if panels[key] then
+						panels[key]:Remove()
 					end
-					removals[key] = nil
+					panels[key] = nil
 				end
 			end
 		end
