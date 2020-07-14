@@ -53,19 +53,26 @@ SWEP.nzu_PreventBox = true -- Do not put in the box by default
 -- We do our own logic for special deploying this weapon if it is in the knife slot
 -- This function replaces SWEP:Deploy() on creation when given into a Knife slot
 -- SWEP:Deploy() is then moved to SWEP:OldDeploy() (which can be called if wanted)
-function SWEP:SpecialDeployKnife()
-	self.Owner:SetWeaponLocked(true)
-	self:PrimaryAttack()
-end
+--function SWEP:SpecialDeployKnife()
+	--self.Owner:SetWeaponLocked(true)
+	--self:PrimaryAttack()
+--end
 
-function SWEP:SpecialSlotKnife()
-	self.OldDeploy = self.Deploy
-	self.Deploy = self.SpecialDeployKnife
+--function SWEP:SpecialSlotKnife()
+	--self.OldDeploy = self.Deploy
+	--self.Deploy = self.SpecialDeployKnife
+--end
+
+-- This function is called instead of SWEP:Deploy() if the weapon is deployed through a Special Slot keybind
+-- This function is NOT called instead of SWEP:Deploy() if the weapon is switched to in ANOTHER means than keybind, even if it is special slot
+-- It works by temporarily replacing SWEP:Deploy() with a function that runs this function. This is restored upon switching to any other weapon
+-- Access the old SWEP:Deploy() using 'self:nzu_NonSpecialDeploy()'
+function SWEP:SpecialDeploy()
+	self:PrimaryAttack()
 end
 
 function SWEP:PrimaryAttack()
 	self.IsKnifing = true
-	self.nzu_CanSpecialHolster = false
 
 	self:SwingAnimation()
 	if SERVER then
@@ -150,7 +157,6 @@ Internals
 function SWEP:Think()
 	if self.IsKnifing and CurTime() >= self:GetNextPrimaryFire() then
 		self.IsKnifing = nil
-		self.nzu_CanSpecialHolster = true
 		self:OnSwingFinished()
 	end
 end
@@ -159,8 +165,13 @@ end
 -- It is predicted and shared from the Think() above
 if NZU_NZOMBIES then
 	function SWEP:OnSwingFinished()
-		self.Owner:SetWeaponLocked(false)
-		self.Owner:SelectPreviousWeapon()
+		if self:IsSpecialDeployed() then
+			if self:SpecialKeyDown() then
+				self.nzu_IsSpecialDeployed = false -- Make it no longer special deployed
+			else
+				self.Owner:SelectPreviousWeapon()
+			end
+		end
 	end
 else
 	function SWEP:OnSwingFinished()
@@ -170,9 +181,4 @@ end
 
 function SWEP:Holster(wep)
 	return not self.IsKnifing
-end
-
--- Sandbox compatibility pretty much
-function SWEP:Deploy()
-	self:PrimaryAttack()
 end

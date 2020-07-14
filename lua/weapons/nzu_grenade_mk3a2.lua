@@ -54,23 +54,37 @@ SWEP.nzu_PreventBox = true
 -- We do our own logic for special deploying this weapon if it is in the knife slot
 -- This function replaces SWEP:Deploy() on creation when given into a Knife slot
 -- SWEP:Deploy() is then moved to SWEP:OldDeploy() (which can be called if wanted)
-function SWEP:SpecialDeployGrenade()
-	self.Owner:SetWeaponLocked(true)
-	self:PrimaryAttack()
-end
+--function SWEP:SpecialDeployGrenade()
+	--self.Owner:SetWeaponLocked(true)
+	--self:PrimaryAttack()
+--end
 
 -- When the weapon is equipped in the Grenade slot
-function SWEP:SpecialSlotGrenade()
-	self.OldDeploy = self.Deploy
-	self.Deploy = self.SpecialDeployGrenade
+--function SWEP:SpecialSlotGrenade()
+	--self.OldDeploy = self.Deploy
+	--self.Deploy = self.SpecialDeployGrenade
+--end
+
+-- This function determines whether the weapon can be deployed with Special Deploy (keybind)
+function SWEP:CanSpecialDeploy()
+	return self:Ammo1() > 0
 end
 
-function SWEP:PrimaryAttack()
+-- This function is called instead of SWEP:Deploy() if the weapon is deployed through a Special Slot keybind
+-- This function is NOT called instead of SWEP:Deploy() if the weapon is switched to in ANOTHER means than keybind, even if it is special slot
+-- It works by temporarily replacing SWEP:Deploy() with a function that runs this function. This is restored upon switching to any other weapon
+-- Access the old SWEP:Deploy() using 'self:nzu_NonSpecialDeploy()'
+function SWEP:SpecialDeploy()
 	self.IsThrowing = true
-	self.nzu_CanSpecialHolster = false
 
 	self:DeployAnimation()
 	self.ThrowTime = CurTime() + self.DeployDelay
+end
+
+function SWEP:PrimaryAttack()
+	if self:Ammo1() > 0 then
+		self:SpecialDeploy()
+	end
 end
 
 function SWEP:DeployAnimation()
@@ -81,11 +95,6 @@ end
 function SWEP:ThrowAnimation()
 	self:SendWeaponAnim(ACT_VM_THROW)
 	self.Owner:SetAnimation(PLAYER_ATTACK1)
-end
-
--- Block deploying if we have no ammo
-function SWEP:PreventDeploy()
-	return self:Ammo1() < 1
 end
 
 if CLIENT then
@@ -155,6 +164,8 @@ end
 
 function SWEP:Overcook()
 	if SERVER then
+		self:TakePrimaryAmmo(1)
+
 		local e = EffectData()
 		e:SetOrigin(self.Owner:GetPos())
 		util.Effect("Explosion", e, false, true)
@@ -168,7 +179,6 @@ function SWEP:Finish()
 	self.ThrowTime = nil
 	self.HolsterTime = nil
 	self.IsThrowing = nil
-	self.nzu_CanSpecialHolster = true
 	self:OnThrowFinished()
 end
 
@@ -183,15 +193,14 @@ end
 -- Sandbox compatibility
 if NZU_NZOMBIES then
 	function SWEP:OnThrowFinished()
-		self.Owner:SetWeaponLocked(false)
-		self.Owner:SelectPreviousWeapon()
+		if self:IsSpecialDeployed() then self.Owner:SelectPreviousWeapon() end
 	end
 	
 	function SWEP:Think()
 		if self.IsThrowing and CurTime() >= self.ThrowTime then
 			if not self.HolsterTime then
 
-				if self.GrenadeCanCook and self:IsSpecialSlotKeyStillDown() then -- Don't throw yet if we're cooking!
+				if self.GrenadeCanCook and (self:SpecialKeyDown() or self.Owner:KeyDown(IN_ATTACK)) then -- Don't throw yet if we're cooking!
 					if CurTime() >= self.ThrowTime + self.GrenadeTime then
 						self:Overcook()
 					end

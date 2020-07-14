@@ -414,44 +414,95 @@ function PLAYER:SelectWeaponPredicted(wep)
 	self.nzu_DoSelectWeaponTime = CurTime() + maxswitchtime
 end
 
+-- Select the weapon, but mark it as a Special deploy
+function PLAYER:SpecialSelectWeaponPredicted(wep)
+	local w = self.nzu_DoSelectWeaponSpecial
+	if IsValid(w) and w ~= wep then
+		if w.nzu_NonSpecialDeploy then
+			w.Deploy = w.nzu_NonSpecialDeploy
+			w.nzu_NonSpecialDeploy = nil
+		end
+		w.nzu_IsSpecialDeployed = nil
+	end
+
+	self:SelectWeaponPredicted(wep)
+	self.nzu_DoSelectWeaponSpecial = wep
+	wep.nzu_IsSpecialDeployed = true
+
+	if wep.SpecialDeploy then
+		wep.nzu_NonSpecialDeploy = wep.Deploy
+		function wep:Deploy()
+			self:SpecialDeploy()
+		end
+	end
+end
+
 hook.Add("PlayerButtonDown", "nzu_WeaponSwitching_Keybinds", function(ply, but)
 	-- Buttons 1-10 are keys 0-9
-	local slot = but < 11 and but - 1 or keybinds[but]
-
-	-- What? MOUSE_WHEEL_ doesn't work even though it's within the enum??? D:
-	--[[if not slot then
-
-		print("Not numerical or keybound", but)
-		if but == MOUSE_WHEEL_UP then
-			local wep = ply:GetActiveWeapon()
-			if IsValid(wep) and wep:GetWeaponSlotNumber() then
-				slot = wep:GetWeaponSlotNumber() + 1
-				if slot > ply:GetMaxWeaponSlots() then slot = 1 end
-			end
-		elseif but == MOUSE_WHEEL_DOWN then
-			local wep = ply:GetActiveWeapon()
-			if IsValid(wep) and wep:GetWeaponSlotNumber() then
-				slot = wep:GetWeaponSlotNumber() - 1
-				if slot < 0 then slot = ply:GetMaxWeaponSlots() end
-			end
-		end
-	end]]
-
+	local slot = keybinds[but]
 	if slot then
+		-- It is a keybind (special slot)
 		local wep = ply:GetWeaponInSlot(slot)
-		if IsValid(wep) then
-			ply:SelectWeaponPredicted(wep)
+		if IsValid(wep) and (not wep.CanSpecialDeploy or wep:CanSpecialDeploy()) then
+			wep.nzu_SpecialKeyDown = but
+			if IsValid(ply.nzu_SpecialWeapon) then ply.nzu_SpecialWeapon.nzu_SpecialKeyDown = nil end -- Can only use 1 at a time, to make things simple
 			ply.nzu_SpecialKeyDown = but
+			ply.nzu_SpecialWeapon = wep
+
+			ply:SpecialSelectWeaponPredicted(wep)
+		end
+
+
+	else
+		slot = but < 11 and but - 1
+
+		-- What? MOUSE_WHEEL_ doesn't work even though it's within the enum??? D:
+		--[[if not slot then
+
+			print("Not numerical or keybound", but)
+			if but == MOUSE_WHEEL_UP then
+				local wep = ply:GetActiveWeapon()
+				if IsValid(wep) and wep:GetWeaponSlotNumber() then
+					slot = wep:GetWeaponSlotNumber() + 1
+					if slot > ply:GetMaxWeaponSlots() then slot = 1 end
+				end
+			elseif but == MOUSE_WHEEL_DOWN then
+				local wep = ply:GetActiveWeapon()
+				if IsValid(wep) and wep:GetWeaponSlotNumber() then
+					slot = wep:GetWeaponSlotNumber() - 1
+					if slot < 0 then slot = ply:GetMaxWeaponSlots() end
+				end
+			end
+		end]]
+
+		if slot then
+			local wep = ply:GetWeaponInSlot(slot)
+			if IsValid(wep) then
+				ply:SelectWeaponPredicted(wep)
+			end
 		end
 	end
 end)
 
 hook.Add("PlayerButtonUp", "nzu_WeaponSwitching_Keybinds", function(ply, but)
-	if ply.nzu_SpecialKeyDown == but then ply.nzu_SpecialKeyDown = nil end
+	if ply.nzu_SpecialKeyDown == but then
+		local w = ply.nzu_SpecialWeapon
+		if IsValid(w) then
+			w.nzu_SpecialKeyDown = nil
+			if w.SpecialKeyReleased then w:SpecialKeyReleased() end
+		end
+
+		ply.nzu_SpecialKeyDown = nil
+		ply.nzu_SpecialWeapon = nil
+	end
 end)
 
-function WEAPON:IsSpecialSlotKeyStillDown()
-	return self.Owner.nzu_SpecialKeyDown and keybinds[self.Owner.nzu_SpecialKeyDown] == self:GetWeaponSlot()
+function WEAPON:SpecialKeyDown()
+	return self.nzu_SpecialKeyDown
+end
+
+function WEAPON:IsSpecialDeployed()
+	return self.nzu_IsSpecialDeployed
 end
 
 hook.Add("StartCommand", "nzu_WeaponSwitching", function(ply, cmd)
@@ -471,9 +522,7 @@ hook.Add("StartCommand", "nzu_WeaponSwitching", function(ply, cmd)
 					ply:SelectWeaponPredicted(wep2)
 				end
 			end
-		end
-
-		if ply.nzu_DoSelectWeapon then
+		else
 			if wep == ply.nzu_DoSelectWeapon or CurTime() > ply.nzu_DoSelectWeaponTime then
 				ply.nzu_DoSelectWeapon = nil
 				ply.nzu_DoSelectWeaponTime = nil
@@ -486,6 +535,20 @@ hook.Add("StartCommand", "nzu_WeaponSwitching", function(ply, cmd)
 	if wep ~= ply.nzu_LastActiveWeapon then
 		local w2 = ply.nzu_LastActiveWeapon
 		ply.nzu_LastActiveWeapon = wep
+
+		-- If we have a special selected weapon and we switch to any OTHER weapon, reset this special one
+		local w = ply.nzu_DoSelectWeaponSpecial
+		if w and w ~= wep then
+			if IsValid(w) then
+				if w.nzu_NonSpecialDeploy then
+					w.Deploy = w.nzu_NonSpecialDeploy
+					w.nzu_NonSpecialDeploy = nil
+				end
+				w.nzu_IsSpecialDeployed = nil
+			end
+			ply.nzu_DoSelectWeaponSpecial = nil
+		end
+
 		hook.Run("PostPlayerSwitchWeapon", ply, w2, wep)
 	end
 end)
@@ -498,7 +561,8 @@ end)
 --[[-------------------------------------------------------------------------
 Special weapon slot behavior
 ---------------------------------------------------------------------------]]
-nzu.AddPlayerNetworkVar("Bool", "WeaponLocked") -- When true you can't switch weapons
+nzu.AddPlayerNetworkVar("Entity", "WeaponLocked") -- When set to a weapon, you cannot switch weapons unless it is to this one
+-- When you use this, make sure to also switch to it yourself; it will not auto-switch to the selected weapon
 
 function nzu.SpecialWeaponSlot(id, func)
 	specialslots[id] = func
@@ -535,7 +599,7 @@ if SERVER then
 		end
 	end
 
-	hook.Add("PlayerSpawn", "nzu_Weapons_Unlock", function(ply) ply:SetWeaponLocked(false) end)
+	hook.Add("PlayerSpawn", "nzu_Weapons_Unlock", function(ply) ply:SetWeaponLocked(nil) end)
 else
 	-- Clients just need to predict their own values when holstered. They are only updated from the server when ammo is set while the weapon is already holstered
 	function GM:PostPlayerSwitchWeapon(ply, old, new)
@@ -551,7 +615,9 @@ end
 
 -- Track old weapons and handle blocking of switching based on special slots
 function GM:PlayerSwitchWeapon(ply, old, new)
-	if (ply:GetWeaponLocked() and not old.nzu_CanSpecialHolster) or (new.PreventDeploy and new:PreventDeploy()) then return true end
+	local w = ply:GetWeaponLocked()
+	if IsValid(w) and w ~= new then return true end -- If we have a locked weapon and we aren't switching to that
+	if new.PreventDeploy and new:PreventDeploy() then return true end -- If the new weapon implements PreventDeploy
 
 	if IsValid(old) then
 		if old:GetWeaponSlotNumber() then
@@ -595,91 +661,57 @@ Populate base weapon slots
 ---------------------------------------------------------------------------]]
 
 nzu.AddKeybindToWeaponSlot("Knife", KEY_V)
-if true then
-	nzu.SpecialWeaponSlot("Knife", function(wep)
-		wep.OldDeploy = wep.Deploy
+nzu.AddKeybindToWeaponSlot("Grenade", KEY_G)
+nzu.AddKeybindToWeaponSlot("SpecialGrenade", KEY_B)
 
-		wep.Deploy = function(self)
-			self.Owner:SetWeaponLocked(true)
-			self:SetNextPrimaryFire(0)
-			self:PrimaryFire()
-			timer.Simple(0.5, function()
+local function defaultkeybindattack(self)
+	self.IsAttacking = true
+
+	self:SetNextPrimaryFire(0)
+	self:PrimaryFire()
+
+	timer.Simple(0.5, function()
+		if IsValid(self) then
+			local vm = self.Owner:GetViewModel()
+			local seq = vm:GetSequence()
+			local dur = vm:SequenceDuration(seq)
+			local remaining = dur - dur*vm:GetCycle()
+			timer.Simple(remaining, function()
 				if IsValid(self) then
-					local vm = self.Owner:GetViewModel()
-					local seq = vm:GetSequence()
-					local dur = vm:SequenceDuration(seq)
-					local remaining = dur - dur*vm:GetCycle()
-					timer.Simple(remaining, function()
-						if IsValid(self) then
-							self.Owner:SetWeaponLocked(false)
-							self.Owner:SelectPreviousWeapon()
-						end
-					end)
+					self.IsAttacking = nil
+					self.Owner:SelectPreviousWeapon()
 				end
 			end)
 		end
 	end)
 end
+local function defaultmodify(wep)
+	if not wep.SpecialDeploy then
+		wep.SpecialDeploy = defaultkeybindattack
 
-nzu.AddKeybindToWeaponSlot("Grenade", KEY_G)
-if true then
-	nzu.SpecialWeaponSlot("Grenade", function(wep)
-		wep.OldDeploy = wep.Deploy
-
-		wep.Deploy = function(self)
-			self.Owner:SetWeaponLocked(true)
-			self:SetNextPrimaryFire(0)
-			self:PrimaryFire()
-			timer.Simple(0.5, function()
-				if IsValid(self) then
-					local vm = self.Owner:GetViewModel()
-					local seq = vm:GetSequence()
-					local dur = vm:SequenceDuration(seq)
-					local remaining = dur - dur*vm:GetCycle()
-					timer.Simple(remaining, function()
-						if IsValid(self) then
-							self.Owner:SetWeaponLocked(false)
-							self.Owner:SelectPreviousWeapon()
-						end
-					end)
-				end
-			end)
+		local oldholster = wep.Holster
+		wep.Holster = function(self)
+			return not self.IsAttacking and oldholster(self)
 		end
-
-		if not wep.GiveRoundProgressionAmmo then
-			wep.AmmoPerRound = 2
-			wep.GrenadeMax = 4
-			wep.GiveRoundProgressionAmmo = weapons.GetStored("nzu_grenade_mk3a2").GiveRoundProgressionAmmo
-		end
-	end, true)
+	end
 end
 
-nzu.AddKeybindToWeaponSlot("SpecialGrenade", KEY_B)
-if true then
-	nzu.SpecialWeaponSlot("SpecialGrenade", function(wep)
-		wep.OldDeploy = wep.Deploy
+nzu.SpecialWeaponSlot("Knife", function(wep)
+	defaultmodify(wep)
+	wep.nzu_InstantDeploy = true -- Knives will additionally have instant deploy on
+end)
+nzu.SpecialWeaponSlot("Grenade", function(wep)
+	defaultmodify(wep)
 
-		wep.Deploy = function(self)
-			self.Owner:SetWeaponLocked(true)
-			self:SetNextPrimaryFire(0)
-			self:PrimaryFire()
-			timer.Simple(0.5, function()
-				if IsValid(self) then
-					local vm = self.Owner:GetViewModel()
-					local seq = vm:GetSequence()
-					local dur = vm:SequenceDuration(seq)
-					local remaining = dur - dur*vm:GetCycle()
-					timer.Simple(remaining, function()
-						if IsValid(self) then
-							self.Owner:SetWeaponLocked(false)
-							self.Owner:SelectPreviousWeapon()
-						end
-					end)
-				end
-			end)
-		end
-	end, true)
-end
+	-- Grenades will additionally auto-modify round progression ammo
+	if not wep.GiveRoundProgressionAmmo then
+		wep.AmmoPerRound = 2
+		wep.GrenadeMax = 4
+		wep.GiveRoundProgressionAmmo = weapons.GetStored("nzu_grenade_mk3a2").GiveRoundProgressionAmmo
+	end
+end, true)
+
+nzu.SpecialWeaponSlot("SpecialGrenade", defaultmodify, true)
 
 
 
@@ -690,7 +722,7 @@ We use this with knives to make them instantly attack, regardless of holster ani
 hook.Add("nzu_WeaponEquippedInSlot", "nzu_Weapons_InstantHolsterFunction", function(ply, wep, slot)
 	local old = wep.Holster
 	function wep:Holster(w2)
-		if w2.nzu_InstantDeploy then return true end
+		if w2.nzu_InstantDeploy then old(self, w2) return true end
 		return old(self, w2)
 	end
 end)
