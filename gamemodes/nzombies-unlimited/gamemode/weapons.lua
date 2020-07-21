@@ -16,6 +16,12 @@ if SERVER then
 	hook.Add("PlayerInitialSpawn", "nzu_WeaponSlotsInit", doinitialize)
 else
 	hook.Add("InitPostEntity", "nzu_WeaponSlotsInit", function() doinitialize(LocalPlayer()) end)
+
+	-- Enable Clients to also have access to hook "WeaponEquip" as well as SWEP:EquipClient() through the hook HUDWeaponPickedUp
+	hook.Add("HUDWeaponPickedUp", "nzu_ClientsideWeaponEquip", function(wep)
+		if wep.EquipClient then wep:Equip() end
+		hook.Run("WeaponEquip", wep, LocalPlayer())
+	end)
 end
 
 
@@ -46,7 +52,7 @@ function PLAYER:GetReplaceWeaponSlot()
 			return v.ID
 		end
 	end
-	
+
 	local wep = self:GetActiveWeapon()
 	return IsValid(wep) and wep:GetWeaponSlotNumber() or IsValid(self.nzu_PreviousWeapon) and self.nzu_PreviousWeapon:GetWeaponSlotNumber() or 1
 end
@@ -80,7 +86,7 @@ local function calculatemaxammo(self)
 			x = 10 -- The amount of ammo for guns that have no mags or single-shot mags
 		else
 			local upper = self.nzu_UpperPrimaryAmmo or 300
-			x = clip * math.Min(10, math.ceil(upper/clip))
+			x = clip * math.Min(10, math.ceil(upper / clip))
 		end
 	end
 
@@ -90,7 +96,7 @@ local function calculatemaxammo(self)
 			y = 10 -- The amount of ammo for guns that have no mags or single-shot mags
 		else
 			local upper = self.nzu_UpperSecondaryAmmo or 300
-			y = clip * math.Min(10, math.ceil(upper/clip))
+			y = clip * math.Min(10, math.ceil(upper / clip))
 		end
 	end
 
@@ -123,21 +129,21 @@ if SERVER then
 			local x,y = calculatemaxammo(self)
 
 			if x and primary >= 0 then
-				local count = self.Owner:GetAmmoCount(primary)
+				local count = self:GetOwner():GetAmmoCount(primary)
 				local diff = x - count
-				if self.Owner:GetActiveWeapon() == self then
-					self.Owner:GiveAmmo(diff, primary)
+				if self:GetOwner():GetActiveWeapon() == self then
+					self:GetOwner():GiveAmmo(diff, primary)
 				else
 					doholsteredammo(self, x, true)
 				end
 			end
 
 			if y and secondary >= 0 then
-				local count = self.Owner:GetAmmoCount(secondary)
+				local count = self:GetOwner():GetAmmoCount(secondary)
 				local diff = y - count
 				if diff > 0 then
-					if self.Owner:GetActiveWeapon() == self then
-						self.Owner:GiveAmmo(diff, secondary)
+					if self:GetOwner():GetActiveWeapon() == self then
+						self:GetOwner():GiveAmmo(diff, secondary)
 					else
 						doholsteredammo(self, y, false)
 					end
@@ -149,8 +155,8 @@ if SERVER then
 	function WEAPON:GivePrimaryAmmo(diff)
 		local ammo = self:GetPrimaryAmmoType()
 		if ammo >= 0 then
-			if self.Owner:GetActiveWeapon() == self then
-				self.Owner:GiveAmmo(diff, ammo)
+			if self:GetOwner():GetActiveWeapon() == self then
+				self:GetOwner():GiveAmmo(diff, ammo)
 			else
 				doholsteredammo(self, self:Ammo1() + diff, true)
 			end
@@ -160,8 +166,8 @@ if SERVER then
 	function WEAPON:GiveSecondaryAmmo(diff)
 		local ammo = self:GetSecondaryAmmoType()
 		if ammo >= 0 then
-			if self.Owner:GetActiveWeapon() == self then
-				self.Owner:GiveAmmo(diff, ammo)
+			if self:GetOwner():GetActiveWeapon() == self then
+				self:GetOwner():GiveAmmo(diff, ammo)
 			else
 				doholsteredammo(self, self:Ammo2() + diff, false)
 			end
@@ -177,16 +183,16 @@ if SERVER then
 			local x,y = calculatemaxammo(self)
 
 			if x and primary >= 0 then
-				if self.Owner:GetActiveWeapon() == self then
-					self.Owner:SetAmmo(x, primary)
+				if self:GetOwner():GetActiveWeapon() == self then
+					self:GetOwner():SetAmmo(x, primary)
 				else
 					doholsteredammo(self, x, true)
 				end
 			end
 
 			if y and secondary >= 0 then
-				if self.Owner:GetActiveWeapon() == self then
-					self.Owner:SetAmmo(y, secondary)
+				if self:GetOwner():GetActiveWeapon() == self then
+					self:GetOwner():SetAmmo(y, secondary)
 				else
 					doholsteredammo(self, y, false)
 				end
@@ -233,10 +239,10 @@ end
 
 -- If the weapon is active, its ammo is the player's ammo. Otherwise it's the stored number
 function WEAPON:Ammo1()
-	return self.Owner:GetActiveWeapon() == self and self.Owner:GetAmmoCount(self:GetPrimaryAmmoType()) or self.nzu_PrimaryAmmo or self.Owner:GetAmmoCount(self:GetPrimaryAmmoType())
+	return self:GetOwner():GetActiveWeapon() == self and self:GetOwner():GetAmmoCount(self:GetPrimaryAmmoType()) or self.nzu_PrimaryAmmo or self:GetOwner():GetAmmoCount(self:GetPrimaryAmmoType())
 end
 function WEAPON:Ammo2()
-	return self.Owner:GetActiveWeapon() == self and self.Owner:GetAmmoCount(self:GetSecondaryAmmoType()) or self.nzu_SecondaryAmmo or self.Owner:GetAmmoCount(self:GetSecondaryAmmoType())
+	return self:GetOwner():GetActiveWeapon() == self and self:GetOwner():GetAmmoCount(self:GetSecondaryAmmoType()) or self.nzu_SecondaryAmmo or self:GetOwner():GetAmmoCount(self:GetSecondaryAmmoType())
 end
 
 
@@ -259,7 +265,7 @@ local function doweaponslot(ply, wep, slot)
 
 	local id = wslot.ID
 	if specialslots[id] then
-		local func = wep["SpecialSlot"..id] or wep["SpecialSlot"] or specialslots[id]
+		local func = wep["SpecialSlot" .. id] or wep["SpecialSlot"] or specialslots[id]
 		if func then func(wep, ply, id) end
 	end
 
@@ -267,7 +273,7 @@ local function doweaponslot(ply, wep, slot)
 	if wslot.Number and IsValid(wep) then
 		ply:SelectWeaponPredicted(wep)
 	end
-	
+
 	hook.Run("nzu_WeaponEquippedInSlot", ply, wep, slot)
 end
 
@@ -382,10 +388,10 @@ else
 		if IsValid(wep) then
 			doweaponslot(LocalPlayer(), wep, slot)
 		else -- If we get networking before the entity is valid, keep an eye out for when it should be ready
-			hook.Add("HUDWeaponPickedUp", "nzu_WeaponSlot"..slot, function(wep)
+			hook.Add("WeaponEquip", "nzu_WeaponSlot" .. slot, function(wep)
 				if wep:EntIndex() == i then
 					doweaponslot(LocalPlayer(), wep, slot)
-					hook.Remove("HUDWeaponPickedUp", "nzu_WeaponSlot"..slot)
+					hook.Remove("WeaponEquip", "nzu_WeaponSlot" .. slot)
 				end
 			end)
 		end
@@ -672,14 +678,14 @@ local function defaultkeybindattack(self)
 
 	timer.Simple(0.5, function()
 		if IsValid(self) then
-			local vm = self.Owner:GetViewModel()
+			local vm = self:GetOwner():GetViewModel()
 			local seq = vm:GetSequence()
 			local dur = vm:SequenceDuration(seq)
 			local remaining = dur - dur*vm:GetCycle()
 			timer.Simple(remaining, function()
 				if IsValid(self) then
 					self.IsAttacking = nil
-					self.Owner:SelectPreviousWeapon()
+					self:GetOwner():SelectPreviousWeapon()
 				end
 			end)
 		end

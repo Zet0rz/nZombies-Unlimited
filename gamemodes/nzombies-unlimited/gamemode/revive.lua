@@ -197,6 +197,13 @@ if SERVER then
 			self.nzu_ReviveStartTime = CurTime()
 			hook.Run("nzu_PlayerStartedRevive", self, target, time)
 
+			local w = self:GetWeaponInSlot("Syringe")
+			if IsValid(w) then
+				w:DeployAnimation() -- If we have a weapon in Syringe slot, this is deployed. It may modify the ReviveTime!
+			else
+				self:Give("nzu_revive_syringe") -- If not, give default syringe weapon (which is only temporarily held)
+			end
+
 			net.Start("nzu_playerreviving")
 				net.WriteEntity(self)
 				net.WriteBool(true)
@@ -242,7 +249,7 @@ if SERVER then
 		-- Optimization. We already block downed players from using below, but we may as well save the trace too
 		if not ply.nzu_ReviveLocked then
 			if not ply:GetIsDowned() then
-				local tr = quicktrace(ply:EyePos(), ply:GetAimVector()*reviverange, ply)
+				local tr = quicktrace(ply:EyePos(), ply:GetAimVector() * reviverange, ply)
 				local target = tr.Entity
 
 				if IsValid(target) and target:CanBeRevived() and target:GetIsDowned() then
@@ -378,7 +385,7 @@ Animations for downed players
 ---------------------------------------------------------------------------]]
 hook.Add("CalcMainActivity", "nzu_Revive_DownedAnimation", function(ply, vel)
 	if ply:GetIsDowned() then
-		
+
 		if vel:Length2D() > 1 then
 			ply.CalcIdeal = ACT_HL2MP_SWIM_REVOLVER
 		else
@@ -404,7 +411,7 @@ hook.Add("UpdateAnimation", "nzu_Revive_DownedAnimation", function(ply, vel, seq
 
 		local len = vel:Length2D()
 		if len > 1 then
-			movement = len/seqspeed
+			movement = len / seqspeed
 		else
 			local cycle = ply:GetCycle()
 			if cycle < cyclex or cycle > cycley then

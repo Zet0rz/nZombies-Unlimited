@@ -45,14 +45,11 @@ end]]
 local PLAYER = FindMetaTable("Player")
 local WEAPON = FindMetaTable("Weapon")
 
-nzu.AddPlayerNetworkVar("Entity", "ViewModelAnimWeapon")
--- This networkvar is used in GM:PlayerSwitchWeapon to always allow back and forth, even if Locked
-
 --[[-------------------------------------------------------------------------
 These functions should be used SHARED! Use Network functions below if you wish to use these Server-side only!
 ---------------------------------------------------------------------------]]
 local function performviewmodelanim(self, seq, noautoend)
-	local viewmodel = self.Owner:GetViewModel()
+	local viewmodel = self:GetOwner():GetViewModel()
 	local seqid, seqdur
 	if type(seq) == "number" then
 		seqid = viewmodel:SelectWeightedSequence(seq)
@@ -64,10 +61,10 @@ local function performviewmodelanim(self, seq, noautoend)
 end
 
 function WEAPON:DoViewModelAnimation(seq, noautoend)
-	self.Owner:SetViewModelAnimWeapon(self)
+	self:GetOwner():SetWeaponLocked(self)
 
 	-- If the weapon isn't deployed, we must change to it and set the animation to start once it's deployed
-	if self.Owner:GetActiveWeapon() ~= self then
+	if self:GetOwner():GetActiveWeapon() ~= self then
 
 		-- Overwrite the Deploy function to play the animation
 		local olddeploy = self.Deploy
@@ -79,7 +76,7 @@ function WEAPON:DoViewModelAnimation(seq, noautoend)
 
 		-- Then make the change! If this is called shared, it will be predicted
 		if SERVER then
-			self.Owner:SelectWeapon(self:GetClass())
+			self:GetOwner():SelectWeapon(self:GetClass())
 		else
 			input.SelectWeapon(self)
 		end
@@ -88,7 +85,7 @@ function WEAPON:DoViewModelAnimation(seq, noautoend)
 		performviewmodelanim(self, seq, noautoend)
 	end
 
-	
+
 	-- Prevent holstering until it is done! This is done by overwriting the weapon's Holster function
 	-- 4) Auto-holster when it is done
 
