@@ -63,7 +63,7 @@ function PLAYER:SpectatePrevious()
 	end
 	self:SetObserverMode(OBS_MODE_NONE)
 end
-	
+
 
 function GM:PlayerDeathThink(ply)
 	if ply.nzu_SpectateTime then

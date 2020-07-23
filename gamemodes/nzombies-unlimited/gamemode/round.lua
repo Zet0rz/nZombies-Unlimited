@@ -259,6 +259,7 @@ if SERVER then
 		
 		donetwork()
 		nzu.ReloadConfigMap()
+		hook.Run("nzu_GameReset")
 	end
 
 	local gameoversequencetime = 10

@@ -371,7 +371,7 @@ else
 		local ann = nzu.GetRandomAnnouncerSound("Powerups", id)
 		if ann then sound.Play(ann, LocalPlayer():GetPos(), 0, pitch, 1) end
 	end)
-	
+
 	function EXT.GetPlayerPowerupTime(ply, id)
 		if ply or ply == LocalPlayer() then
 			return activepowerups[id] -- Since the client always only knows the highest time of itself and globals (which it won't know the difference between)

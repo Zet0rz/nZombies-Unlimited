@@ -299,6 +299,13 @@ if CLIENT then
 			ply.nzu_ReviveTarget = net.ReadEntity()
 			ply.nzu_ReviveStartTime = CurTime()
 
+			if ply == LocalPlayer() then
+				local w = ply:GetWeaponInSlot("Syringe")
+				if IsValid(w) then
+					w:DeployAnimation() -- If we have a weapon in Syringe slot, we perform the same action as Server. This may happen delayed (given the net message), so it can never truly be predicted
+				end
+			end
+
 			hook.Run("nzu_PlayerStartedRevive", ply, ply.nzu_ReviveTarget, ply.nzu_ReviveTime - CurTime())
 		else
 			local target = ply.nzu_ReviveTarget

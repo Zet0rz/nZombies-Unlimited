@@ -132,6 +132,9 @@ loadfile_c("menu/menu_mismatch.lua")
 
 loadfile("announcer.lua")
 
+loadfile("powerups.lua")
+loadfile("powerups_basedrops.lua")
+
 --[[-------------------------------------------------------------------------
 Gamemode modules
 ---------------------------------------------------------------------------]]

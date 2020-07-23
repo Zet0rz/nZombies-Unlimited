@@ -171,6 +171,11 @@ nzu.AddSaveExtension("Spawnpoints", {
 	-- Save and load aren't really needed here
 	Load = function() end,
 	PreLoad = function(tbl)
+		nzu.Spawns = {}
+		nzu.OpenSpawns = {}
+		spawnpoints = nzu.Spawns
+		openspawns = nzu.Spawns
+
 		for k,v in pairs(tbl) do
 			if not spawnpoints[v.Type] then spawnpoints[v.Type] = {} end
 			if not openspawns[v.Type] then openspawns[v.Type] = {} end

@@ -1,39 +1,48 @@
 local EXTENSION = nzu.Extension()
 
 local settings = {
+
+	-- Starting Items & Setup
 	["StartWeapon"] = {
 		Type = "Weapon",
 		Default = "weapon_pistol",
 	},
-
 	["StartKnife"] = {
 		Type = "Weapon",
 		Default = "nzu_knife_crowbar",
 	},
-
 	["StartGrenade"] = {
 		Type = "Weapon",
 		Default = "nzu_grenade_mk3a2",
 	},
-
 	["StartPoints"] = {
 		Type = "Number",
 		Default = 500,
 		Parse = function(n) return math.Round(n) end
 	},
 
+	-- HUD and Cosmetic settings
 	["HUD"] = nzu.HUDSetting, -- This table is exposed in hudmanagement.lua
-	
 	["RoundSounds"] = {
 		Type = "ResourceSet",
 		Default = "classic", -- classic.lua, as found in lua/nzombies-unlimited/resourcesets/roundsounds/classic.lua. It's a lua file extension, but not actual code (it's JSON). Lua is just necessary for Workshop
 	},
-
 	["Announcer"] = {
 		Type = "ResourceSet",
 		Default = "samantha",
 		Client = true,
 	},
+
+	-- Mystery Box settings
+	["MysteryBoxWeapons"] = {
+		Type = "WeightedWeaponList",
+		Notify = function(val, key, ext)
+			--if NZU_NZOMBIES then timer.Simple(0.1, function() ext.ReloadModelsList() end) end
+		end,
+	}
+
+	-- Powerups Settings
+	
 }
 
 if CLIENT then

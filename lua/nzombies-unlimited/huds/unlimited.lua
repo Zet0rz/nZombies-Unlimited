@@ -438,7 +438,8 @@ local pulse_time = 1
 local pulse_base = 0.75 -- How much of the full overlay is contributed by the base health (the rest is added by the pulse)
 
 HUD.DamageOverlayMaterial = Material("materials/nzombies-unlimited/hud/overlay_low_health.png", "unlitgeneric smooth")
-function HUD:Paint_Health(ply) -- Paint_ function: It is hooked without needing to be nzu.HUDComponent-registered. Use this for anything you just always wanna draw with your HUD.
+function HUD:Paint_Health() -- Paint_ function: It is hooked without needing to be nzu.HUDComponent-registered. Use this for anything you just always wanna draw with your HUD.
+	local ply = self.Player
 	local health = ply:Health()
 	local max = ply:GetMaxHealth()
 
@@ -710,6 +711,29 @@ function HUD:Draw_TargetID(ply, text, typ, data, ent)
 		draw.SimpleText(str, targetidfont, x, y, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	end
 end
+
+--[[-------------------------------------------------------------------------
+Spectate Info
+---------------------------------------------------------------------------]]
+--[[local spectate_name_font = "nzu_Font_Bloody_Medium"
+
+function HUD:SpectateInfo()
+	local ply = self.Player
+	local x,y = ScrW() / 2, ScrH() - 100
+
+	surface.SetMaterial(point_glow)
+	local v = ply:GetPlayerColor()
+	surface.SetDrawColor(v.x*200 + 55, v.y*200 + 55, v.z*200 + 55,255)
+
+	surface.DrawTexturedRect(x - 150, y, 75, 50)
+	surface.DrawTexturedRectUV(x - 325, y, 100, 50, 1,0,0,1)
+
+	surface.SetMaterial(point_shadow)
+	surface.SetDrawColor(0,0,0,255)
+	surface.DrawRect(x-210, y, 40, 50)
+
+	--draw.SimpleText(ply:Nick(), spectate_name_font, x, y, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+end]]
 
 --[[-------------------------------------------------------------------------
 Game Over Panel
