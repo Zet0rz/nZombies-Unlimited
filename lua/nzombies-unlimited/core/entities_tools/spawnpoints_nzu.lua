@@ -144,7 +144,6 @@ local function NewSpawner(type, pos, ang)
 	Spawner.Pos = pos
 	Spawner.Angles = ang
 	Spawner.Type = type
-	ENTITY.SetRoomHandler(Spawner, "Spawnpoints") -- Yes, this does work ;)
 
 	return Spawner
 end
@@ -200,7 +199,11 @@ end
 function SPAWNER:SetRooms(tbl)
 	ENTITY.SetRooms(self, tbl)
 end
-nzu.AddRoomHandler("Spawnpoints", function(spawner) spawner:Activate() end)
+
+-- Now we just add our opening function
+function SPAWNER:OnRoomOpened(flag)
+	self:Activate()
+end
 
 --[[-------------------------------------------------------------------------
 Now getters and utility

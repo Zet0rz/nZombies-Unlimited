@@ -5,6 +5,9 @@ SPAWNPOINT_ZOMBIE.Type = "anim"
 SPAWNPOINT_ZOMBIE.Base = "base_entity"
 SPAWNPOINT_ZOMBIE.Model = "models/player/odessa.mdl"
 
+SPAWNPOINT_ZOMBIE.OnRoomOpened = true -- This makes it pass the Room test. Since these don't function in Sandbox, we don't need to actually set a function
+-- If this was shared code between nZombies and Sandbox, you'd ideally want to set the function server-side, and just "true" clientside (to make context menu option work)
+
 function SPAWNPOINT_ZOMBIE:Initialize()
 	if SERVER then
 		self:SetModel(self.Model)
@@ -13,7 +16,6 @@ function SPAWNPOINT_ZOMBIE:Initialize()
 		self:SetCollisionGroup(COLLISION_GROUP_WEAPON)
 		self:DrawShadow(false)
 	end
-	self:SetRoomHandler("Spawnpoints")
 end
 
 if CLIENT then

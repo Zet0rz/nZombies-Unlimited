@@ -126,6 +126,25 @@ if SERVER then
 		return true -- Allow the normal use, but we're locked
 	end
 
+	--[[-------------------------------------------------------------------------
+	Local function for OnRoomOpened (runs when the room is opened) which,
+		if all surrounding rooms are also open, it will open itself for free
+	---------------------------------------------------------------------------]]
+	local function doorautoopen(door, room)
+		local data = door:GetDoorData()
+		if not data then return end
+
+		for k,v in pairs(door.nzu_Rooms) do
+			if not nzu.IsRoomOpen(k) then return true end -- Don't remove the handler/rooms from us yet
+		end
+
+		if data.Group then
+			nzu.OpenDoorGroup(data.Group, nil, nil, door)
+		else
+			nzu.OpenDoor(door, nil, nil, door)
+		end
+	end
+
 	function ENTITY:CreateDoor(data)
 		-- Sanity check
 		data.Price = data.Price or 0
@@ -172,7 +191,7 @@ if SERVER then
 							data = data2
 							networkclone = k
 						end
-					end	
+					end
 				end
 			end
 
@@ -196,7 +215,7 @@ if SERVER then
 		end
 
 		if data.FlagOpen and data.Rooms then
-			self:SetRoomHandler("DoorAutoOpen")
+			self.OnDoorOpened = doorautoopen
 			self:SetRooms(data.Rooms)
 		end
 
@@ -259,8 +278,8 @@ if SERVER then
 		local slave = svtbl.slavename
 
 		-- Do nothing if the enslaved door group was already triggered this Door Group cycle!
-		if t then
-			if t[ent] ~= nil then return initial == ent end
+		if t and t[ent] ~= nil then
+			return initial == ent
 		end
 
 		local doors = {}
@@ -286,7 +305,7 @@ if SERVER then
 			if v then k:SetSaveValue("m_bLocked", false) end
 		end
 
-		
+
 		if IsValid(ply) then -- Use the targeted door to open it as if the player did
 			if initial and ent ~= initial then ent:Use(ply, ply, USE_ON, 1) end
 
@@ -301,7 +320,7 @@ if SERVER then
 
 			return true
 		else -- Open it as if no one did (any direction)
-			local awayfrom = slave or ent:GetName()
+			--local awayfrom = slave or ent:GetName()
 			for k,v in pairs(doors) do
 				k:Fire("OpenAwayFrom", "!player")
 				k:SetSaveValue("returndelay", -1)

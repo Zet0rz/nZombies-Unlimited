@@ -3,39 +3,15 @@ local ENTITY = FindMetaTable("Entity")
 
 if SERVER then
 	local rooms = {}
-	function nzu.GetRoomList() return table.GetKeys(rooms) end	
-
-	function ENTITY:SetRoomHandler(id)
-		if id then
-			self.nzu_RoomHandler = id
-			if not self.nzu_Rooms then self.nzu_Rooms = {} end
-		else
-			if self.nzu_RoomHandler and self.nzu_Rooms then
-				for k,v in pairs(self.nzu_Rooms) do
-					rooms[k][self] = nil
-				end
-				self.nzu_RoomHandler = nil
-				self.nzu_Rooms = nil
-			end
-		end
-	end
-
-	local handlers = {}
-	function nzu.AddRoomHandler(id, handler)
-		if NZU_NZOMBIES then handlers[id] = handler end -- Handlers have no use in Sandbox
-	end
+	function nzu.GetRoomList() return table.GetKeys(rooms) end
 
 	function ENTITY:AddRoom(flag)
-		assert(self.nzu_RoomHandler, "Attempted to add a Room to entity without a Room Handler set.")
-
 		if not rooms[flag] then rooms[flag] = {} end
 		rooms[flag][self] = true
 		self.nzu_Rooms[flag] = true
 	end
 
 	function ENTITY:RemoveRoom(flag)
-		assert(self.nzu_RoomHandler, "Attempted to remove a Room to entity without a Room Handler set.")
-
 		if rooms[flag] then
 			rooms[flag][self] = nil
 			if next(rooms[flag]) == nil then
@@ -55,7 +31,7 @@ if SERVER then
 			olds[v] = nil
 		end
 
-		for k,v in pairs(olds) do -- Now only those who were there before, but not now
+		for k,v in pairs(olds) do -- Now only those who were there before, but not anymore
 			self:RemoveRoom(k)
 		end
 	end
@@ -108,13 +84,13 @@ if SERVER then
 				rooms[flag] = nil -- No longer retain these flags
 
 				for k,v in pairs(ent) do
-					if IsValid(k) then
-						local handler = k.nzu_RoomHandler and handlers[k.nzu_RoomHandler]
+					if IsValid(k) and k.nzu_Rooms then
+						local handler = k.OnRoomOpened
 						if not handler or not handler(k, flag) then
-							-- Clear this from the handler
-							k.nzu_RoomHandler = nil
+							-- Clear the rooms if it has either no function, or the function didn't return true
+							-- If the function returns true, it retains the flags (opening again with the rest of the flags associated to it)
 							k.nzu_Rooms = nil
-						end						
+						end
 					end
 				end
 			end
@@ -142,10 +118,6 @@ if SERVER then
 			end
 		end
 	end)
-else
-	function ENTITY:SetRoomHandler(id) -- Client mirror, just so clients know what type of room handler this belongs to
-		self.nzu_RoomHandler = id
-	end
 end
 
 --[[-------------------------------------------------------------------------
@@ -559,8 +531,7 @@ end
 
 if NZU_SANDBOX then
 	-- A property that lets you modify the rooms of a selected entity
-	-- Works for any entity that has self.nzu_RoomHandler field set
-	-- (i.e. Entity:SetRoomHandler())
+	-- Works for any entity that has self.OnRoomOpened function set
 
 	properties.Add("nzu_Rooms", {
 		MenuLabel = "[NZU] Edit Room",
@@ -572,7 +543,7 @@ if NZU_SANDBOX then
 			if not IsValid(ent) then return false end
 			if not gamemode.Call("CanProperty", ply, "nzu_Rooms", ent) then return false end
 
-			return ent.nzu_RoomHandler
+			return ent.OnRoomOpened
 		end,
 		Receive = function(self, length, player)
 			local ent = net.ReadEntity()
