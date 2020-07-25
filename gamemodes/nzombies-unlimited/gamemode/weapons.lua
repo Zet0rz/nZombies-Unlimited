@@ -732,3 +732,122 @@ hook.Add("nzu_WeaponEquippedInSlot", "nzu_Weapons_InstantHolsterFunction", funct
 		return old(self, w2)
 	end
 end)
+
+
+
+--[[-------------------------------------------------------------------------
+Weighted Weapon List utility functions
+These functions let you determine random weapons for players from a pool of weighted weapons
+It also supports it such that weapons the player is already carrying are not selected
+---------------------------------------------------------------------------]]
+
+if SERVER then 
+	-- Select a weapon from a weighted weapon list (Table where key is classname, value is numerical weight)
+	-- If ply is passed, that player's weapons are filtered out. If not, it takes from the full pool.
+	function nzu.SelectWeapon(pool, ply)
+		if pool[1] then
+			local possible = IsValid(ply) and nzu.FilterWeaponListForPlayer(pool, ply) or pool
+			return possible[math.random(#possible)]
+		else
+			local possible
+			local total = 0
+
+			if IsValid(ply) then
+				possible, total = nzu.FilterWeaponListForPlayer(pool, ply)
+			else
+				possible = pool
+				for k,v in pairs(possible) do
+					total = total + v
+				end
+			end
+
+			local ran = math.random(total)
+			local cur = 0
+			for k,v in pairs(possible) do
+				cur = cur + v
+				if cur >= ran then
+					return k
+				end
+			end
+		end
+	end
+
+	-- Filters a weapon list for the specified player. This removes all weapons the player is already carrying.
+	-- If the list is weighted, a total is returned as the second argument
+	function nzu.FilterWeaponListForPlayer(pool, ply)
+		local possible = {}
+		if pool[1] then -- Sequential
+			for k,v in pairs(pool) do
+				if not IsValid(ply:GetWeapon(v)) then
+					table.insert(possible, v)
+				end
+			end
+			return possible
+		else
+			local total = 0
+			for k,v in pairs(pool) do
+				if not IsValid(ply:GetWeapon(k)) then
+					possible[k] = v
+					total = total + v
+				end
+			end
+			return possible, total
+		end
+	end
+
+	-- Precache world and view model of all weapons in the list
+	-- This is networked to all clients. If "ply" is passed, it is only networked to that player or table of players (net.Send-supported argument)
+	util.AddNetworkString("nzu_precacheweapons")
+	function nzu.NetworkPrecacheWeaponModels(weps, ply)
+		net.Start("nzu_precacheweapons")
+			local num = table.Count(weps)
+			net.WriteUInt(num, 16)
+
+			if weps[1] then -- It is numerically sequential (presumably!)
+				for k,v in pairs(weps) do
+					net.WriteString(v)
+				end
+			else -- If it is class-based on keys (such as a weighted weapon list)
+				for k,v in pairs(weps) do
+					net.WriteString(k)
+				end
+			end
+		if ply then net.Send(ply) else net.Broadcast() end
+	end
+else
+
+	-- Clientside: Precache the weapon(s). util.PrecacheModel doesn't quite work, instead we draw it using a clientside model
+	function nzu.PrecacheWeaponModels(weps)
+		local cmodel
+		for k,v in pairs(weps) do
+			local wep = weapons.GetStored(v)
+			if wep then
+				local model = wep.WM or wep.WorldModel
+				if model and model ~= "" then
+					util.PrecacheModel(model)
+					if not cmodel then cmodel = ClientsideModel(model) else cmodel:SetModel(model) end
+					--print("Precaching:", model)
+					cmodel:DrawModel()
+				end
+				local model2 = wep.VM or wep.ViewModel
+				if model2 and model2 ~= "" then
+					util.PrecacheModel(model2)
+					if not cmodel then cmodel = ClientsideModel(model2) else cmodel:SetModel(model2) end
+					--print("Precaching:", model2)
+					cmodel:DrawModel()
+				end
+			end
+		end
+		if cmodel then cmodel:Remove() end
+	end
+
+	net.Receive("nzu_precacheweapons", function()
+		local t = {}
+		local num = net.ReadUInt(16)
+		for i = 1,num do
+			table.insert(t, net.ReadString())
+		end
+
+		nzu.PrecacheWeaponModels(t)
+	end)
+end

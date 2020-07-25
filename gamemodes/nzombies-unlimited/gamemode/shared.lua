@@ -135,6 +135,9 @@ loadfile("announcer.lua")
 loadfile("powerups.lua")
 loadfile("powerups_basedrops.lua")
 
+loadfile_s("mysterybox.lua")
+loadfile("nzombies-unlimited/core/entities_tools/mysterybox.lua")
+
 --[[-------------------------------------------------------------------------
 Gamemode modules
 ---------------------------------------------------------------------------]]
