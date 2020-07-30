@@ -1,11 +1,29 @@
+--[[
+Extension Setting Types
+This file defines the built-in Extension setting types you can use. You can add your own using nzu.AddExtensionSettingType, or simply by filling in your own Extension's Settings table with all these values
+
+Available types:
+- "String": A simple string
+- "Number": A double
+- "Boolean": A boolean
+- "Vector": A vector
+- "Angle": An angle
+- "Matrix": A 4x4 matrix
+- "Color": A Color object
+- "Weapon": A string representing the classname of a weapon
+- "WeightedWeaponList": A table with keys being weapon classnames, and values being a numerical weight
+- "ResourceSet": A dropdown listing options of json files found in the specified folder. Requires additional field "SetName" which defines what folder to look in
+- "OptionSet": A dropdown listing options from a predefined set of options. Requires additional field "Options" which can be a sequential table of options, or a key/value pair for data behind each option.
+- "FileDir": A dropdown listing folders found in a specific path. Requires additional field "Path" which is always relative to "GAME" (file.Find(path, "GAME") <- Directories from this)
+]]
+
 
 -- String: A text entry that will send whenever it loses focus
 nzu.AddExtensionSettingType("String", {
-	NetRead = net.ReadString,
-	NetWrite = net.WriteString,
-	Panel = function(parent)
+	NetType = TYPE_STRING, -- This points at net.WriteString/net.ReadString
+	Panel = function(self, parent)
 		local p = vgui.Create("DTextEntry", parent)
-		p:SetTall(40)
+		p:SetTall(20)
 
 		function p:OnFocusChanged(b)
 			if not b then self:Send() end -- Trigger networking on text field focus lost
@@ -18,21 +36,22 @@ nzu.AddExtensionSettingType("String", {
 
 -- Number: A networked double with a Number Wang
 nzu.AddExtensionSettingType("Number", {
-	NetRead = net.ReadDouble,
-	NetWrite = net.WriteDouble,
-	Panel = function(parent)
-		local p = vgui.Create("Panel", parent)
-		p.N = p:Add("DNumberWang")
-		p.N:Dock(FILL)
-		p.N:SetMinMax(nil,nil)
-		p:SetTall(40)
+	NetType = TYPE_NUMBER,
+	Parse = function(self, v)
+		local num = v
+		if self.Integer then return math.Round(v) end
+		if self.Min then num = math.Max(self.Min, num) end
+		if self.Max then num = math.Min(self.Max, num) end
+		return num
+	end,
+	Panel = function(self, parent)
+		local p = vgui.Create("DNumberWang", parent)
+		p:SetMinMax(self.Min, self.Max)
+		p:SetTall(20)
 
-		function p.N.OnValueChanged()
-			if p.Send then p:Send() end -- Trigger networking whenever it changes
+		function p:OnValueChanged()
+			if self.Send then self:Send() end -- Trigger networking whenever it changes
 		end
-
-		function p:SetValue(n) self.N:SetValue(n) end
-		function p:GetValue() return self.N:GetValue() end
 
 		return p
 	end
@@ -40,9 +59,8 @@ nzu.AddExtensionSettingType("Number", {
 
 -- Boolean: A true/false value that appears as a checkbox, networked whenever clicked
 nzu.AddExtensionSettingType("Boolean", {
-	NetRead = net.ReadBool,
-	NetWrite = net.WriteBool,
-	Panel = function(parent)
+	NetType = TYPE_BOOL,
+	Panel = function(self, parent)
 		local p = vgui.Create("DCheckBoxLabel", parent)
 		p:SetText("Enabled")
 		p:SetTall(15)
@@ -58,9 +76,8 @@ nzu.AddExtensionSettingType("Boolean", {
 
 -- Vector: 3 number wangs with an associated Save button. Uses DVectorEntry (included in nZU)
 nzu.AddExtensionSettingType("Vector", {
-	NetRead = net.ReadVector,
-	NetWrite = net.WriteVector,
-	Panel = function(parent)
+	NetType = TYPE_VECTOR,
+	Panel = function(self, parent)
 		local p = vgui.Create("Panel", parent)
 
 		p.S = p:Add("DButton")
@@ -71,7 +88,7 @@ nzu.AddExtensionSettingType("Vector", {
 		p.V = p:Add("DVectorEntry")
 		p.V:Dock(FILL)
 
-		p:SetSize(200,20)
+		p:SetTall(20)
 
 		p.S.DoClick = function() p:Send() end -- Network on button click
 		function p:SetValue(v) self.V:SetVector(v) end
@@ -83,9 +100,8 @@ nzu.AddExtensionSettingType("Vector", {
 
 -- Angle: 3 number wangs with an associated Save button, similar to Vector
 nzu.AddExtensionSettingType("Angle", {
-	NetRead = net.ReadAngle,
-	NetWrite = net.WriteAngle,
-	Panel = function(parent)
+	NetType = TYPE_ANGLE,
+	Panel = function(self, parent)
 		local p = vgui.Create("Panel", parent)
 
 		p.S = p:Add("DButton")
@@ -96,7 +112,7 @@ nzu.AddExtensionSettingType("Angle", {
 		p.A = p:Add("DAngleEntry")
 		p.A:Dock(FILL)
 
-		p:SetSize(200,20)
+		p:SetTall(20)
 
 		p.S.DoClick = function() p:Send() end -- Network on button click
 		function p:SetValue(v) self.A:SetAngles(v) end
@@ -108,9 +124,8 @@ nzu.AddExtensionSettingType("Angle", {
 
 -- Matrix: 4x4 number wangs with an associated Save button, also similar to Angle and Vector
 nzu.AddExtensionSettingType("Matrix", {
-	NetRead = net.ReadMatrix,
-	NetWrite = net.WriteMatrix,
-	Panel = function(parent)
+	NetType = TYPE_MATRIX,
+	Panel = function(self, parent)
 		local p = vgui.Create("Panel", parent)
 
 		p.S = p:Add("DButton")
@@ -121,7 +136,7 @@ nzu.AddExtensionSettingType("Matrix", {
 		p.M = p:Add("DMatrixEntry")
 		p.M:Dock(FILL)
 
-		p:SetSize(200,100)
+		p:SetTall(100)
 
 		p.S.DoClick = function() p:Send() end -- Network on button click
 
@@ -134,10 +149,9 @@ nzu.AddExtensionSettingType("Matrix", {
 
 -- Color: A color select with a Save button
 nzu.AddExtensionSettingType("Color", {
-	NetRead = net.ReadColor,
-	NetWrite = net.WriteColor,
-	Load = function(t) return IsColor(t) and t or Color(t.r, t.g, t.b, t.a) end,
-	Panel = function(parent)
+	NetType = TYPE_COLOR,
+	Parse = function(self, t) return IsColor(t) and t or Color(t.r, t.g, t.b, t.a) end,
+	Panel = function(self, parent)
 		local p = vgui.Create("Panel", parent)
 
 		p.S = p:Add("DButton")
@@ -148,7 +162,7 @@ nzu.AddExtensionSettingType("Color", {
 		p.C = p:Add("DColorMixer")
 		p.C:Dock(FILL)
 
-		p:SetSize(200,185)
+		p:SetTall(185)
 
 		p.S.DoClick = function() p:Send() end -- Network on button click
 
@@ -161,9 +175,8 @@ nzu.AddExtensionSettingType("Color", {
 
 -- Weapon: A text field dropdown that contains all installed weapons, including a search field to filter the dropdown
 nzu.AddExtensionSettingType("Weapon", {
-	NetWrite = net.WriteString,
-	NetRead = net.ReadString,
-	Panel = function(parent, ext, setting)
+	NetType = TYPE_STRING, -- Weapons are just class strings
+	Panel = function(self, parent)
 		local p = vgui.Create("DSearchComboBox", parent)
 
 		p:AddChoice("  [None]", "") -- Allow the choice of none
@@ -196,6 +209,8 @@ nzu.AddExtensionSettingType("Weapon", {
 			return data
 		end
 
+		p:SetTall(20)
+
 		return p
 	end
 })
@@ -203,7 +218,7 @@ nzu.AddExtensionSettingType("Weapon", {
 -- Weighted Weapon List: A list of weapons where each weapon has a weight associated to it. Its internal value is a table where each weapon class is the key,
 -- and the associated weight is the value. This is used for example in the Mystery Box weapons list.
 nzu.AddExtensionSettingType("WeightedWeaponList", {
-	Default = {}, -- Default is empty = use all installed weapons (that are valid)
+	Default = {}, -- Default is empty
 	NetRead = function()
 		local t = {}
 		local num = net.ReadUInt(16)
@@ -213,7 +228,7 @@ nzu.AddExtensionSettingType("WeightedWeaponList", {
 		end
 		return t
 	end,
-	NetWrite = function(t)
+	NetWrite = function(self, t)
 		local t2 = table.GetKeys(t)
 		local num = #t2
 		net.WriteUInt(num, 16)
@@ -223,10 +238,10 @@ nzu.AddExtensionSettingType("WeightedWeaponList", {
 			net.WriteUInt(t[class], 16)
 		end
 	end,
-	Panel = function(parent, ext)
-		local p = parent:Add("Panel")
+	Panel = function(self, parent)
+		local p = vgui.Create("Panel", parent)
 		p:SetTall(350)
-		p:DockMargin(10,10,10,10)
+		--p:DockMargin(10,10,10,10)
 
 		local l = p:Add("DListView")
 		l:Dock(FILL)
@@ -347,116 +362,37 @@ nzu.AddExtensionSettingType("WeightedWeaponList", {
 	end
 })
 
--- Option Set: A dropdown containing a selection of options networked from the Server.
--- Note: This setting requires implementing GetOptions which should return a table of pairs: {Option = data, Display = pretty}
--- where 'data' is the value networked, and 'pretty' is a pretty display name for the dropdown. If pretty doesn't exist, data is used in its place.
-local optionset = {
-	NetWrite = net.WriteString,
-	NetRead = net.ReadString,
-	GetOptions = function()
-		return {} -- Nothing by default! You must implement this if you want any options!
+nzu.AddExtensionSettingType("OptionSet", {
+
+	-- We could have Parse here which would change it to Extension:SetSetting(key, "option_id").
+	-- But it causes unnecessary back-and-forth parsing between panel and networking
+	-- Instead, it will just be Extension:SetSetting(key, Extension.Settings[key].Options["option_id"]) i.e. the data itself
+
+	--Parse = function(self, key) -- Whenever the setting is set, it gets parsed to the data behind the option
+		--return self.Options[key]
+	--end,
+
+	NetWrite = function(self, data)
+		local key
+		for k,v in pairs(self.Options) do
+			if v == data then
+				key = k
+				break
+			end
+		end
+
+		net.WriteString(key)
 	end,
-}
-if SERVER then
-	util.AddNetworkString("nzu_optionset")
-	local function networkoptions(ext, s, ply)
-		if type(ext) == "string" then ext = nzu.GetExtension(ext) end
-		if ext then
-			local setting = ext:GetSettingsMeta()[s]
-			if setting and setting.GetOptions then
-				local tbl = setting.GetOptions()
-				local num = #tbl
-
-				if num > 0 then
-					net.Start("nzu_optionset")
-						net.WriteString(k)
-						net.WriteUInt(num, 16)
-						for i = 1,num do
-							net.WriteString(tbl[i].Option)
-							net.WriteString(tbl[i].Display)
-						end
-					net.Send(ply)
-				end
-			end
-		end
-	end
-
-	-- In Sandbox, cache all option sets created and network them to any player joining
-	if NZU_SANDBOX then
-		local sets = {}
-		optionset.Create = function(ext, setting)
-			sets[setting] = ext
-		end
-
-		hook.Add("PlayerInitialSpawn", "nzu_Extensions_OptionSetNetwork", function(ply)
-			for k,v in pairs(sets) do
-				networkoptions(v, k, ply)
-			end
-		end)
-	else
-		-- In nZombies, only respond to admin requests
-		net.Receive("nzu_optionset", function(len, ply)
-			if nzu.IsAdmin(ply) then
-				local ext = net.ReadString()
-				local id = net.ReadString()
-
-				networkoptions(ext, id, ply)
-			end
-		end)
-	end
-else
-	local function readoptions()
-		local id = net.ReadString()
-		local num = net.ReadUInt(16)
-
-		local tbl = {}
-		for i = 1,num do
-			local t = {}
-			t.Option = net.ReadString()
-			t.Display = net.ReadString()
-
-			table.insert(tbl, t)
-		end
-
-		return id, tbl
-	end
-
-	local sets
-	if NZU_SANDBOX then
-		sets = {}
-	end
-
-	net.Receive("nzu_optionset", function()
-		local id,tbl = readoptions()
-		if sets then sets[id] = tbl end -- Only do this in Sandbox pretty much
-
-		hook.Run("nzu_OptionSetUpdated", id, tbl)
-	end)
-
-	optionset.Panel = function(parent, ext, setting)
+	NetRead = function(self)
+		local key = net.ReadString()
+		return self.Options[key]
+	end,
+	Panel = function(self, parent)
 		local p = vgui.Create("DComboBox", parent)
 
-		function p:Populate(id, tbl)
-			if id == setting then
-				self:Clear()
-				for k,v in pairs(tbl) do
-					self:AddChoice(v.Display, v.Option)
-				end
-			end
+		for k,v in pairs(self.Options) do
+			p:AddChoice(k, v)
 		end
-
-		if NZU_SANDBOX then
-			if sets and sets[setting] then
-				p:Populate(setting, sets[setting])
-			end
-		else
-			-- Request options
-			net.Start("nzu_optionset")
-				net.WriteString(ext.ID)
-				net.WriteString(setting)
-			net.SendToServer()
-		end
-		hook.Add("nzu_OptionSetUpdated", p, p.Populate)
 
 		function p:OnSelect(index, value, data)
 			self:Send()
@@ -484,5 +420,44 @@ else
 
 		return p
 	end
-end
-nzu.AddExtensionSettingType("OptionSet", optionset)
+})
+
+
+nzu.AddExtensionSettingType("FileDir", {
+	NetType = TYPE_STRING,
+	Panel = function(self, parent)
+		local p = vgui.Create("DSearchComboBox", parent)
+
+		local _,dirs = file.Find(self.Path, "GAME")
+		p:AddChoice("  [None]", "") -- Allow the choice of none
+		for k,v in pairs(dirs) do
+			p:AddChoice(v)
+		end
+		p:SetAllowCustomInput(true)
+
+		function p:OnSelect(index, value, data)
+			self:Send()
+		end
+
+		function p:SetValue(val)
+			self:SetText(val)
+
+			for k,v in pairs(self.Data) do
+				if val == v then
+					self.selected = k
+					return
+				end
+			end
+
+			self.Choices[0] = val
+			self.Data[0] = val
+			self.selected = 0
+		end
+
+		function p:GetValue()
+			return self:GetSelected()
+		end
+
+		return p
+	end
+})

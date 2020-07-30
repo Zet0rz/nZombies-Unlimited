@@ -1,36 +1,45 @@
-local EXTENSION = nzu.Extension()
-
-local settings = {
+local EXT = EXT or nzu.Extensions.core -- This protects against lua refresh where EXT is no longer valid
+EXT.Settings = {
 
 	-- Starting Items & Setup
 	["StartWeapon"] = {
 		Type = "Weapon",
 		Default = "weapon_pistol",
+		Label = "Starting Weapon",
 	},
 	["StartKnife"] = {
 		Type = "Weapon",
 		Default = "nzu_knife_crowbar",
+		Label = "Default Knife",
 	},
 	["StartGrenade"] = {
 		Type = "Weapon",
 		Default = "nzu_grenade_mk3a2",
+		Label = "Default Grenade",
 	},
 	["StartPoints"] = {
 		Type = "Number",
 		Default = 500,
-		Parse = function(n) return math.Round(n) end
+		Integer = true,
+		Label = "Starting Points",
 	},
 
 	-- HUD and Cosmetic settings
 	["HUD"] = nzu.HUDSetting, -- This table is exposed in hudmanagement.lua
 	["RoundSounds"] = {
-		Type = "ResourceSet",
+		--Type = "ResourceSet",
+		Type = "String",
 		Default = "classic", -- classic.lua, as found in lua/nzombies-unlimited/resourcesets/roundsounds/classic.lua. It's a lua file extension, but not actual code (it's JSON). Lua is just necessary for Workshop
+		Label = "Round Sounds",
 	},
+
+	-- Announcer. The folder name for the folder to look for announcer sound files in
 	["Announcer"] = {
-		Type = "ResourceSet",
+		Type = "FileDir", -- It is really just a string
+		Path = "sound/nzu/announcer/*", -- Everything in this folder
 		Default = "samantha",
 		Client = true,
+		Label = "Announcer",
 	},
 
 	-- Mystery Box settings
@@ -39,13 +48,14 @@ local settings = {
 		Notify = function(val, key, ext)
 			--if NZU_NZOMBIES then timer.Simple(0.1, function() ext.ReloadModelsList() end) end
 		end,
+		Label = "Mystery Box Weapons",
 	}
 
 	-- Powerups Settings
 	
 }
 
-if CLIENT then
+--[[if CLIENT then
 	-- Pre-register these as their files are located in the gamemode, not appearing in sandbox
 
 	local labelledsettings = {
@@ -101,4 +111,4 @@ if CLIENT then
 	return settings, panelfunc
 end
 
-return settings
+return settings]]

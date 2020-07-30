@@ -202,7 +202,7 @@ nzu.AddSpawnmenuTab("Extension Settings", "DPanel", function(panel)
 		f.LoadedCheckbox = checkbox
 		f:SetContents(p)
 		if not nzu.IsExtensionLoaded(k) and f:GetExpanded() then
-			f:Toggle()
+			--f:Toggle()
 		end
 
 		loadedexts = loadedexts < columns and loadedexts + 1 or 1
@@ -214,7 +214,7 @@ nzu.AddSpawnmenuTab("Extension Settings", "DPanel", function(panel)
 		if pnl then
 			pnl.LoadedCheckbox:SetChecked(true)
 			
-			if pnl.Contents then pnl.Contents:Remove() end
+			if IsValid(pnl.Contents) then pnl.Contents:Remove() end
 			local p = generatesettingspanel(ext, pnl)
 			pnl:SetContents(p)
 		end

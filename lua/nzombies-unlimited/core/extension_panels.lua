@@ -4,7 +4,7 @@ Generic Setting Type panel creation, for utility
 ---------------------------------------------------------------------------]]
 function nzu.ExtensionSettingTypePanel(typ, parent, parent2)
 	local build,toparent
-	if parent2 then -- 3 arguments passed, meaning first is Extension ID, second is Setting Key, third is Paren
+	if parent2 then -- 3 arguments passed, meaning first is Extension ID, second is Setting Key, third is Parent
 		local ext = nzu.GetExtension(typ)
 		if ext then
 			local m = ext.GetSettingsMeta()
@@ -19,7 +19,7 @@ function nzu.ExtensionSettingTypePanel(typ, parent, parent2)
 	end
 
 	if build and build.Panel then
-		local pnl = build.Panel(toparent)
+		local pnl = build:Panel(toparent)
 		if IsValid(pnl) then
 			pnl.Send = function() end -- You can override this after receiving the panel if you want
 			return pnl
@@ -32,62 +32,76 @@ end
 Networked Extension Panel
 ---------------------------------------------------------------------------]]
 local function sendnetwork(p, v)
+	if p.nzu_NoNetwork then return end
+
 	local val = v
 	if val == nil then val = p:GetValue() end
-	nzu.RequestExtensionSetting(p._ExtensionID, p._ExtensionSetting, val)
+	p.Extension:RequestChangeSetting(p.SettingKey, val)
 end
 
-local bext, bset, bsetpnl
-local function nwpanel(id, parent)
-	local setting = bset[id]
-	if setting then
-		local build = setting.Panel
-		if build then
-			local p = build(parent, bext, id, setting)
-			p.SetValue(p, bext.Settings[id])
-			p._ExtensionID = bext.ID
-			p._ExtensionSetting = id
-
-			p.Send = sendnetwork -- This is called to send its information to the server
-
-			bsetpnl[id] = p
-			return p
-		end
-	end
+local function setvaluenonetwork(p, v)
+	p.nzu_NoNetwork = true
+	p:SetValue(v)
+	p.nzu_NoNetwork = nil
 end
 
 local PANEL = {}
-function PANEL:_HookUpdate(setting, value)
-	if self.SettingPanels[setting] then
-		self.SettingPanels[setting]:SetValue(value)
-	end
+function PANEL:AddSetting(key, tbl, parent)
+	local tbl = tbl or self.Extension.Settings[key]
+	local p = tbl:Panel(self)
+	p:SetParent(parent or self)
+	p.SettingKey = key
+	p.Send = sendnetwork
+	p.Extension = self.Extension
+	p.SetValueNoNetwork = setvaluenonetwork
+	self.Settings[key] = p
+
+	p:SetValueNoNetwork(self.Extension[key])
+
+	return p
 end
 
-local extpanels = {}
 function PANEL:Rebuild()
 	local ext = self.Extension
 	self:Clear()
+	self.Settings = {} -- Reset key indexing
 
-	local pf = ext.GetPanelFunction()
-	if not pf then
+	-- If the extension comes with a BuildPanel function, we can run that on this panel to let the extension design its own layout
+	if ext.BuildPanel then
+		ext:BuildPanel(self)
+	return end
+
+	-- If the extension has no settings, let the player know
+	if not ext.Settings then
 		local l = self:Add("DLabel")
 		l:SetText("This Extension has no settings.")
 		l:Dock(TOP)
 		l:SetContentAlignment(5)
 	return end
 
-	-- Build the panel
-	bext = ext
-	bset = ext.GetSettingsMeta()
-	bsetpnl = {}
-	local tall = pf(self, nwpanel)
-	self.SettingPanels = bsetpnl -- Store this so hooks can access them by ID
-	bext = nil
-	bset = nil
-	bsetpnl = nil
+	-- Default: Stack all settings in a vertical scroll panel. Order can be given with ZPos field. Label can be set with Label field.
+	for k,v in pairs(ext.Settings) do
+		local pnl = self:Add("Panel")
+		pnl:SetZPos(v.ZPos or 0)
 
-	if tall then self:SetTall(tall) else self:SizeToChildren(false, true) end
+		local l = pnl:Add("DLabel")
+		l:SetText(v.Label or k)
+		--l:SetFont("ChatFont")
+		l:Dock(TOP)
 
+		local p = self:AddSetting(k,v, pnl)
+		--p:SetParent(pnl)
+		p:Dock(TOP)
+
+		pnl:Dock(TOP)
+		--pnl:SetTall(100)
+		pnl:DockPadding(5,5,5,0)
+		pnl:InvalidateLayout(true)
+		pnl:SizeToChildren(false, true)
+	end
+
+	self:InvalidateLayout(true)
+	self:SizeToChildren(false, true)
 	self:Highlight()
 end
 
@@ -106,53 +120,25 @@ function PANEL:PaintOver(w,h)
 	end
 end
 
-local function dorebuilds(ext)
-	local id = ext.ID
-	if extpanels[id] then
-		for k,v in pairs(extpanels[id]) do
-			if IsValid(k) then
-				k:Rebuild()
-			else
-				extpanels[k] = nil
-			end
-		end
-	end
-end
-
-hook.Add("nzu_ExtensionSettingChanged", "nzu_ExtensionPanels_NetworkUpdate", function(name, setting, value)
-	if extpanels[name] then
-		for k,v in pairs(extpanels[name]) do
-			if IsValid(k) then
-				k:_HookUpdate(setting, value)
-			else
-				extpanels[k] = nil
-			end
-		end
-	end
-end)
-
 function PANEL:SetExtension(ext)
 	self:Clear()
 	if type(ext) == "string" then
 		ext = nzu.GetExtension(ext)
 	end
 
+	self:OnRemove() -- This runs the removal of the panel from the extension's list of panels
 	self.Extension = ext
-	local id = ext.ID
-	if ext then
-		self:Rebuild()
-		if not extpanels[id] then extpanels[id] = {} end
-		extpanels[id][self] = true
-		ext.RebuildPanels = dorebuilds
-	else
-		if extpanels[id] then
-			extpanels[id][self]  = nil
-			if table.IsEmpty(extpanels[id]) then extpanels[id] = nil end
-		end
-	end
+	if not ext.Panels then ext.Panels = {} end
+	ext.Panels[self] = true
 
-	self:InvalidateLayout(true)
-	self:SizeToChildren(true, true)
+	self:Rebuild()
+end
+
+function PANEL:OnRemove()
+	if self.Extension and self.Extension.Panels[self] then
+		self.Extension.Panels[self] = nil
+		if table.IsEmpty(self.Extension.Panels) then self.Extension.Panels = nil end
+	end
 end
 
 vgui.Register("nzu_ExtensionPanel", PANEL, "DPanel")
