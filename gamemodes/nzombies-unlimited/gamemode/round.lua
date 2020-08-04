@@ -1,7 +1,7 @@
 
 local ROUND = nzu.Round or {}
 nzu.Round = ROUND
-local SETTINGS = nzu.GetExtension("core").Settings
+local SETTINGS = nzu.GetExtension("core")
 
 ROUND_INVALID = -1
 ROUND_WAITING = 0
