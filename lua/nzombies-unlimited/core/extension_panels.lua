@@ -79,19 +79,33 @@ function PANEL:Rebuild()
 		l:SetContentAlignment(5)
 	return end
 
-	-- Default: Stack all settings in a vertical scroll panel. Order can be given with ZPos field. Label can be set with Label field.
+	-- Default: Stack all settings in a vertical scroll panel. Order can be given with Order field. Label can be set with Label field.
 	for k,v in pairs(ext.Settings) do
 		local pnl = self:Add("Panel")
-		pnl:SetZPos(v.ZPos or 0)
+		pnl:SetZPos(v.Order or 0)
 
 		local l = pnl:Add("DLabel")
 		l:SetText(v.Label or k)
 		--l:SetFont("ChatFont")
-		l:Dock(TOP)
 
 		local p = self:AddSetting(k,v, pnl)
 		--p:SetParent(pnl)
-		p:Dock(TOP)
+
+		if p:GetTall() <= 25 then
+			l:Dock(LEFT)
+			l:SetSize(100, 50)
+			l:DockMargin(0,0,5,0)
+
+			--if p:GetWide() > 200 then
+				p:Dock(FILL)
+			--else
+				--p:Dock(RIGHT)
+			--end
+		else
+			l:Dock(TOP)
+			p:Dock(TOP)
+		end
+		
 
 		pnl:Dock(TOP)
 		--pnl:SetTall(100)

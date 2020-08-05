@@ -376,31 +376,29 @@ end
 Round Sounds using ResourceSet setting in Core extension
 ---------------------------------------------------------------------------]]
 if SERVER then
-	-- Sounds!
-	local statemap = {
-		[ROUND_ONGOING] = "Start",
-		[ROUND_PREPARING] = "End",
-		[ROUND_GAMEOVER] = "GameOver",
-	}
-	local sounds = nzu.GetResourceSet("RoundSounds")
 	hook.Add("nzu_RoundStart", "nzu_Round_Sounds", function(num)
-		if num == 1 and sounds.Initial then return end
-		local s = sounds.Start and sounds.Start[math.random(#sounds.Start)]
+		if num == 1 and file.Exists("sound/nzu/round/"..SETTINGS.RoundSounds.."/initial", "GAME") then return end
+
+		local sounds = file.Find("sound/nzu/round/"..SETTINGS.RoundSounds.."/start/*", "GAME")
+		local s = sounds[math.random(#sounds)]
 		if s then nzu.PlayClientSound(s) end
 	end)
 
 	hook.Add("nzu_RoundEnd", "nzu_Round_Sounds", function(num)
-		local s = sounds.End and sounds.End[math.random(#sounds.End)]
+		local sounds = file.Find("sound/nzu/round/"..SETTINGS.RoundSounds.."/end/*", "GAME")
+		local s = sounds[math.random(#sounds)]
 		if s then nzu.PlayClientSound(s) end
 	end)
 
 	hook.Add("nzu_GameStarted", "nzu_Round_Sounds", function()
-		local s = sounds.Initial and sounds.Initial[math.random(#sounds.Initial)]
+		local sounds = file.Find("sound/nzu/round/"..SETTINGS.RoundSounds.."/initial/*", "GAME")
+		local s = sounds[math.random(#sounds)]
 		if s then nzu.PlayClientSound(s) end
 	end)
 
 	hook.Add("nzu_GameOver", "nzu_Round_Sounds", function()
-		local s = sounds.GameOver and sounds.GameOver[math.random(#sounds.GameOver)]
+		local sounds = file.Find("sound/nzu/round/"..SETTINGS.RoundSounds.."/gameover/*", "GAME")
+		local s = sounds[math.random(#sounds)]
 		if s then nzu.PlayClientSound(s) end
 	end)
 end

@@ -201,8 +201,7 @@ if SERVER then
 		self.MoveTime = CurTime() + dur
 		self.Weapon = nil -- So it doesn't close us on its own removal
 
-		timer.Simple(3, function() nzu.Announcer("MysteryBox_Laugh") end)
-		timer.Simple(5, function() nzu.Announcer("MysteryBox_Leave") end)
+		timer.Simple(3, function() nzu.Announcer("mysterybox/leave") end)
 		self:OnDisappear(dur)
 	end
 

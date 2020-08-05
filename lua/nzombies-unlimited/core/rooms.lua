@@ -22,17 +22,25 @@ if SERVER then
 	end
 
 	function ENTITY:SetRooms(flags)
-		local olds = table.Copy(self.nzu_Rooms)
-
-		for k,v in pairs(flags) do
-			if not olds[v] then
+		if not self.nzu_Rooms then
+			for k,v in pairs(flags) do
 				self:AddRoom(v)
 			end
-			olds[v] = nil
-		end
+		else
+			local flags = {}
 
-		for k,v in pairs(olds) do -- Now only those who were there before, but not anymore
-			self:RemoveRoom(k)
+			for k,v in pairs(flags) do
+				if not self.nzu_Rooms[v] then
+					self:AddRoom(v)
+				end
+				flags[v] = true
+			end
+
+			for k,v in pairs(self.nzu_Rooms) do -- Now only those who were there before, but not anymore
+				if not found[k] then
+					self:RemoveRoom(k)
+				end
+			end
 		end
 	end
 

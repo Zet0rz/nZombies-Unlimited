@@ -242,9 +242,9 @@ hook.Add("nzu_GameOverSequence", "nzu_Scoreboard_ShowOnGameOver", function(time)
 	if not LocalPlayer():IsUnspawned() then
 		local gp = gameoverpanel
 		if not gp then
-			local hud = nzu.GetActiveHUD()
-			if hud and hud._GameOverPanel then
-				gp = hud:_GameOverPanel()
+			local hud = nzu.HUD
+			if hud and hud.GameOverPanel then
+				gp = hud:GameOverPanel()
 			else
 				gp = gameoverpanelfunc()
 			end
@@ -265,9 +265,9 @@ hook.Add("nzu_GameOver", "nzu_Scoreboard_ShowGameOverText", function(time)
 	if not LocalPlayer():IsUnspawned() then
 		if IsValid(gameoverpanel) then gameoverpanel:Remove() end
 
-		local hud = nzu.GetActiveHUD()
-		if hud and hud._GameOverPanel then -- Ask the HUD object to define a Game Over panel
-			gameoverpanel = hud:_GameOverPanel()
+		local hud = nzu.HUD
+		if hud and hud.GameOverPanel then -- Ask the HUD object to define a Game Over panel
+			gameoverpanel = hud:GameOverPanel()
 		else
 			gameoverpanel = gameoverpanelfunc()
 		end

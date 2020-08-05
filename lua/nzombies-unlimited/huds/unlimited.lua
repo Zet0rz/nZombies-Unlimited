@@ -1,9 +1,79 @@
 
-HUD.Name = "Unlimited"
-if SERVER then return end -- Not really necessary, but hey, we save a bit of loading and memory since the server would discard this anyway
+--[[-------------------------------------------------------------------------
+Unlimited HUD - by Zet0r
+A HUD based on the layout of BO3 Zombies, with its own custom theme
+This is the built-in default HUD of nZombies Unlimited. You can make your own HUD similar to this.
+
+You can make your own HUD by making a .lua file and putting it in "lua/nzombies-unlimited/huds/" just like this one.
+The file should create its own HUD object (table) and return it at the end of the file.
+You may add functions to this table exactly like you would a SWEP or ENT class file. However the prefix of the function name
+determines the behavior of the function. These are the following behavior types:
+
+	Paint_:
+		This function is drawn in GM:HUDPaint(). Do this for all basic drawing functions.
+
+		Example:
+			function HUD:Paint_Round()
+				surface.DrawText(nzu.Round:GetRound())
+			end
+
+	Panel_:
+		This function creates a panel and returns it. It is run on HUD initialization.
+		Do this if you want to use panels for your HUD. Panels can later be accessed in
+		HUD.Panels.key where "key" is the what comes after "Panel_" in the name.
+
+		Example:
+			function HUD:Panel_Round()
+				local p = vgui.Create("DLabel")
+				p:ParentToHUD()
+				p:SetPos(0,0)
+				p:SetText(nzu.Round:GetRound())
+
+				return p
+			end
+
+			(Panel can be reached in HUD.Panels.Round while it exists)
+
+	Hook_:
+		This function is a hook that will be hooked only while the HUD is active.
+		The hook it hooks to is whatever comes after "Hook_" in the name.
+		Do this if you want your HUD to react to certain events, such as to trigger Max Ammo or powerup alerts.
+
+		Example:
+			function HUD:Hook_Think()
+				-- This is run on Think!
+			end
+
+
+	Additionally!
+	These values in the HUD have special meaning:
+	- HUD.Player: The player currently viewing from (spectating, or local player)
+	- HUD:OnPlayerChanged(new): If this exists, run whenever the observed player changes
+	- HUD:IsValid(): Returns true while the HUD is active
+	- HUD.Panels: The table of all panels created from Panel_ functions
+	- HUD:GameOverPanel(): Creates the panel shown at game over
+
+To make it simple, you can use this HUD as a boiler plate for developing your own.
+Here is a table of contents of what components this HUD is made up from:
+
+	- Round Indicator (Paint)
+	- Points (Panel)
+	- Damage Overlay (Health, Paint)
+	- Weapons (Paint)
+	- Downed Indicator (Paint)
+	- Revive Progress (Paint)
+	- Bleedout Greyscale Effects (Hook, RenderScreenspaceEffects)
+---------------------------------------------------------------------------]]
+
+local HUD = {}
+
+
 
 --[[-------------------------------------------------------------------------
-Round Indicator
+ROUND INDICATOR
+
+Draws tally marks while the round is <=5, and text when higher.
+When the round changes, this animates with a "burn-in" effect.
 ---------------------------------------------------------------------------]]
 local roundfont = "nzu_RoundNumber"
 surface.CreateFont(roundfont, {
@@ -66,12 +136,15 @@ local lastparticletime
 local riser
 local initialcounter
 
+-- Localize for optimization
 local ROUND = nzu.Round
+local ROUND_PREPARING = ROUND_PREPARING
+--
 
-function HUD:Round(ply, r, state)
+function HUD:Paint_Round()
 	local CT = CurTime()
-	--local r = ROUND:GetRound()
-	--local state = ROUND:GetState()
+	local r = ROUND:GetRound()
+	local state = ROUND:GetState()
 
 	if riser or state == ROUND_PREPARING and r ~= 1 then
 		if not riser then riser = 0 end
@@ -288,8 +361,10 @@ function HUD:Round(ply, r, state)
 end
 
 --[[-------------------------------------------------------------------------
-Points HUD
-Uses panels, and thus the function returns a removal function
+POINTS
+
+Creates a panel that automatically attaches players to itself, stacking player
+panels on top of each other. These each have playermodel icons.
 ---------------------------------------------------------------------------]]
 local point_shadow = Material("nzombies-unlimited/hud/points_shadow.png")
 local point_glow = Material("nzombies-unlimited/hud/points_glow.vmt")
@@ -302,7 +377,7 @@ local othernamefont = "nzu_Font_Points_NameSmall"
 local pointsfont = "nzu_Font_Points_PointsLarge"
 local pointsfont2 = "nzu_Font_Points_PointsSmall"
 
-function HUD:Points()
+function HUD:Panel_Points()
 	local pnl = vgui.Create("DPanel")
 	pnl:ParentToHUD()
 	pnl:SetPos(50, 100)
@@ -429,7 +504,10 @@ function HUD:Points()
 end
 
 --[[-------------------------------------------------------------------------
-Damage Overlay
+DAMAGE OVERLAY
+
+Draws the health of the player as an overlay on their screen.
+Uses HUDPaintBackground to draw behind all other HUD.
 ---------------------------------------------------------------------------]]
 local min_threshold = 0.7
 local max_threshold = 0.3
@@ -437,8 +515,9 @@ local pulse_threshold = 0.4
 local pulse_time = 1
 local pulse_base = 0.75 -- How much of the full overlay is contributed by the base health (the rest is added by the pulse)
 
-HUD.DamageOverlayMaterial = Material("materials/nzombies-unlimited/hud/overlay_low_health.png", "unlitgeneric smooth")
-function HUD:Paint_Health() -- Paint_ function: It is hooked without needing to be nzu.HUDComponent-registered. Use this for anything you just always wanna draw with your HUD.
+local damage_overlay = Material("materials/nzombies-unlimited/hud/overlay_low_health.png", "unlitgeneric smooth")
+
+function HUD:Hook_HUDPaintBackground()
 	local ply = self.Player
 	local health = ply:Health()
 	local max = ply:GetMaxHealth()
@@ -452,14 +531,17 @@ function HUD:Paint_Health() -- Paint_ function: It is hooked without needing to 
 			fade = fade + pulse*(1-pulse_base)
 		end
 
-		surface.SetMaterial(self.DamageOverlayMaterial)
+		surface.SetMaterial(damage_overlay)
 		surface.SetDrawColor(255,0,0,255*fade)
 		surface.DrawTexturedRect(0,0,ScrW(),ScrH())
 	end
 end
 
 --[[-------------------------------------------------------------------------
-Weapons HUD
+WEAPONS HUD
+
+Draws the weapons the player is currently holding. Also responsible for drawing
+the special slot weapons that have access through special keys.
 ---------------------------------------------------------------------------]]
 local defaultmat = Material("nzombies-unlimited/hud/mk3a2_icon.png", "unlitgeneric smooth") -- TODO: Change this to not use old nZ material
 local col_keybind = Color(255,255,100)
@@ -474,7 +556,13 @@ local weaponfont_name = "nzu_Font_Bloody_Medium"
 
 local equipmentfont = "nzu_Font_Bloody_Small"
 
-function HUD:Weapons(ply, hudweapons)
+-- This special table is the ordered set of all weapons the client is aware of
+-- that are equipped in slots with associated keybinds. The results are in order of receival.
+-- Each result is a table with two values: Weapon = the weapon, Bind = input.GetKeyName(keybind)
+local hudweapons = nzu.GetOrderedKeybindSlotWeapons()
+
+function HUD:Paint_Weapons()
+	local ply = self.Player
 	local w,h = ScrW(),ScrH()
 
 	local nameposh = h - 185
@@ -581,7 +669,11 @@ function HUD:Weapons(ply, hudweapons)
 end
 
 --[[-------------------------------------------------------------------------
-Downed Indicator
+DOWNED INDICATOR
+
+Draws the icon to revive players above every downed other player.
+This is split into two functions: One draws a single indicator, the other
+loops through all downed players and runs the first function for each of them
 ---------------------------------------------------------------------------]]
 local REVIVEfont = "nzu_Font_Revive"
 local downedindicator = Vector(0,0,25)
@@ -593,82 +685,106 @@ local waveheight = 40
 local pointheight = 15
 local bleedouttime = 45
 
-function HUD:_GetDownedIndicatorPosition(ply)
-	local pos = (ply:GetPos() + downedindicator):ToScreen()
-	if pos.visible then
-		return pos.x,pos.y
-	end
-end
+-- This table contains the keys of all downed players, and the value of their fastest revivor
+-- The value is NULL (not nil) if there is no revivor but they are downed
+local downedplayers = nzu.GetDownedPlayersRevivors()
 
-function HUD:Draw_DownedIndicator(_, ply, revivor)
-	local x,y = self:_GetDownedIndicatorPosition(ply)
-	if x then
-		surface.SetFont(REVIVEfont)
-		local w,h = surface.GetTextSize(revivetext)
+function HUD:Paint_DownedIndicators()
+	for k,v in pairs(downedplayers) do
+		if k ~= self.Player then -- We don't draw this for our observed player
+			local pos = (ply:GetPos() + downedindicator):ToScreen()
+			if pos.visible then
+				local x,y = pos.x,pos.y
 
-		local w2 = w + outlines*2
-		local x2 = x - w/2 - outlines
-		local y2 = y - 6
+				surface.SetFont(REVIVEfont)
+				local w,h = surface.GetTextSize(revivetext)
 
-		surface.SetMaterial(point_shadow)
-		surface.SetDrawColor(0,0,0,255)
-		surface.DrawTexturedRectRotated(x, y - h, waveheight, w2, 90)
+				local w2 = w + outlines*2
+				local x2 = x - w/2 - outlines
+				local y2 = y - 6
 
-		surface.DrawRect(x2, y2, w2, revivebarheight)
+				surface.SetMaterial(point_shadow)
+				surface.SetDrawColor(0,0,0,255)
+				surface.DrawTexturedRectRotated(x, y - h, waveheight, w2, 90)
 
-		surface.SetMaterial(point)
-		surface.DrawTexturedRect(x2, y2 + revivebarheight, w2, pointheight)
-		
+				surface.DrawRect(x2, y2, w2, revivebarheight)
 
-		if IsValid(revivor) then
-			local diff = revivor.nzu_ReviveTime - revivor.nzu_ReviveStartTime
-			local pct = (CurTime() - revivor.nzu_ReviveStartTime)/diff
+				surface.SetMaterial(point)
+				surface.DrawTexturedRect(x2, y2 + revivebarheight, w2, pointheight)
+				
 
-			surface.SetDrawColor(255,255,255)
-			surface.SetTextColor(255,255,255)
-			surface.DrawRect(x2 + 4, y2 + 3, (w2 - 8) * pct, revivebarheight - 6)
-		elseif ply.nzu_DownedTime then
-			local pct = (1 - (CurTime() - ply.nzu_DownedTime)/bleedouttime)*255
-			surface.SetDrawColor(255,pct,0)
-			surface.SetTextColor(255,pct,0)
-			surface.DrawRect(x2 + 4, y2 + 3, w2 - 8, revivebarheight - 6)
+				if IsValid(revivor) then
+					local diff = revivor.nzu_ReviveTime - revivor.nzu_ReviveStartTime
+					local pct = (CurTime() - revivor.nzu_ReviveStartTime)/diff
+
+					surface.SetDrawColor(255,255,255)
+					surface.SetTextColor(255,255,255)
+					surface.DrawRect(x2 + 4, y2 + 3, (w2 - 8) * pct, revivebarheight - 6)
+				elseif ply.nzu_DownedTime then
+					local pct = (1 - (CurTime() - ply.nzu_DownedTime)/bleedouttime)*255
+					surface.SetDrawColor(255,pct,0)
+					surface.SetTextColor(255,pct,0)
+					surface.DrawRect(x2 + 4, y2 + 3, w2 - 8, revivebarheight - 6)
+				end
+				surface.DrawTexturedRect(x2 + 7, y2 + revivebarheight, w2 - 14, pointheight - 4)
+				surface.SetMaterial(point_glow)
+				surface.DrawTexturedRectRotated(x, y - h, waveheight, w2, 90)
+				
+				surface.SetTextPos(x - w/2, y - h)
+				surface.DrawText(revivetext)
+			end
 		end
-		surface.DrawTexturedRect(x2 + 7, y2 + revivebarheight, w2 - 14, pointheight - 4)
-		surface.SetMaterial(point_glow)
-		surface.DrawTexturedRectRotated(x, y - h, waveheight, w2, 90)
-		
-		surface.SetTextPos(x - w/2, y - h)
-		surface.DrawText(revivetext)
 	end
 end
 
 --[[-------------------------------------------------------------------------
-Revive Progress
+REVIVE PROGRESS
+
+The progress bar for reviving a player. This uses the "downedplayers" table above
+to check if the observed player has a revivor. Otherwise, it checks the observed player's
+revive target
 ---------------------------------------------------------------------------]]
-function HUD:Draw_ReviveProgress(_, ply, isbeingrevived)
-	local lp = LocalPlayer()
-	local w,h = ScrW()/2 ,ScrH()
-	local revivor = isbeingrevived and ply or LocalPlayer()
+function HUD:Paint_ReviveProgress(_, ply, isbeingrevived)
+	local ply = downedplayers[self.Player] -- Starts off as who is reviving us
+	local isbeingrevived = true
+	local anyprogress = IsValid(revivor)
 
-	local diff = revivor.nzu_ReviveTime - revivor.nzu_ReviveStartTime
-	local pct = (CurTime() - revivor.nzu_ReviveStartTime)/diff
-	if pct > 1 then pct = 1 end
-
-	surface.SetDrawColor(0,0,0)
-	surface.DrawRect(w - 150, h - 300, 300, 20)
-
-	surface.SetDrawColor(255,255,255)
-	surface.DrawRect(w - 145, h - 295, 290*pct, 10)
-
-	if isbeingrevived then
-		draw.SimpleTextOutlined("Being revived by "..ply:Nick(), "DermaLarge", w, h - 310, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM, 2, color_black)
-	else
-		draw.SimpleTextOutlined("Reviving "..ply:Nick(), "DermaLarge", w, h - 310, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM, 2, color_black)
+	if not anyprogress then
+		ply = self.Player.nzu_ReviveTarget -- Otherwise whoever we're reviving
+		if IsValid(revivor) then
+			isbeingrevived = false -- This isn't us being revived
+			anyprogress = true
+		end
 	end
+
+	if anyprogress then
+		local w,h = ScrW()/2, ScrH()
+		local revivor = isbeingrevived and ply or self.Player
+
+		local diff = revivor.nzu_ReviveTime - revivor.nzu_ReviveStartTime
+		local pct = (CurTime() - revivor.nzu_ReviveStartTime)/diff
+		if pct > 1 then pct = 1 end
+
+		surface.SetDrawColor(0,0,0)
+		surface.DrawRect(w - 150, h - 300, 300, 20)
+
+		surface.SetDrawColor(255,255,255)
+		surface.DrawRect(w - 145, h - 295, 290*pct, 10)
+
+		if isbeingrevived then
+			draw.SimpleTextOutlined("Being revived by "..ply:Nick(), "DermaLarge", w, h - 310, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM, 2, color_black)
+		else
+			draw.SimpleTextOutlined("Reviving "..ply:Nick(), "DermaLarge", w, h - 310, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM, 2, color_black)
+		end
+	end	
 end
 
 --[[-------------------------------------------------------------------------
-Bleed Out Color Distortion
+BLEED OUT COLOR DISTORTION
+
+This is hooked to RenderScreenspaceEffects. It draws the color modifications for
+the bleedout time left. Remember that HUDs can only have 1 hook for each hook type,
+so if you wish to use more screenspace effects, put them all into 1 function (perhaps categorize in multiple local functions)
 ---------------------------------------------------------------------------]]
 local colmod = {
 	["$pp_colour_addr"] = 0,
@@ -681,15 +797,24 @@ local colmod = {
 	["$pp_colour_mulg"] = 0,
 	["$pp_colour_mulb"] = 0
 }
-function HUD:Draw_BleedoutScreenspaceEffects(ply, downtime, deathtime) -- Deathtime will be added later when variable down times is supported and networked
-	local pct = (CurTime() - downtime)/bleedouttime -- For now we just use the static 45 second variable
-	colmod["$pp_colour_colour"] = 1 - pct
-	colmod["$pp_colour_addr"] = pct*0.5
-	DrawColorModify(colmod)
+function HUD:Hook_RenderScreenspaceEffects() -- Deathtime will be added later when variable down times is supported and networked
+	local ply = self.Player
+	if ply:GetIsDowned() then
+
+		local diff = ply.nzu_BleedoutTime - ply.nzu_DownedTime
+		local pct = (CurTime() - ply.nzu_DownedTime)/diff
+
+		colmod["$pp_colour_colour"] = 1 - pct
+		colmod["$pp_colour_addr"] = pct*0.5
+		DrawColorModify(colmod)
+	end
 end
 
 --[[-------------------------------------------------------------------------
 Target ID
+
+This uses the hook which runs whenever the gamemode has found a target to
+get Target ID type and text from
 ---------------------------------------------------------------------------]]
 local targetidfont = "nzu_Font_TargetID"
 
@@ -703,7 +828,7 @@ local typeformats = {
 	[TARGETID_TYPE_ELECTRICITY] = function(text) return text end,
 }
 
-function HUD:Draw_TargetID(ply, text, typ, data, ent)
+function HUD:Hook_nzu_DrawTargetID(text, typ, data, ent)
 	local x,y = ScrW()/2, ScrH()/2 + 100
 	local str = typeformats[typ] and typeformats[typ](text, data, ent) or text
 
@@ -738,9 +863,8 @@ end]]
 --[[-------------------------------------------------------------------------
 Game Over Panel
 This is actually an internal function, but it is called through the Scoreboard file
-The _ prefix means it is ignored by the HUD system, and thus internal (or accessed directly)
 ---------------------------------------------------------------------------]]
-function HUD:_GameOverPanel()
+function HUD:GameOverPanel()
 	local p = vgui.Create("Panel")
 	local txt = p:Add("DLabel")
 	txt:SetFont("nzu_Font_Bloody_Biggest")
@@ -764,3 +888,5 @@ function HUD:_GameOverPanel()
 
 	return p
 end
+
+return HUD

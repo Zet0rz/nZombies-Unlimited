@@ -647,7 +647,7 @@ if CLIENT then
 			end
 		end
 
-		if wep.DrawHUDIcon then table.insert(hudweapons, {Weapon = wep, Bind = bind}) end
+		table.insert(hudweapons, {Weapon = wep, Bind = bind})
 	end)
 
 	hook.Add("nzu_WeaponRemovedFromSlot", "nzu_Weapons_HUDWeapon", function(ply, wep, slot)
@@ -659,7 +659,7 @@ if CLIENT then
 		end
 	end)
 
-	nzu.HUDComponent("Weapons", function() return hudweapons end)
+	function nzu.GetOrderedKeybindSlotWeapons() return hudweapons end
 end
 
 --[[-------------------------------------------------------------------------

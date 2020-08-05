@@ -15,7 +15,7 @@ if SERVER then
 	-- Saving! Man, isn't it just easy?
 	nzu.AddSaveExtension("NavOutOfBounds", {
 		Save = function()
-			local tbl = {OutOfBounds = table.GetKeys()}
+			local tbl = {OutOfBounds = table.GetKeys(outofbounds)}
 			return tbl
 		end,
 		Load = function(data)

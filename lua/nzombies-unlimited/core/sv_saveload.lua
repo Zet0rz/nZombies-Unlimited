@@ -111,9 +111,9 @@ local function loadconfig(config)
 				-- Load extensions with specified settings (rather than defaults)
 				-- These are loaded in the order they were saved (unless the .txt was modified)
 
-				local id = string.lower(v.ID)
-				if nzu.GetExtension(id) then
-					nzu.UpdateExtension(id, v.Settings) -- Update if already loaded (Core)
+				local ext = nzu.GetExtension(string.lower(v.ID))
+				if ext then
+					ext:BulkSetSettings(v.Settings)
 				else
 					nzu.LoadExtension(id, v.Settings)
 				end
@@ -512,21 +512,18 @@ if NZU_SANDBOX then -- Saving a map can only be done in Sandbox
 	}
 	local function getextensionsettings()
 		local tbl = {}
-		for k,v in pairs(nzu.GetLoadedExtensionOrder()) do
-			local ext = nzu.GetExtension(v)
-			if ext then
-				if ext.GetSettingsMeta() then
-					local t = {}
-					-- Loop through the settings meta; If any have a "Save" we will save the value of that function instead
-					for k,v in pairs(ext.GetSettingsMeta()) do
-						local tosave = ext.Settings[k]
-						if v.Save then tosave = v.Save(tosave) end
-						t[k] = tosave
-					end
-					table.insert(tbl, {ID = ext.ID, Settings = t})
-				else
-					table.insert(tbl, {ID = ext.ID})
-				end				
+		for k,v in pairs(nzu.GetLoadedExtensions()) do
+			if v.Settings then
+				local t = {}
+				-- Loop through the settings meta; If any have a "Save" we will save the value of that function instead
+				for k2,v2 in pairs(v.Settings) do
+					local tosave = v[k2]
+					if v2.Save then tosave = v2.Save(tosave) end
+					t[k2] = tosave
+				end
+				table.insert(tbl, {ID = k, Settings = t})
+			else
+				table.insert(tbl, {ID = k})
 			end
 		end
 		return util.TableToJSON(tbl, true)

@@ -6,6 +6,7 @@ local loaded_extensions = nzu.Extensions
 
 function nzu.GetExtension(name) return loaded_extensions[name] end
 function nzu.IsExtensionLoaded(name) return loaded_extensions[name] and true or false end
+function nzu.GetLoadedExtensions() return loaded_extensions end
 
 
 --[[-------------------------------------------------------------------------
@@ -380,7 +381,7 @@ else
 
 
 
-	-- EXTENION BASE
+	-- EXTENTION BASE
 
 	-- Request setting changes
 	function extensionbase:RequestChangeSetting(key, value)

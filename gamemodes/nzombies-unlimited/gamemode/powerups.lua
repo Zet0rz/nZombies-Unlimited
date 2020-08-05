@@ -452,7 +452,7 @@ else
 			if powerup and powerup.Sound then
 				sound.Play(powerup.Sound, LocalPlayer():GetPos(), 0, neg and 50 or 100, 1)
 			end
-			local ann = nzu.GetRandomAnnouncerSound("Powerups", id)
+			local ann = nzu.GetAnnouncerSound("powerups/"..string.lower(id))
 			if ann then sound.Play(ann, LocalPlayer():GetPos(), 0, neg and 50 or 100, 1) end
 
 			-- Duration-based Activation (for HUD and tables)

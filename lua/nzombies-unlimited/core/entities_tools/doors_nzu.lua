@@ -215,7 +215,7 @@ if SERVER then
 		end
 
 		if data.FlagOpen and data.Rooms then
-			self.OnDoorOpened = doorautoopen
+			self.OnRoomOpened = doorautoopen
 			self:SetRooms(data.Rooms)
 		end
 
@@ -447,24 +447,6 @@ if SERVER then
 			if data and data.Price == 0 and not data.Electricity then
 				nzu.BuyDoor(k)
 			end
-		end
-	end)
-
-	--[[-------------------------------------------------------------------------
-	Auto-opening doors if all connected rooms are opened
-	---------------------------------------------------------------------------]]
-	nzu.AddRoomHandler("DoorAutoOpen", function(door, room)
-		local data = door:GetDoorData()
-		if not data then return end
-
-		for k,v in pairs(door.nzu_Rooms) do
-			if not nzu.IsRoomOpen(k) then return true end -- Don't remove the handler/rooms from us yet
-		end
-
-		if data.Group then
-			nzu.OpenDoorGroup(data.Group, nil, nil, door)
-		else
-			nzu.OpenDoor(door, nil, nil, door)
 		end
 	end)
 end

@@ -2,10 +2,6 @@ local PLAYER = FindMetaTable("Player")
 local ENTITY = FindMetaTable("Entity")
 nzu.AddPlayerNetworkVar("Bool", "IsDowned") -- So prediction can work with it too
 
-local bleedouttime = 45 -- Seconds
-
-
-
 
 --[[-------------------------------------------------------------------------
 Basic Revive state
@@ -13,22 +9,40 @@ Basic Revive state
 if SERVER then
 	util.AddNetworkString("nzu_playerdowned") -- Server: Broadcast that a player was downed
 
+	-- We can change this later when we want variable bleedout time
+	function PLAYER:GetBleedoutTime()
+		return 45 -- Seconds
+	end
+
+	local function networkdowned(ply, time, death)
+		net.Start("nzu_playerdowned")
+			net.WriteEntity(ply)
+			net.WriteBool(true)
+			net.WriteFloat(time)
+			net.WriteFloat(death)
+		net.Broadcast()
+	end
+
 	function PLAYER:DownPlayer()
 		if not self:GetIsDowned() then
 			self:SetHealth(1) -- Is this a nice touch or nah?
 			self:SetIsDowned(true)
 			self.nzu_DownedTime = CurTime()
+			self.nzu_BleedoutTime = CurTime() + self:GetBleedoutTime()
 
-			net.Start("nzu_playerdowned")
-				net.WriteEntity(self)
-				net.WriteBool(true)
-				net.WriteFloat(self.nzu_DownedTime)
-			net.Broadcast()
+			networkdowned(self, self.nzu_DownedTime, self.nzu_BleedoutTime)
 
 			hook.Run("nzu_PlayerDowned", self)
 
 			self:AddUntargetability("Downed")
 		end
+	end
+
+	function PLAYER:SetBleedoutTime(time)
+		self.nzu_BleedoutTime = time
+		networkdowned(self, self.nzu_DownedTime, self.nzu_BleedoutTime)
+
+		hook.Run("nzu_PlayerBleedoutChanged", self)
 	end
 
 	-- Promised Revive: A downed player is promised to be revived - therefore, do not count them as out
@@ -44,6 +58,7 @@ if SERVER then
 			self:SetHealth(100)
 			self:SetIsDowned(false)
 			self.nzu_DownedTime = nil
+			self.nzu_BleedoutTime = nil
 			self.nzu_PromisedRevive = nil
 
 			net.Start("nzu_playerdowned")
@@ -81,10 +96,15 @@ if CLIENT then
 	net.Receive("nzu_playerdowned", function()
 		local ply = net.ReadEntity()
 		if net.ReadBool() then
+			local already = ply.nzu_DownedTime
+
 			ply.nzu_DownedTime = net.ReadFloat()
-			hook.Run("nzu_PlayerDowned", ply)
+			ply.nzu_BleedoutTime = net.ReadFloat()
+
+			hook.Run(already and "nzu_PlayerBleedoutChanged" or "nzu_PlayerDowned", self)
 		else
 			ply.nzu_DownedTime = nil
+			ply.nzu_BleedoutTime = nil
 			if net.ReadBool() then
 				local savior
 				if net.ReadBool() then savior = net.ReadEntity() end
@@ -137,8 +157,7 @@ if SERVER then
 	-- Handle bleedout in a player's Post Think
 	hook.Add("PlayerPostThink", "nzu_Revive_Bleedout", function(ply)
 		if ply:GetIsDowned() then
-			local passed = CurTime() - ply.nzu_DownedTime
-			if passed > bleedouttime then
+			if ply.nzu_BleedoutTime < CurTime() then
 				ply:Kill() -- Just using Kill() is how to kill a downed player
 			end
 		end
@@ -149,6 +168,7 @@ if SERVER then
 		if ply:GetIsDowned() then
 			ply:SetIsDowned(false)
 			ply.nzu_DownedTime = nil
+			ply.nzu_BleedoutTime = nil
 
 			net.Start("nzu_playerdowned")
 				net.WriteEntity(ply)
@@ -449,19 +469,13 @@ end)
 Clientside HUD Drawing
 ---------------------------------------------------------------------------]]
 if CLIENT then
-	local localplayer
-	local isbeingrevived = false
 	local downedplayers = {}
 	hook.Add("nzu_PlayerDowned", "nzu_Revive_HUDDownedIndicator", function(ply)
-		if ply ~= LocalPlayer() then
-			downedplayers[ply] = NULL
-		end
+		downedplayers[ply] = NULL
 	end)
 
 	local function playernolongerdown(ply)
-		if ply ~= LocalPlayer() then
-			downedplayers[ply] = nil
-		end
+		downedplayers[ply] = nil
 	end
 	hook.Add("nzu_PlayerRevived", "nzu_Revive_HUDDownedIndicator", playernolongerdown)
 	hook.Add("nzu_PlayerBledOut", "nzu_Revive_HUDDownedIndicator", playernolongerdown)
@@ -469,17 +483,6 @@ if CLIENT then
 
 	-- When players start reviving a target, check to see if they're faster and update the revivor if so
 	hook.Add("nzu_PlayerStartedRevive", "nzu_Revive_HUDDownedIndicator", function(ply, target, time)
-		if target == LocalPlayer() then -- If LocalPlayer is the one being revived
-			if not isbeingrevived then -- If we were not previously being revived, immediately overwrite
-				localplayer = ply
-				isbeingrevived = true
-			elseif not IsValid(localplayer) or localplayer.nzu_ReviveTime > ply.nzu_ReviveTime then -- Else only if faster than previous revivor
-				localplayer = ply
-			end
-		elseif ply == LocalPlayer() and not isbeingrevived then -- If we're reviving, and we're also not being revived, change our target
-			localplayer = target
-		end
-
 		if downedplayers[target] then
 			if not IsValid(downedplayers[target]) or downedplayers[target].nzu_ReviveTime > ply.nzu_ReviveTime then
 				downedplayers[target] = ply
@@ -489,31 +492,7 @@ if CLIENT then
 
 	-- When players stop reviving, loop through all to find the next fastest one to take over, if any
 	hook.Add("nzu_PlayerStoppedRevive", "nzu_Revive_HUDDownedIndicator", function(ply, target)
-		if ply == LocalPlayer() or target == LocalPlayer() then -- We're stopping being revived or stopping to revive ourselves
-			local min = math.huge
-			local revivor
-			for k,v in pairs(player.GetAll()) do
-				if v.nzu_ReviveTarget == LocalPlayer() then -- Loop through all. If any are reviving us, that takes priority (for fastest)
-					if v.nzu_ReviveTime < min then
-						min = v.nzu_ReviveTime
-						revivor = v
-					end
-				end
-			end
-
-			if IsValid(revivor) then -- Someone's reviving us
-				localplayer = revivor
-				isbeingrevived = true
-			elseif IsValid(LocalPlayer().nzu_ReviveTarget) then -- We're reviving someone else
-				localplayer = LocalPlayer().nzu_ReviveTarget
-				isbeingrevived = false
-			else
-				localplayer = nil
-				isbeingrevived = false -- Neither is true
-			end
-		end
-
-		-- For other players, loop through all and find the next fastest to take over
+		-- Loop through all and find the next fastest to take over
 		if downedplayers[target] then
 			local min = math.huge
 			local revivor
@@ -534,45 +513,7 @@ if CLIENT then
 		end
 	end)
 
-	local dopaint = nzu.DrawHUDComponent
-	-- Draw downed indicator on other players
-	hook.Add("HUDPaint", "nzu_Revive_DownedIndicator", function()
-		for k,v in pairs(downedplayers) do
-			dopaint("DownedIndicator", k, v)
-		end
-		--dopaint("HUD_DownedIndicator", Entity(2))
-	end)
-
-	-- Draw revive progress for local player
-	hook.Add("HUDPaint", "nzu_Revive_ReviveProgress", function()
-		if IsValid(localplayer) then
-			dopaint("ReviveProgress", localplayer, isbeingrevived)
-		end
-	end)
-
-	hook.Add("RenderScreenspaceEffects", "nzu_Revive_BleedoutEffects", function()
-		if LocalPlayer():GetIsDowned() then
-			dopaint("BleedoutScreenspaceEffects", LocalPlayer().nzu_DownedTime)
-		end
-	end)
-
-	--[[local getplys = team.GetPlayers
-	hook.Add("HUDPaint", "nzu_Revive_DownedIndicator", function()
-		local lp = LocalPlayer()
-
-		if not lp:IsUnspawned() then
-			local plys = getplys(lp:Team())
-
-			local torevive = {}
-			local maxprogress = {}
-			for k,v in pairs(plys) do
-				if v:GetIsDowned() then table.insert(torevive, v) end
-				if v.nzu_ReviveTarget then
-					local remain = v.nzu_ReviveTime
-				end
-			end
-		end
-	end)]]
+	function nzu.GetDownedPlayersRevivors() return downedplayers end
 end
 
 

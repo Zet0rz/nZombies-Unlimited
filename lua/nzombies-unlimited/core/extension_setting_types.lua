@@ -12,9 +12,9 @@ Available types:
 - "Color": A Color object
 - "Weapon": A string representing the classname of a weapon
 - "WeightedWeaponList": A table with keys being weapon classnames, and values being a numerical weight
-- "ResourceSet": A dropdown listing options of json files found in the specified folder. Requires additional field "SetName" which defines what folder to look in
 - "OptionSet": A dropdown listing options from a predefined set of options. Requires additional field "Options" which can be a sequential table of options, or a key/value pair for data behind each option.
-- "FileDir": A dropdown listing folders found in a specific path. Requires additional field "Path" which is always relative to "GAME" (file.Find(path, "GAME") <- Directories from this)
+- "FileDir": A dropdown listing folders found in a specific path. Requires additional field "Path" which is always relative to "GAME" (file.Find(path, "GAME") <- Directories or files from this).
+	Additionally requires either field "Directories = true" or "Files = true" or both to control whether to show files or folders (or both).
 ]]
 
 
@@ -428,10 +428,17 @@ nzu.AddExtensionSettingType("FileDir", {
 	Panel = function(self, parent)
 		local p = vgui.Create("DSearchComboBox", parent)
 
-		local _,dirs = file.Find(self.Path, "GAME")
+		local files,dirs = file.Find(self.Path, "GAME")
 		p:AddChoice("  [None]", "") -- Allow the choice of none
-		for k,v in pairs(dirs) do
-			p:AddChoice(v)
+		if self.Files then
+			for k,v in pairs(files) do
+				p:AddChoice(self.Directories and v or string.StripExtension(v), v)
+			end
+		end
+		if self.Directories then
+			for k,v in pairs(dirs) do
+				p:AddChoice(v)
+			end
 		end
 		p:SetAllowCustomInput(true)
 

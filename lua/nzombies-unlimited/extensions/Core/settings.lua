@@ -6,40 +6,56 @@ EXT.Settings = {
 		Type = "Weapon",
 		Default = "weapon_pistol",
 		Label = "Starting Weapon",
+		Order = 1,
 	},
 	["StartKnife"] = {
 		Type = "Weapon",
 		Default = "nzu_knife_crowbar",
 		Label = "Default Knife",
+		Order = 2,
 	},
 	["StartGrenade"] = {
 		Type = "Weapon",
 		Default = "nzu_grenade_mk3a2",
 		Label = "Default Grenade",
+		Order = 3,
 	},
 	["StartPoints"] = {
 		Type = "Number",
 		Default = 500,
 		Integer = true,
 		Label = "Starting Points",
+		Order = 4,
 	},
 
 	-- HUD and Cosmetic settings
-	["HUD"] = nzu.HUDSetting, -- This table is exposed in hudmanagement.lua
+	["HUD"] = {
+		Type = "FileDir", -- It is really just a string
+		Path = "lua/nzombies-unlimited/huds/*.lua", -- Everything in this folder
+		Files = true,
+		Default = "unlimited.lua", -- The default HUD
+		Client = true,
+		Label = "HUD Style",
+		Order = 6,
+	},
 	["RoundSounds"] = {
-		--Type = "ResourceSet",
-		Type = "String",
-		Default = "classic", -- classic.lua, as found in lua/nzombies-unlimited/resourcesets/roundsounds/classic.lua. It's a lua file extension, but not actual code (it's JSON). Lua is just necessary for Workshop
+		Type = "FileDir",
+		Path = "sound/nzu/round/*",
+		Directories = true,
+		Default = "classic",
 		Label = "Round Sounds",
+		Order = 7,
 	},
 
 	-- Announcer. The folder name for the folder to look for announcer sound files in
 	["Announcer"] = {
 		Type = "FileDir", -- It is really just a string
 		Path = "sound/nzu/announcer/*", -- Everything in this folder
+		Directories = true,
 		Default = "samantha",
 		Client = true,
 		Label = "Announcer",
+		Order = 8,
 	},
 
 	-- Mystery Box settings
@@ -49,66 +65,14 @@ EXT.Settings = {
 			--if NZU_NZOMBIES then timer.Simple(0.1, function() ext.ReloadModelsList() end) end
 		end,
 		Label = "Mystery Box Weapons",
-	}
+		Order = 100,
+	},
 
 	-- Powerups Settings
-	
-}
-
---[[if CLIENT then
-	-- Pre-register these as their files are located in the gamemode, not appearing in sandbox
-
-	local labelledsettings = {
-		{"StartPoints", "Starting Points"},
-		{"StartWeapon", "Starting Weapon"},
-		{"StartKnife", "Starting Knife"},
-		{"StartGrenade", "Starting Grenade"},
+	["EnablePowerups"] = {
+		Type = "Boolean",
+		Default = true,
+		Label = "Enable Powerups",
+		Order = 5,
 	}
-
-	local panelfunc = function(p, SettingPanel)
-		for k,v in pairs(labelledsettings) do
-			local pnl = vgui.Create("Panel", p)
-			pnl:SetTall(25)
-			pnl:Dock(TOP)
-			pnl:DockPadding(5,2,5,2)
-
-			local lbl = pnl:Add("DLabel")
-			lbl:SetText(v[2])
-			lbl:Dock(LEFT)
-			lbl:SetWide(125)
-			lbl:DockMargin(0,0,10,0)
-
-			local st = SettingPanel(v[1],pnl)
-			st:Dock(FILL)
-		end
-
-		local lbl_hud = p:Add("DLabel")
-		lbl_hud:Dock(TOP)
-		lbl_hud:SetText("HUD Theme:")
-		lbl_hud:DockMargin(5,2,5,10)
-		lbl_hud:SetFont("Trebuchet18")
-
-		local huds = SettingPanel("HUD", p)
-		huds:SetTall(25)
-		huds:Dock(TOP)
-
-		local lbl_rsounds = p:Add("DLabel")
-		lbl_rsounds:SetText("Round Sounds")
-		lbl_rsounds:Dock(TOP)
-		local roundsounds = SettingPanel("RoundSounds", p)
-		roundsounds:SetTall(25)
-		roundsounds:Dock(TOP)
-
-		local lbl_ann = p:Add("DLabel")
-		lbl_ann:SetText("Announcer")
-		lbl_ann:Dock(TOP)
-		local ann = SettingPanel("Announcer", p)
-		ann:SetTall(25)
-		ann:Dock(TOP)
-
-		return p
-	end
-	return settings, panelfunc
-end
-
-return settings]]
+}
