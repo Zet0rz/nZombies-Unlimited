@@ -92,7 +92,6 @@ Extension Manager
 ---------------------------------------------------------------------------]]
 loadfile("nzombies-unlimited/core/extension_manager.lua")
 loadfile_c("nzombies-unlimited/core/extension_panels.lua")
-loadfile_c("nzombies-unlimited/core/hudmanagement.lua") -- Needed for the settings panel
 
 --[[-------------------------------------------------------------------------
 Core Modules shared with Sandbox
@@ -108,6 +107,7 @@ loadfile_s("nzombies-unlimited/core/rooms.lua") -- Only Server outside Sandbox
 --[[-------------------------------------------------------------------------
 Gamemode-specific files
 ---------------------------------------------------------------------------]]
+loadfile_c("hudmanagement.lua")
 loadfile("player.lua")
 loadfile("playeruse.lua")
 

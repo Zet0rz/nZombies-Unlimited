@@ -347,11 +347,10 @@ else
 		end
 	end
 	function ENT:DrawTranslucent() end
-
-	ENT.TargetIDTextType = "MysteryBox" -- HUDs can check against this instead, but still default to TARGETID_TYPE_BUY if not implemented
+	
 	function ENT:GetTargetIDText()
 		if self:GetIsReady() then
-			return " random weapon ", TARGETID_TYPE_BUY, self:GetPrice()
+			return "Buy", "Random Weapon",  self:GetPrice()
 		end
 	end
 

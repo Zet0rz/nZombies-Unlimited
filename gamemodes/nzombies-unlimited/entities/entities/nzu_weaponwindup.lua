@@ -210,7 +210,7 @@ else
 		end
 
 		if self.WeaponName and (not IsValid(self:GetPlayer()) or self:GetPlayer() == LocalPlayer()) then
-			return " pick up "..self.WeaponName, TARGETID_TYPE_USE, self
+			return "Weapon", self.WeaponName, self.SavedClass
 		end
 	end
 end

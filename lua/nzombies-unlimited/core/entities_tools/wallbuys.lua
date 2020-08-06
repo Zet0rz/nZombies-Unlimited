@@ -192,17 +192,17 @@ if CLIENT then
 		if self.SavedClass ~= self:GetWeaponClass() then
 			local wep = weapons.GetStored(self:GetWeaponClass())
 			if wep then
-				self.WeaponName = " "..wep.PrintName.." "
+				self.WeaponName = wep.PrintName
 			else
-				self.WeaponName = " UNKNOWN WEAPON "
+				self.WeaponName = "UNKNOWN WEAPON"
 			end
 			self.SavedClass = self:GetWeaponClass()
 		end
 
 		if LocalPlayer():HasWeapon(self:GetWeaponClass()) then
-			return self.WeaponName .. "Ammo ", TARGETID_TYPE_BUY, math.Round(self:GetPrice()/2)
+			return "Buy", self.WeaponName .. " Ammo", math.Round(self:GetPrice()/2)
 		else
-			return self.WeaponName, TARGETID_TYPE_BUY, self:GetPrice()
+			return "Buy", self.WeaponName, self:GetPrice()
 		end
 	end
 	

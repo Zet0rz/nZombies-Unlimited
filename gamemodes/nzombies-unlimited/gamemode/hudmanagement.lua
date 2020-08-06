@@ -156,56 +156,73 @@ function nzu.GetObservedPlayer() return observedplayer end
 
 --[[-------------------------------------------------------------------------
 Target ID System
-TODO: I kinda really don't like this system ... is there a better way?
 ---------------------------------------------------------------------------]]
-TARGETID_TYPE_GENERIC = 1
-TARGETID_TYPE_USE = 2
-TARGETID_TYPE_BUY = 3
-TARGETID_TYPE_USECOST = 4
-TARGETID_TYPE_PLAYER = 5
-TARGETID_TYPE_ELECTRICITY = 6
 
 local targetidrange = 100
 function GM:HUDDrawTargetID()
-	local ply = observedplayer
-	local dir = ply:GetAimVector()
-	local start = EyePos()
+	if hud and hud.DrawTargetID then
+		local ply = observedplayer
+		local dir = ply:GetAimVector()
+		local start = EyePos()
 
-	local tr = {
-		start = start,
-		endpos = start + dir*targetidrange,
-		filter = ply
-	}
+		local tr = {
+			start = start,
+			endpos = start + dir*targetidrange,
+			filter = ply
+		}
 
-	local res = util.TraceLine(tr)
-	if not res.Hit then return end
+		local res = util.TraceLine(tr)
+		if not res.Hit then return end
 
-	local ent = res.Entity
-	if not IsValid(ent) then return end
-	
-	local text, typ, data
-	local str = ent:GetNW2String("nzu_TargetIDText") -- This takes priority over all others
-	if str and str ~= "" then
-		text = str
-	else
-		-- The order goes: Special hook, ENT-defined, Normal hook
-		text, typ, data = hook.Run("nzu_GetTargetIDTextSpecial", ent)
-		if not text then
-			if ent.GetTargetIDText then
-				text, typ, data = ent:GetTargetIDText()
+		local ent = res.Entity
+		if not IsValid(ent) then return end
+
+		local str = ent:GetNW2String("nzu_TargetIDText") -- This takes priority over all others
+		if str then
+			if str ~= "" then
+				hud:DrawTargetID(str, ent)
+			end
+		else
+			local typ, str, val = hook.Run("nzu_GetTargetIDText", ent)
+			local f = hud["DrawTargetID"..typ]
+			if f then
+				f(hud, str, ent, val)
+			else
+				-- The HUD can also implement this as a hook, but it's probably better to just implement all types you'd translate anyway
+				local str2 = hook.Run("nzu_TranslateTargetID", ent, typ, str, val)
+				if str2 then
+					hud:DrawTargetID(str2, typ, str, ent, val)
+				end
 			end
 		end
-		if not text then
-			text, typ, data = hook.Run("nzu_GetTargetIDText", ent)
-		end
-	end
-
-	if text then
-		hook.Run("nzu_DrawTargetID", text, typ, data, ent)
 	end
 end
 
+-- Perform the code that will determine based on the entity given what type of Target ID we want to pass on to the HUD
+-- In base, it is given by the function of the entity
+function GM:nzu_GetTargetIDText(ent)
+	return ent.GetTargetIDText and ent:GetTargetIDText()
+end
 
+local generictypes = {
+	Use = "Press E to %s",
+	UseCost = "Press E to %s for %c",
+	Buy = "Press E to buy %s for %c",
+	NoElectricity = "Requires Electricity",
+	-- Player,
+	PickUp = "Press E to pick up %s",
+	Weapon = "Press E to pick up %s",
+}
+
+-- This hook translates a type, string, and value, into full text that will be put into the hook
+-- This is the gamemode base translation in case the HUD doesn't implement the types, and no other hooks exist to translate
+function GM:nzu_TranslateTargetID(ent, typ, str, val)
+	local inp = generictypes[typ]
+	if inp then
+		return string.format(inp, str, val)
+	end
+	return str
+end
 
 --[[-------------------------------------------------------------------------
 Setting-managed + Spawning/Unspawning activation
@@ -239,13 +256,3 @@ hook.Add("nzu_PlayerUnspawned", "nzu_DeactivateHUD", function(ply)
 		deactivatehud()
 	end
 end)
-
---[[-------------------------------------------------------------------------
-DEBUG CODE
----------------------------------------------------------------------------]]
-
-function nzu.HUDComponent() end
-function nzu.DrawHUDComponent() end
-
-function DebugHUDOn() setuphud(hud) end
-function DebugHUDOff() deactivatehud() end

@@ -63,6 +63,8 @@ Here is a table of contents of what components this HUD is made up from:
 	- Downed Indicator (Paint)
 	- Revive Progress (Paint)
 	- Bleedout Greyscale Effects (Hook, RenderScreenspaceEffects)
+	- Target ID (Special Functions)
+	- Spectate Info (Panel + Special Function)
 ---------------------------------------------------------------------------]]
 
 local HUD = {}
@@ -813,29 +815,62 @@ end
 --[[-------------------------------------------------------------------------
 Target ID
 
-This uses the hook which runs whenever the gamemode has found a target to
-get Target ID type and text from
+This uses special functions called directly from the HUD Management file.
+DrawTargetID() is called whenever there is generic text ready to draw.
+DrawTargetID[type]() is called whenever an entity returns a specific formatting type.
+If the HUD does not implement this type, the gamemode attempts to translate it (using hook nzu_TranslateTargetID)
+and the formatted text is drawn in generic DrawTargetID().
+
+HUD:DrawTargetID() must be implemented to have any Target ID functionality (the gamemode will not perform any of these actions if the hud does not have the generic function)
 ---------------------------------------------------------------------------]]
 local targetidfont = "nzu_Font_TargetID"
 
-local typeformats = {
-	[TARGETID_TYPE_USE] = function(text, data, ent) return "Press E to"..text end,
-	[TARGETID_TYPE_BUY] = function(text, data, ent) return "Press E to buy"..text.."for "..data end,
-	[TARGETID_TYPE_USECOST] = function(text, data, ent)
-		return "Press E to"..text.."for "..data
-	end,
-	[TARGETID_TYPE_PLAYER] = function(text, data, ent) return ent:Nick() end,
-	[TARGETID_TYPE_ELECTRICITY] = function(text) return text end,
-}
+-- Special Function: DrawTargetID is called with the text whenever it is a generic type that should just be shown
+-- Additionally, if it was translated from a type, these are also passed in the following format:
+-- (str, type, oldstr, ent, val)
 
-function HUD:Hook_nzu_DrawTargetID(text, typ, data, ent)
+-- str: The formatted text (just draw this directly)
+-- type: The type it was formatted from
+-- oldstr: The string that was used in the formatting (in case you want to format your own and ignore built-in, but you kinda shouldn't)
+-- ent: The entity this was translated from
+-- val: The additional data value used in the translation (often price when used with "Buy" type)
+
+function HUD:DrawTargetID(str)
 	local x,y = ScrW()/2, ScrH()/2 + 100
-	local str = typeformats[typ] and typeformats[typ](text, data, ent) or text
-
-	if str then
-		draw.SimpleText(str, targetidfont, x, y, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-	end
+	draw.SimpleText(str, targetidfont, x, y, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end
+
+-- Special Target ID type-based functions. These receive input strings and let you format your own
+-- Alternatively you can even draw entirely different based on type (such as adding icons).
+-- In this HUD, it just formats the text and runs the generic one with it
+
+-- These are the base gamemode ones: Use, UseCost, Buy, Player, NoElectricity
+function HUD:DrawTargetIDUse(str, ent, val)
+	self:DrawTargetID("Press E to "..str)
+end
+
+function HUD:DrawTargetIDUseCost(str, ent, val)
+	self:DrawTargetID("Press E to "..str.." for "..val)
+end
+
+function HUD:DrawTargetIDBuy(str, ent, val)
+	self:DrawTargetID("Press E to buy "..str.." for "..val)
+end
+
+function HUD:DrawTargetIDPlayer(str, ent, val)
+	self:DrawTargetID(str) -- For Player formats, the string is the name of the player
+end
+
+function HUD:DrawTargetIDNoElectricity(str, ent, val)
+	self:DrawTargetID("Requires Electricity")
+end
+
+function HUD:DrawTargetIDPickUp(str, ent, val)
+	self:DrawTargetID("Press E to pick up "..str)
+end
+
+-- For weapons, the value is the weapon class. We just use Pick Up formatting though
+HUD.DrawTargetIDWeapon = HUD.DrawTargetIDPickUp
 
 --[[-------------------------------------------------------------------------
 Spectate Info
