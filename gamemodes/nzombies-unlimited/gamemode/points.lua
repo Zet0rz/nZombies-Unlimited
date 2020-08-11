@@ -129,7 +129,4 @@ if CLIENT then
 		local n = net.ReadInt(32)
 		hook.Run("nzu_PlayerPointNotify", ply, n)
 	end)
-
-	-- HUD Component: On this one, you're on your own in terms of arguments!
-	nzu.HUDComponent("Points")
 end

@@ -17,7 +17,12 @@ Activating HUDs from objects
 ---------------------------------------------------------------------------]]
 local hud = nzu.HUD
 local paints = {}
+local defaultpaints = {}
 local observedplayer = IsValid(LocalPlayer()) and IsValid(LocalPlayer():GetObserverTarget()) and LocalPlayer():GetObserverTarget() or LocalPlayer()
+
+-- Use this to add a default paint function that will be run if the HUD does not implement "Paint_[name]".
+-- Can be used for addon-based additions, allowing the HUD to implement a custom style, but not requiring "supporting" HUDs just to work
+function nzu.AddDefaultHUDFunction(name, func) defaultpaints[name] = func end
 
 -- A HUD Object may have functions that start with these keywords for this specific type of behavior
 -- The first function is when the HUD is activated
@@ -42,6 +47,9 @@ local keywords = {
 				hud.Panels[name] = nil
 			end
 		end,
+	},
+	Initialize = {
+		function(hud, name, func) func(hud) end,
 	}
 }
 
@@ -50,7 +58,7 @@ local function deactivatehud()
 		for k,v in pairs(hud) do
 			if type(v) == "function" then
 				local keyword,name = string.match(k, "([^_]+)_(.+)")
-				if keyword and name and keywords[keyword] then
+				if keyword and name and keywords[keyword] and keywords[keyword][2] then
 					keywords[keyword][2](hud, name)
 				end
 			end
@@ -65,14 +73,22 @@ local function setuphud(loaded)
 	if IsValid(LocalPlayer()) then
 		hud.Player = observedplayer
 		
+		local foundids = {}
 		for k,v in pairs(loaded) do
 			if type(v) == "function" then
 				local keyword,name = string.match(k, "([^_]+)_(.+)")
 				if keyword and name and keywords[keyword] then
 					keywords[keyword][1](loaded, name, v)
+					foundids[name] = true
 				end
 			end
 		end
+
+		-- Add all default paints that weren't added by the HUD
+		for k,v in pairs(defaultpaints) do
+			if not foundids[k] then paints[k] = v end
+		end
+
 		nzu.HUD = loaded
 		hud = loaded
 		hud.UNHOOK = nil
@@ -100,6 +116,7 @@ local function loadhud(class)
 	
 	-- By adding this, the HUD is allowed to do hook.Add("SomeHook", self, function(self) end) which will automatically unhook when the HUD is disabled
 	loaded.IsValid = IsValidHUD
+	loaded.ClassName = class
 	return loaded
 end
 
@@ -120,6 +137,7 @@ end
 -- Lua refresh: Reload the active HUD
 if hud then
 	deactivatehud()
+	hud = loadhud(hud.ClassName)
 	setuphud(hud)
 end
 
@@ -223,6 +241,8 @@ function GM:nzu_TranslateTargetID(ent, typ, str, val)
 	end
 	return str
 end
+
+
 
 --[[-------------------------------------------------------------------------
 Setting-managed + Spawning/Unspawning activation

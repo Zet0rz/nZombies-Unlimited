@@ -82,7 +82,7 @@ if SERVER then
 
 	-- Technically this can be overwritten, making it possible to spawn a drop from code but have it do whatever on activation
 	function ENT:ActivatePowerup(ent)
-		nzu.ActivatePowerup(self:GetPowerup(), self:GetPos(), self:GetPersonal() and ent or nil, self:GetPowerupDuration(), self:GetNegative()) -- Second nil is duration: Use default
+		nzu.ActivatePowerup(self:GetNegative() and "-"..self:GetPowerup() or self:GetPowerup(), self:GetPos(), self:GetPersonal() and ent or nil, self:GetPowerupDuration())
 		if self.GrabSound then self:EmitSound(self.GrabSound) end
 		self:Remove()
 	end
@@ -96,34 +96,32 @@ if CLIENT then
 	local mats = {
 		"nzombies-unlimited/particle/powerup_glow_09",
 		--"nzombies-unlimited/particle/powerup_wave_5",
-		"particle/particle_glow_03"
+		"nzombies-unlimited/particle/powerup_glow_09",
+		--"particle/particle_glow_03"
 	}
+
+	local cols = {
+		{{100,255,100},{255,255,255},{200,255,200}}, -- Global Positive: Green
+		{{100,200,255},{200,255,255},{200,200,255}}, -- Personal Positive: Blue
+		{{255,0,0},{200,100,100},{255,200,200}}, -- Global Negative: Red
+		{{255,50,255},{255,100,255},{255,200,255}}, -- Personal Negative: Purple
+	}
+
 	local mat = Material(mats[1])
 	function ENT:Draw()
 		if not self.NextParticle or self.NextParticle < CurTime() then
-			local r,g,b
-			if self:GetNegative() then
-				if self:GetPersonal() then
-					r,g,b = 255,50,255
-				else
-					r,g,b = 255,50,50
-				end
-			else
-				if self:GetPersonal() then
-					r,g,b = 100,200,255
-				else
-					r,g,b = 100,255,100
-				end
-			end
+
+			local col = cols[1 + (self:GetPersonal() and 1 or 0) + (self:GetNegative() and 2 or 0)]
 			for k,v in pairs(mats) do
 				local p = self.ParticleEmitter:Add(v, self:GetPos())
 				p:SetDieTime(0.5)
 				p:SetStartAlpha(255)
 				p:SetEndAlpha(0)
-				p:SetStartSize(10)
-				p:SetEndSize(35)
+				p:SetStartSize(30 - k*5)
+				p:SetEndSize(40 - k*5)
 				p:SetRoll(math.random()*2)
-				p:SetColor(r,g,b)
+				local c = col[k]
+				p:SetColor(c[1],c[2],c[3])
 				p:SetLighting(false)
 			end
 			self.NextParticle = CurTime() + 0.2
@@ -138,8 +136,8 @@ if CLIENT then
 		if IsValid(self.ParticleEmitter) then self.ParticleEmitter:Finish() end
 	end
 
-	local rotang = Angle(0,50,0)
+	local rotang = Angle(2,50,5)
 	function ENT:Think()
-		self:SetRenderAngles(self:GetRenderAngles() or self:GetAngles() + rotang*math.sin(CurTime()/10)*FrameTime()) -- TODO: Make accurate?
+		self:SetRenderAngles((self:GetRenderAngles() or self:GetAngles()) + rotang*math.sin(CurTime()/10)*FrameTime()) -- TODO: Make accurate?
 	end
 end

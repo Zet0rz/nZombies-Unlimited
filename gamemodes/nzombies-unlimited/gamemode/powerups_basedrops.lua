@@ -7,7 +7,7 @@ The Powerup Structure:
 	Scale = Number/nil,
 	Material = String/nil,
 	Duration = Number/nil,
-	PlayerBased = true/nil,
+	Global = true/nil,
 	DefaultPersonal = true/nil,
 	Undroppable = true/nil,
 	Sound = Sound/nil,
@@ -24,16 +24,17 @@ Material: If you want to override material, you can do it here. Nil means origin
 Duration: The *DEFAULT* duration. Nil means the Powerup doesn't have a duration, but is instant
 	Note: Powerups may be activated at different durations, this is the default duration.
 
-PlayerBased: If true, then the function will get the 'ply' argument - The player who activated it
-	It will also allow the powerup to exist in a "Personal" state. A global drop will then also
-	loop through all players and call Function for each of them.
+Global: If true, the powerup will not be able to be spawned in a "Personal" state.
+	Additionally, the Function is only run once, and "ply" is not passed
+	Without Global, the Function will run through each playing player, as well as when new players drop in
+	while the effect is active
 
 Negative: If true, the Powerup supports existing as Negative (red) with a bad effect. Will pass argument 'neg' to Function and EndFunction
 	If both Negative and PlayerBased, will also support personal-negatives (purple) drops.
 	Negatives do not naturally drop, but can be dropped from code.
 
-DefaultPersonal: All drops can be global, and all PlayerBased can also be personal. If this is true,
-	then this drop is by default Personal (but can still be spawned or activated global)
+DefaultPersonal: If this is true, then this drop is by default Personal (but can still be spawned or activated global)
+	This does not work if the powerup is Global, as Personal state does not exist
 
 Undroppable: If set, this powerup cannot be enabled through settings to be part of the drop cycle. Instead, it can only
 	be dropped by code. Example of this is Widows Wine drops, which always drop by code through the Perks system.
@@ -44,32 +45,29 @@ EndSound: If set, will play this sound when the Powerup ends. Only applicable to
 	Note: If PlayerBased, then the above sounds are only played for players for which it activated (often all players)
 	Note: If the powerup is negative, the above sounds will play at a lower pitch
 
-Function: The function that runs when the powerup is activated. Will receive the position of the drop entity as argument and duration
-	If PlayerBased is true, it will have a third argument: player, and the function will be called for all players individually
+Function: The function that runs when the powerup is activated. It will loop through all players who are currently playing on which it applies
+	If Global is true, this Function will only run ONCE, and will NOT receive any players.
 
-	Note: If PlayerBased and the drop was personal, this function only runs for that one player
+	Arguments:
 		pos: The position the powerup was picked up from, if any (may be nil!)
-		ply: Only passed if PlayerBased is true. The player for which this is activated
-		neg: Only passed if Negative is true. This argument is true if the powerups is negative, false if positive
-
-		Note: Arguments are in this order, but if one doesn't apply, the next will take its place. E.g.:
-			PlayerBased+Negative = (pos, ply, neg)
-			PlayerBased = (pos, ply)
-			Negative = (pos, neg)
-			None = (pos)
-
-			etc...
+		neg: This argument is true if the powerups is negative, false if positive
+		dur: The duration of the effect. Is nil if the powerup doesn't have Duration set.
+		ply: The player for which this is activated. Will not be passed if Global is true.
 
 	Note: This function only runs once when the Powerup is activated. If it is later re-activated to refresh
 	the duration, this does not run the function again (but delays the EndFunction and extends PLAYER:PlayerHasPowerup)
 
-EndFunction: The function that runs when the Powerup ends. Only automatically called for those with Durations.
-	Receives 1 argument: Terminate - True when the effect was terminated prematurely (such as through the game resetting)
-	All arguments following are identical to Function (based on set fields) except for 'pos' which isn't passed here
+	Note: If the powerup does not have a Duration, but this function returns a number, this will be networked to clients
+	and the LoopSound will run for this duration. (Only Server-side this return is used)
 
-	Note: If Duration is not set but Function returns a duration, this function is called after that amount of time
-		Subnote: This duration is private to the server, and Clients won't display or know about the time - it will remain instant for them
-	Note: This function is prematurely called when the game ends or is reset, if it was about to be called
+EndFunction: The function that runs when the Powerup ends. Only automatically called for those with Durations.
+	Arguments:
+		neg: This argument is true if the powerup is negative, false if positive
+		ply: The player for which this ends. Is nil if the powerup is Global.
+		terminate: True if the powerup was terminated (ended prematurely, such as by Game Over, player dropping out, or nzu.TerminatePowerup)
+
+	Note: This function is prematurely called when the game ends or is reset, and for non-Globals for each player when they drop out, if the powerup was active for them.
+	Terminate will be true in this case
 ---------------------------------------------------------------------------]]
 
 nzu.RegisterPowerup("MaxAmmo", {
@@ -77,17 +75,16 @@ nzu.RegisterPowerup("MaxAmmo", {
 	Model = Model("models/nzu/powerups/maxammo.mdl"),
 	Color = Color(255,255,100),
 	--Duration is nil, this powerup is an instant activate
-	PlayerBased = true, -- Max ammo is activated individually for players
 	--Negative = true,
 	Sound = Sound("nzu/powerups/maxammo/maxammo.wav"),
-	Function = function(drop, ply, neg)
+	Function = SERVER and function(pos, neg, dur, ply)
 		if neg then
 			-- Empty out the reserve ammo of their currently held weapon
 
 		else
 			ply:GiveMaxAmmo()
 		end
-	end,
+	end or nil,
 })
 
 nzu.RegisterPowerup("Carpenter", {
@@ -96,7 +93,9 @@ nzu.RegisterPowerup("Carpenter", {
 	Color = Color(255,255,100),
 	-- Duration is nil, the drop is instant despite the effect happening over time
 	-- Despite this, our Function returns a duration for the powerup to use internally
-	Function = function(pos)
+	Global = true,
+	--Negative = true,
+	Function = SERVER and function(pos)
 		local pos = pos or Vector()
 		local barricades = ents.FindByClass("nzu_barricade") -- TODO: Some sort of subclass support?
 		local max = 0
@@ -112,26 +111,26 @@ nzu.RegisterPowerup("Carpenter", {
 			end)
 		end
 
-		return max -- We apply our own internal duration!
-	end,
-	LoopSound = Sound("nzu/powerups/carpenter/loop.wav"),
-	EndSound = Sound("nzu/powerups/carpenter/end.wav"),
-	EndFunction = function(terminate)
-		if not terminate then
+		timer.Simple(max, function()
 			for k,v in pairs(nzu.Round:GetPlayers()) do
 				if not v:GetIsDowned() then
 					v:GivePoints(200, "Carpenter")
 				end
 			end
-		end
-	end,
+		end)
+
+		return max -- We apply our own internal duration!
+	end or nil,
+	LoopSound = Sound("nzu/powerups/carpenter/loop.wav"),
+	EndSound = Sound("nzu/powerups/carpenter/end.wav"),
 })
 
 nzu.RegisterPowerup("Nuke", {
 	Name = "Nuke",
 	Model = Model("models/nzu/powerups/nuke.mdl"),
 	Color = Color(255,255,100),
-	Function = function(pos)
+	Global = true,
+	Function = SERVER and function(pos)
 		local pos = pos or Vector()
 		local zombs = ents.FindByClass("nzu_zombie") -- TODO: Also account for other entities
 		local max = 0
@@ -151,19 +150,29 @@ nzu.RegisterPowerup("Nuke", {
 			end)
 		end
 
-		return max -- We apply our own internal duration!
-	end,
-	LoopSound = Sound("nzu/powerups/carpenter/loop.wav"),
-	EndSound = Sound("nzu/powerups/carpenter/end.wav"),
-	EndFunction = function(terminate)
-		if not terminate then
+		timer.Simple(max, function()
 			for k,v in pairs(nzu.Round:GetPlayers()) do
 				if not v:GetIsDowned() then
 					v:GivePoints(400, "Nuke")
 				end
 			end
-		end
+		end)
+	end or function()
+		surface.PlaySound("nzu/powerups/nuke/flash.wav")
+
+		local num = 200
+		hook.Add("HUDPaintBackground", "nzu_Nuke_Flash", function()
+			surface.SetDrawColor(200, 200, 200, num)
+			surface.DrawRect(0,0,ScrW(),ScrH())
+
+			num = num - 100*FrameTime()
+			if num <= 0 then
+				hook.Remove("HUDPaintBackground", "nzu_Nuke_Flash")
+			end
+		end)
 	end,
+	LoopSound = Sound("nzu/powerups/carpenter/loop.wav"),
+	EndSound = Sound("nzu/powerups/carpenter/end.wav")
 })
 
 nzu.RegisterPowerup("DoublePoints", {
@@ -171,7 +180,7 @@ nzu.RegisterPowerup("DoublePoints", {
 	Model = Model("models/nzu/powerups/doublepoints.mdl"),
 	Color = Color(255,255,100),
 	Duration = 30,
-	PlayerBased = true,
+	--Negative = true,
 	LoopSound = Sound("nzu/powerups/doublepoints/loop.wav"),
 	EndSound = Sound("nzu/powerups/doublepoints/end.wav"),
 	-- We don't do a function. Instead we have the hook below.
@@ -189,7 +198,7 @@ nzu.RegisterPowerup("InstaKill", {
 	Model = Model("models/nzu/powerups/instakill.mdl"),
 	Color = Color(255,255,100),
 	Duration = 30,
-	PlayerBased = true, -- This is also player based. One player may have Instakill without another having
+	--Negative = true,
 	LoopSound = Sound("nzu/powerups/instakill/loop.wav"),
 	EndSound = Sound("nzu/powerups/instakill/end.wav"),
 	-- Same as double points

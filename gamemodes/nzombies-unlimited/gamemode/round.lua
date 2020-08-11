@@ -344,11 +344,6 @@ if CLIENT then
 			hook.Run(h, net.ReadFloat())
 		end
 	end)
-
-	-- Let's activate the HUD Component!
-	nzu.HUDComponent("Round", function()
-		return ROUND.Round, ROUND.State
-	end)
 end
 
 --[[-------------------------------------------------------------------------

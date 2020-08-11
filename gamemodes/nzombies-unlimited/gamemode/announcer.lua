@@ -8,7 +8,7 @@ is shared so that sounds CAN be played on Server if need to be
 IDs are typically prefixed by the extension they come from
 i.e. "PowerUps_MaxAmmo" or "MysteryBox_BoxLeave"
 ---------------------------------------------------------------------------]]
-local announcerpath = "sound/nzu/announcer/"
+local announcerpath = "nzu/announcer/"
 local SETTINGS = nzu.GetExtension("core")
 
 local function selectsound(path)

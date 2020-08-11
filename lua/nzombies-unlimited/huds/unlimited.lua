@@ -44,6 +44,16 @@ determines the behavior of the function. These are the following behavior types:
 				-- This is run on Think!
 			end
 
+	Initialize_:
+		This function is run whenever the HUD is enabled, or re-enabled after every disable (unspawning and rejoining).
+		This can be used to initialize local variables based on current game state that might have happened before the HUD hooks were active.
+		Good with Hook_ functions to grab the correct "starting" state and using the hook to update it from here on.
+
+		Example:
+			function HUD:Initialize_GameState()
+				-- This is run when the HUD activate!
+			end
+
 
 	Additionally!
 	These values in the HUD have special meaning:
@@ -65,6 +75,7 @@ Here is a table of contents of what components this HUD is made up from:
 	- Bleedout Greyscale Effects (Hook, RenderScreenspaceEffects)
 	- Target ID (Special Functions)
 	- Spectate Info (Panel + Special Function)
+	- Powerups (Paint + Initialize + Special Function (alerts))
 ---------------------------------------------------------------------------]]
 
 local HUD = {}
@@ -874,10 +885,14 @@ HUD.DrawTargetIDWeapon = HUD.DrawTargetIDPickUp
 
 --[[-------------------------------------------------------------------------
 Spectate Info
----------------------------------------------------------------------------]]
---[[local spectate_name_font = "nzu_Font_Bloody_Medium"
 
-function HUD:SpectateInfo()
+A panel that shows the currently spectated player
+It is hidden whenever the player is LocalPlayer()
+HUD:OnPlayerChanged runs when the player changes, and shows/hides the panel accordingly
+---------------------------------------------------------------------------]]
+local spectate_name_font = "nzu_Font_Bloody_Medium"
+
+--[[function HUD:Paint_SpectateInfo()
 	local ply = self.Player
 	local x,y = ScrW() / 2, ScrH() - 100
 
@@ -892,8 +907,81 @@ function HUD:SpectateInfo()
 	surface.SetDrawColor(0,0,0,255)
 	surface.DrawRect(x-210, y, 40, 50)
 
-	--draw.SimpleText(ply:Nick(), spectate_name_font, x, y, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	draw.SimpleText(ply:Nick(), spectate_name_font, x, y, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end]]
+
+function HUD:Panel_SpectateInfo()
+	local pnl = vgui.Create("DPanel")
+	pnl:ParentToHUD()
+	pnl:SetSize(400,50)
+	pnl:SetPos(ScrW()/2 - pnl:GetWide()/2, ScrH() - 100)
+	pnl:SetBackgroundColor(Color(0,0,0,200))
+
+	local mid = pnl:Add("Panel")
+	mid:Dock(FILL)
+
+	local spectate = mid:Add("DLabel")
+	spectate:SetText("Spectating")
+	spectate:Dock(TOP)
+	spectate:SetContentAlignment(5)
+	spectate:SizeToContentsY()
+	spectate:DockMargin(0,5,0,0)
+
+	local ply = mid:Add("DLabel")
+	ply:SetFont("Trebuchet24")
+	ply:SetText(self.Player:Nick())
+	ply:Dock(FILL)
+	ply:SetContentAlignment(8)
+
+	local spec_next = pnl:Add("Panel")
+	spec_next:Dock(RIGHT)
+	spec_next:SetWide(50)
+	local spec_next_icon = spec_next:Add("DLabel")
+	spec_next_icon:SetText(">")
+	spec_next_icon:SetFont("DermaLarge")
+	spec_next_icon:Dock(FILL)
+	spec_next_icon:SetContentAlignment(5)
+	local spec_next_text = spec_next:Add("DLabel")
+	spec_next_text:SetText("RMB")
+	spec_next_text:Dock(BOTTOM)
+	spec_next_text:SetContentAlignment(5)
+
+	local spec_prev = pnl:Add("Panel")
+	spec_prev:Dock(LEFT)
+	spec_prev:SetWide(50)
+	local spec_prev_icon = spec_prev:Add("DLabel")
+	spec_prev_icon:SetText("<")
+	spec_prev_icon:SetFont("DermaLarge")
+	spec_prev_icon:Dock(FILL)
+	spec_prev_icon:SetContentAlignment(5)
+	local spec_prev_text = spec_prev:Add("DLabel")
+	spec_prev_text:SetText(" LMB")
+	spec_prev_text:Dock(BOTTOM)
+	spec_prev_text:SetContentAlignment(5)
+
+	function pnl:SetPlayer(pl)
+		ply:SetText(pl:Nick())
+	end
+
+	if self.Player == LocalPlayer() then
+		pnl:Hide()
+	end
+
+	return pnl
+end
+
+function HUD:OnPlayerChanged(ply)
+	if ply == LocalPlayer() then
+		self.Panels.SpectateInfo:Hide()
+	else
+		self.Panels.SpectateInfo:Show()
+		self.Panels.SpectateInfo:SetPlayer(ply)
+	end
+end
+
+--[[-------------------------------------------------------------------------
+Powerups
+---------------------------------------------------------------------------]]
 
 --[[-------------------------------------------------------------------------
 Game Over Panel

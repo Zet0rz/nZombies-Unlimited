@@ -1,12 +1,5 @@
 local PLAYER = FindMetaTable("Player")
-
--- Negative Powerups: Identified by prepending "-" in front of the ID (For example: "-doublepoints")
-local function isneg(id)
-	if string.sub(id, 1, 1) == "-" then
-		return true, string.sub(id, 2)
-	end
-	return false, id
-end
+local SETTINGS = nzu.GetExtension("core")
 
 -------------------------
 -- Localize
@@ -16,6 +9,24 @@ local math = math
 local getplayers = nzu.GetSpawnedPlayers
 local table = table
 -----------------
+
+-- Local tables listing all currently active powerups and the time they will end
+local globalactives = {}
+local playeractives = {}
+
+-- Lua refresh
+for k,v in pairs(getplayers()) do
+	playeractives[v] = {}
+end
+--
+
+-- Negative Powerups: Identified by prepending "-" in front of the ID (For example: "-DoublePoints")
+local function isneg(id)
+	if string.sub(id, 1, 1) == "-" then
+		return true, string.sub(id, 2)
+	end
+	return false, id
+end
 
 --[[-------------------------------------------------------------------------
 Adding and Getting Powerups, Utility
@@ -36,13 +47,11 @@ function nzu.GetDroppablePowerups()
 	end
 end
 
---[[-------------------------------------------------------------------------
-Active Powerups & Checks
--- Note: Clients are only aware of global powerups, and their own personal ones
----------------------------------------------------------------------------]]
-local globalactives = {}
-local playeractives = {}
 
+--[[-------------------------------------------------------------------------
+SHARED FUNCTIONS
+Getters & Accessors
+---------------------------------------------------------------------------]]
 -- Get the end time of a globally active powerup
 function nzu.GetPowerupTime(id)
 	return globalactives[id]
@@ -50,7 +59,7 @@ end
 
 -- Get the end time of a powerup for a player, only looking at personal powerups
 function PLAYER:GetPersonalPowerupTime(id)
-	return playeractives[self] and playeractives[self][id]
+	return playeractives[self][id]
 end
 
 -- Get the end time of a powerup for a player, taking into account both personal and global actives
@@ -68,35 +77,320 @@ end
 
 -- Return whether the player has access to the powerup at all (either personally active or globally active)
 -- 		Note: Use PLAYER:GetPersonalPowerupTime for personal-only checks (just use the result as boolean)
--- 		Note: To get JUST whether it is globally active, use nzu.GePowerupTime (just use the result as boolean)
+-- 		Note: To get JUST whether it is globally active, use nzu.GetPowerupTime (just use the result as boolean)
 function PLAYER:HasPowerup(id)
-	return globalactives[id] or playeractives[self] and playeractives[self][id]
+	return (globalactives[id] or playeractives[self][id]) and true or false
 end
 
 
+--[[-------------------------------------------------------------------------
+Local functions: Timed Activation & Deactivation
+---------------------------------------------------------------------------]]
+local function check_powerups()
+	local ct = CurTime()
+	for k,v in pairs(globalactives) do
+		if ct > v then
+			globalactives[k] = nil
+
+			-- End the powerup
+			local neg, real_id = isneg(k)
+			local powerup = powerups[real_id]
+
+			if powerup and powerup.EndFunction then
+				if powerup.Global then
+					powerup.EndFunction(neg, nil, false)
+				else
+					for k2,v2 in pairs(getplayers()) do
+						if not playeractives[v2] and playeractives[v2][k] then powerup.EndFunction(neg, v2, false) end
+					end
+				end
+			end
+
+			hook.Run("nzu_PowerupEnded", real_id, neg)
+		end
+	end
+
+	local empty = true
+	for k,v in pairs(playeractives) do
+		for k2,v2 in pairs(v) do
+			if ct > v2 then
+				v[k2] = nil
+
+				-- End the powerup for this player
+				local neg, real_id = isneg(k2)
+				local powerup = powerups[real_id]
+
+				if powerup and powerup.EndFunction and not globalactives[k2] then powerup.EndFunction(neg, k, false) end
+				hook.Run("nzu_PowerupEnded_Personal", real_id, neg, k)
+			else
+				empty = false
+			end
+		end
+	end
+
+	if empty and table.IsEmpty(globalactives) then
+		hook.Remove("Think", "nzu_Powerups_TimerControl")
+	end
+end
 
 --[[-------------------------------------------------------------------------
-Spawning Powerups (SERVER)
+Powerup Activation (Shared)
 ---------------------------------------------------------------------------]]
-if SERVER then
-	function nzu.CreatePowerup(id, pos, personal)
+local function activate_powerup(powerup, id, time, dur, real_id, neg, pos, plys)
+	-- First; Hook the Think function if there are no active powerups
+	hook.Add("Think", "nzu_Powerups_TimerControl", check_powerups)
+	--[[if table.IsEmpty(globalactives) then -- If there are no global powerups active
+		local any = false
+		for k,v in pairs(playeractives) do -- Go through each player
+			if not table.IsEmpty(v) then -- If any player has a non-empty powerup table, we break
+				any = true
+				break
+			end
+		end
+
+		-- If no player have non-empty powerup tables, we hook
+		if not any then
+			hook.Add("Think", "nzu_Powerups_TimerControl", check_powerups)
+		end
+	end]]
+
+	-- If players are passed, it HAS to be non-Global
+	if plys then
+		local f = not globalactives[id] and powerup.Function -- We only grab the function if it is not already globally active
+
+		-- If "plys" is valid, it's a single player
+		if IsValid(plys) then
+			
+			-- If the player does not have the powerup active at all, we set the time and run the function (if it was grabbed)
+			if not playeractives[plys][id] then
+				playeractives[plys][id] = time
+				if f then f(pos, neg, dur, plys) end
+
+			-- Else, if the player has it active but it ends in a shorter time, we update the time (and not run the function)
+			elseif playeractivse[plys][id] < time then
+				playeractives[plys][id] = time
+			end
+
+			-- Hook call; This runs regardless of whether the player has it active or not, and whether it was even a longer time than previously active
+			hook.Run("nzu_PowerupActivated_Personal", real_id, neg, dur, plys)
+		else
+
+			-- It is a table of players, we loop through them all and do the same
+			for k,v in pairs(plys) do
+				if not playeractives[v][id] then
+					playeractives[v][id] = time
+					if f then f(pos, neg, dur, v) end
+				elseif playeractivse[v][id] < time then
+					playeractives[v][id] = time
+				end
+				hook.Run("nzu_PowerupActivated_Personal", real_id, neg, dur, v)
+			end
+		end
+	else
+
+		-- If the powerup is Global, first get old previous time
+		local oldtime = globalactives[id]
+
+		-- If there was no previous old time, the powerup was not already active globally
+		-- We then set the time
+		if not oldtime then
+			globalactives[id] = time
+
+			-- If it is global, we know it wasn't previously active so we just run the function
+			if powerup.Global then
+				if powerup.Function then powerup.Function(pos, neg, dur) end
+
+			-- Else, it is player-based. We must loop through all players and run it only on those that don't have it personally active
+			else
+				local f = powerup.Function
+				for k,v in pairs(getplayers()) do
+					if not playeractives[v][id] and f then
+						f(pos, neg, v)
+					end
+				end
+			end
+
+		-- Otherwise if it is already globally active, we just update the time if it is smaller
+		elseif oldtime < time then
+			globalactives[id] = time
+		end
+
+		-- Run the hook; Again, it is regardless of actual activation
+		hook.Run("nzu_PowerupActivated", real_id, neg, dur)
+	end
+end
+
+--[[-------------------------------------------------------------------------
+Powerup Termination (Shared)
+---------------------------------------------------------------------------]]
+local function terminate_powerup(powerup, id, real_id, neg, plys)
+	if plys then
+		local f = not globalactives[id] and powerup.EndFunction
+
+		if IsValid(plys) then
+			playeractives[plys][id] = nil
+			if f then f(neg, plys, true) end
+			hook.Run("nzu_PowerupTerminated_Personal", real_id, neg, plys)
+		else
+			for k,v in pairs(plys) do
+				playeractives[v][id] = nil
+				if f then f(neg, v, true) end
+				hook.Run("nzu_PowerupActivated_Personal", real_id, neg, v)
+			end
+		end
+	else
+		globalactives[id] = nil
+		if powerup.Global then
+			if powerup.EndFunction then powerup.EndFunction(neg, nil, true) end
+		else
+			local f = powerup.EndFunction
+			for k,v in pairs(getplayers()) do
+				if not playeractives[v][id] then
+					f(neg, v, true)
+				end
+			end
+		end
+		hook.Run("nzu_PowerupTerminated", real_id, neg)
+	end
+end
+
+
+--[[-------------------------------------------------------------------------
+Players disconnecting/unspawning
+---------------------------------------------------------------------------]]
+
+-- Function for if a player drops out, is disconnects, or otherwise removed
+-- Clean this player's table, along with running EndFunction for all powerups
+-- that are PlayerBased and active on him
+local function removeply(ply)
+	local removed = {}
+	if playeractives[ply] then
+		for k,v in pairs(playeractives[ply]) do
+			local neg, real_id = isneg(k)
+			local powerup = powerups[real_id]
+
+			if powerup and powerup.EndFunction then
+				powerup.EndFunction(ply, neg, true)
+			end
+
+			removed[k] = true
+		end
+		playeractives[ply] = nil
+	end
+	for k,v in pairs(globalactives) do
+		if not removed[k] then -- Not already deactivated for this player
+			local neg, real_id = isneg(id)
+			local powerup = powerups[real_id]
+
+			if powerup and not powerup.Global and powerup.EndFunction then
+				powerup.EndFunction(ply, neg, true)
+			end
+		end
+	end
+end
+hook.Add("nzu_PlayerUnspawned", "nzu_UnspawnPowerups", removeply) -- Unspawning = Removal of all active powerups
+if SERVER then hook.Add("PlayerDisconnected", "nzu_DisconnectPowerups", removeply) end -- Disconnecting also cleans up that player
+
+--[[-------------------------------------------------------------------------
+Players dropping in
+Dropping in, powerups table initialized, and run all non-Global powerups that are globally active on this player
+---------------------------------------------------------------------------]]
+hook.Add("nzu_PlayerInitialSpawned", "nzu_InitializePowerups", function(ply)
+	if SERVER or ply == LocalPlayer() then
+		playeractives[ply] = {}
+
+		for k,v in pairs(globalactives) do
+			local neg, real_id = isneg(k)
+			local powerup = powerups[real_id]
+
+			if powerup and not powerup.Global and powerup.Function then
+				-- Pos is nil when dropping in
+				powerup.Function(nil, neg, v - CurTime(), ply)
+			end
+		end
+	end
+end)
+
+--[[-------------------------------------------------------------------------
+Game Over, resetting powerups
+This only needs to be done for globals, as the player ones are removed when
+the player is Unspawned (after game over)
+---------------------------------------------------------------------------]]
+hook.Add("nzu_GameOverSequence", "nzu_PowerupsFullReset", function()
+	local removed = {}
+	for k,v in pairs(globalactives) do
 		local neg, real_id = isneg(id)
 		local powerup = powerups[real_id]
-		if not powerup then return end
 
-		local drop = ents.Create("nzu_powerup")
-		drop:SetPowerup(id)
-		drop:SetPersonal(powerup.PlayerBased and personal)
-		drop:SetNegative(neg)
-		drop:SetPos(pos)
-		drop:Spawn()
-		return drop
+		if powerup and powerup.EndFunction then
+			if powerup.Global then
+				powerup.EndFunction(neg, true)
+			else
+				for k,v in pairs(getplayers()) do
+					powerup.EndFunction(v, neg, true)
+				end
+			end
+		end
+
+		removed[k] = true
 	end
+
+	for k,v in pairs(playeractives) do
+		for k2,v2 in pairs(v) do
+			if not removed[k2] then
+				local neg, real_id = isneg(k2)
+				local powerup = powerups[real_id]
+
+				powerup.EndFunction(k, neg, true)
+			end
+		end
+		playeractives[k] = {} -- We don't actually FULLY remove the powerup table for this player, to avoid errors in runtime functions
+		-- They will be automatically removed when the player has Unspawned (post Game Over)
+	end
+	globalactives = {}
+	hook.Remove("Think", "nzu_Powerups_TimerControl")
+end)
+
+if SERVER then
+	--[[-------------------------------------------------------------------------
+	Local functions: Networking
+	---------------------------------------------------------------------------]]
+	util.AddNetworkString("nzu_powerups")
+	local function network_activate(id, neg, time, personal, plys)
+		net.Start("nzu_powerups")
+			net.WriteString(id)
+			net.WriteBool(neg)
+			net.WriteBool(personal)
+			net.WriteBool(true) -- Activated
+			if time then
+				net.WriteBool(true)
+				net.WriteFloat(time)
+			else
+				net.WriteBool(false)
+			end
+		if plys then net.Send(plys) else net.Broadcast() end
+	end
+
+	local function network_terminate(id, neg, plys)
+		net.Start("nzu_powerups")
+			net.WriteString(id)
+			net.WriteBool(neg)
+			net.WriteBool(plys and true or false)
+			net.WriteBool(false) -- Terminated
+		if plys then net.Send(plys) else net.Broadcast() end
+	end
+
+	-- Players joining in should be made aware of global powerups
+	hook.Add("PlayerInitialSpawned", "nzu_InitializePowerups", function(ply)
+		for k,v in pairs(globalactives) do
+			local neg, real_id = isneg(k)
+			network_activate(real_id, neg, v, false, ply)
+		end
+	end)
 
 	--[[-------------------------------------------------------------------------
 	The Powerup Cycle system (Also includes hooks to let you modify it! :D)
 	---------------------------------------------------------------------------]]
-
 	local droplist = {}
 	local dropsthisround = 0
 
@@ -121,12 +415,12 @@ if SERVER then
 	---------------------------------------------------------------------------]]
 	local chance = 50 -- 1 in 50 = 2%
 	local maxperround = 4
-	hook.Add("nzu_ZombieKilled", "nzu_Powerups_Drop", function(z)
+	local function zombiekilled(z)
 		if dropsthisround < maxperround and math.random(chance) == 1 then
 			local area = navmesh.GetNearestNavArea(z:GetPos())
-			if IsValid(area) and not nzu.IsNavAreaOutOfBounds(area) then -- and area is not out of bounds: TODO
+			if IsValid(area) and not nzu.IsNavAreaOutOfBounds(area) then
 
-				local id = table.remove(droplist, #droplist)
+				local id = table.remove(droplist, #droplist) -- TODO: Right now, this is not random, it always just takes the drops in order
 				local powerup = nzu.GetPowerup(id)
 				if powerup then
 					nzu.CreatePowerup(up, z:GetPos(), powerup.DefaultPersonal)
@@ -138,415 +432,255 @@ if SERVER then
 				end
 			end
 		end
-	end)
+	end
+	
+	-- Enable/Disable drop hook
+	function SETTINGS:OnEnablePowerupsChanged(old, new)
+		if new then
+			hook.Add("nzu_ZombieKilled", "nzu_PowerupsDrop", zombiekilled)
+		else
+			hook.Remove("nzu_ZombieKilled", "nzu_PowerupsDrop")
+		end
+	end
 
+	-- And remember to hook it based on the current value!
+	if SETTINGS.EnablePowerups then
+		hook.Add("nzu_ZombieKilled", "nzu_PowerupsDrop", zombiekilled)
+	end
 
 	--[[-------------------------------------------------------------------------
-	Powerups Activation & Networking (Locals - Usable global functions down below!)
+	Global functions: Activation & Creation
 	---------------------------------------------------------------------------]]
-	util.AddNetworkString("nzu_powerups_activation")
-	local function networkupdate(id, neg, time, ply)
-		net.Start("nzu_powerups_activation")
-			net.WriteString(id) -- ID of the powerup (prior to negation)
-			net.WriteBool(neg) -- Whether it is negative or not
 
-		if ply then
-			net.WriteBool(true) -- True: This is a personal powerup
-			net.WriteBool(true) -- True: We ACTIVATED the powerup
-			if time then net.WriteFloat(time) end -- If time is given, the powerup is duration-based. We send the end time.
-			net.Send(ply)
-		else
-			net.WriteBool(false) -- False: This is a global powerup
-			net.WriteBool(true) -- Ditto as above, but Acivation and Time is always sent after Personal
-			if time then net.WriteFloat(time) end
-			net.Broadcast()
-		end
+	function nzu.CreatePowerup(id, pos, personal)
+		local neg, real_id = isneg(id)
+		local powerup = powerups[real_id]
+		if not powerup then return end
+
+		local drop = ents.Create("nzu_powerup")
+		drop:SetPowerup(real_id)
+		drop:SetPersonal(not powerup.Global and personal)
+		drop:SetNegative(neg)
+		drop:SetPos(pos)
+		drop:SetPowerupDuration(10)
+		--drop:SetLifetime(30)
+		drop:Spawn()
+		return drop
 	end
 
-	local function networkupdate_deactivate(id, neg, ply)
-		net.Start("nzu_powerups_activation")
-			net.WriteString(id)
-			net.WriteBool(neg)
+	function DebugTest()
+		local pos = Entity(1):GetEyeTrace().HitPos
+		local spacing = 50
 
-		if ply then
-			net.WriteBool(true)
-			net.WriteBool(false) -- False: We DEACTIVATE this powerup!
-			net.Send(ply)
-		else
-			net.WriteBool(false)
-			net.WriteBool(false) -- Same as above, but it is sent after personal
-			net.Broadcast()
-		end
-	end
-
-	local function runfunctionforplayers(plys, powerup, id, pos, neg)
-		for k,v in pairs(plys) do
-			if not playeractives[v] or not playeractives[v][id] then
-				powerup.Function(pos, v, neg)
+		local i = 1
+		for k,v in pairs(powerups) do
+			nzu.CreatePowerup(k, pos + Vector(i*spacing, 0, 0))
+			if not v.Global then
+				nzu.CreatePowerup(k, pos + Vector(i*spacing, spacing, 0), true)
 			end
-		end
-	end
-
-	local function runfunctionglobal(powerup, id, pos, neg)
-		if powerup.PlayerBased then
-			runfunctionforplayers(getplayers(), powerup, id, pos, neg)
-		else
-			powerup.Function(pos, neg) -- If it isn't PlayerBased, run activation as global
-		end
-	end
-
-	local function dodeactivate_global(powerup, id, neg)
-		globalactives[id] = nil
-
-		local tonetworkupdate = {}
-		local toend = powerup and powerup.EndFunction
-		local toend_playerbased = toend and powerup.PlayerBased
-		for k,v in pairs(getplayers()) do
-			if not playeractives[v] or not playeractives[v][id] then -- The player does not have a personal version going on of this powerup
-				table.insert(tonetworkupdate, v)
-				if toend_playerbased then
-					powerup.EndFunction(true, v, neg)
+			if v.Negative then
+				nzu.CreatePowerup("-"..k, pos + Vector(i*spacing, spacing*2, 0))
+				if not v.Global then
+					nzu.CreatePowerup("-"..k, pos + Vector(i*spacing, spacing*3, 0), true)
 				end
 			end
-		end
-
-		if toend and not toend_playerbased then
-			powerup.EndFunction(true, neg)
-		end
-
-		networkupdate_deactivate(id, neg, not table.IsEmpty(tonetworkupdate) and tonetworkupdate)
-	end
-
-	local function dodeactivate_personal(powerup, id, neg, ply, toend)
-		playeractives[ply][id] = nil
-		if table.IsEmpty(playeractives[ply]) then playeractives[ply] = nil end
-
-		if toend then
-			powerup.EndFunction(true, ply, neg)
+			i = i + 1
 		end
 	end
 
-	--[[-------------------------------------------------------------------------
-	Powerups Activation (Usable functions)
-	---------------------------------------------------------------------------]]
-	-- id: The ID of the powerup to be activated. Use "-" in front to make negative
-	-- pos: The position from which to activate the powerup from (powerups like Nukes may use this)
-	-- ply: The player who it should be activated for. Nil = global
-	-- dur: The duration to activate the powerup for. Overrides the powerup's own Duration. Nil = default
+	-- Activate a powerup. This runs the effect if it is not already active, and otherwise updates the time if it is longer than previously active
+	-- Passing a "-" in front of the ID makes it negative. Pass pos to give a position for positional powerups (such as Carpenter and Nuke)
+	-- Passing ply as a single player or table of players will activate it personally for these players, if the powerup is not Global (otherwise it will globally activate!)
+	-- Passing dur will set the duration of the powerup. Not passing it will make it default.
 	function nzu.ActivatePowerup(id, pos, ply, dur)
 		local neg, real_id = isneg(id)
 		local powerup = powerups[real_id]
 		if not powerup or (neg and not powerup.Negative) then return end
 
-		if ply and powerup.PlayerBased then -- Activate for a player or list of players (only if the powerup supports it!)
-			local plys = IsValid(ply) and {ply} or ply -- If it's not a single valid player, it's expected to be a table of players
-
-			if powerup.Duration then -- If it is duration-based
-				local newtime = CurTime() + (dur or powerup.Duration)
-
-				for k,v in pairs(plys) do
-					if not playeractives[v] then playeractives[v] = {} end
-					local time = playeractives[v][id]
-
-					if not time then
-						playeractives[v][id] = newtime
-
-						if powerup.Function then powerup.Function(pos, v, neg) end
-					elseif newtime > time then
-						playeractives[v][id] = newtime
+		local plys = not powerup.Global and ply
+		local time = powerup.Duration and CurTime() + (dur or powerup.Duration)
+		if time then
+			activate_powerup(powerup, id, time, dur, real_id, neg, pos, plys)
+		elseif powerup.Function then
+			if powerup.Global then
+				time = powerup.Function(pos, neg)
+			else
+				if IsValid(plys) then
+					time = powerup.Function(pos, neg, nil, plys)
+				else
+					for k,v in pairs(plys or getplayers()) do
+						time = powerup.Function(pos, neg, nil, v)
 					end
 				end
-				networkupdate(real_id, neg, newtime, plys)
-			else
-				if powerup.Function then runfunctionforplayers(plys, powerup, id, pos, neg) end
-				networkupdate(real_id, neg, nil, plys)
 			end
-
-			hook.Run("nzu_Powerups_PowerupActivated", real_id, dur, neg, pos, ply)
-		else -- Activate globally (This happens if a powerup is not player-based, even if a player is passed)
-			if powerup.Duration then
-				local newtime = CurTime() + (dur or powerup.Duration)
-				local time = globalactives[id]
-
-				-- We only do any internal updating if the new time is higher than the old
-				if not time or newtime > time then
-					globalactives[id] = newtime
-
-					if not time and powerup.Function then
-						runfunctionglobal(powerup, id, pos, neg)
-					end
-					networkupdate(real_id, neg, newtime)
-				end
-			else
-				if powerup.Function then runfunctionglobal(powerup, id, pos, neg) end
-				networkupdate(real_id, neg, nil)
-			end
-
-			-- Run the hook! The player passed is nil if it is not PlayerBased (even if "ply" was passed!)
-			hook.Run("nzu_Powerups_PowerupActivated", real_id, dur, neg, pos)
 		end
+		network_activate(real_id, neg, time, plys and true or false, plys)
 	end
 
-	-- Deactivate a powerup. This can be done prematurely. Specifying "ply" makes it deactivate only for that player/list of players.
+	-- Terminate a powerup. This will make it end prematurely. Specifying "ply" makes it deactivate only for that player/list of players.
 	-- Note: If the powerup was activated globally, deactivating it from a player does NOT remove it from that player (as it is still global!)
-	function nzu.EndPowerup(id, ply)
+	function nzu.TerminatePowerup(id, ply)
 		local neg, real_id = isneg(id)
 		local powerup = powerups[real_id]
 
 		if ply then -- Deactivate for players
+			local toterminate
 			local plys = IsValid(ply) and {ply} or ply
-			local tonetworkupdate = {}
-			local toend = powerup and powerup.PlayerBased and powerup.EndFunction and not globalactives[id]
-			for k,v in pairs(plys) do
-				if playeractives[v] and playeractives[v][id] then
-					dodeactivate_personal(powerup, real_id, neg, v, toend)
-					table.insert(tonetworkupdate, v)
-				end
-			end
 
-			if not table.IsEmpty(tonetworkupdate) then
-				networkupdate_deactivate(real_id, neg, tonetworkupdate)
-				hook.Run("nzu_Powerups_PowerupTerminated", real_id, neg, tonetworkupdate)
-			end
-		elseif globalactives[id] then -- Disable globally. But only does anything if it is ACTIVE to begin with!
-			dodeactivate_global(powerup, real_id, neg)
-			hook.Run("nzu_Powerups_PowerupTerminated", real_id, neg)
-		end
-	end
-
-
-
-	--[[-------------------------------------------------------------------------
-	Hooks and Control of powerup durations and players
-	---------------------------------------------------------------------------]]
-
-	-- This function is hooked to Think whenever a powerup is active in time
-	local function checkpowerups()
-		local CT = CurTime()
-		for k,v in pairs(globalactives) do
-			if CT > v then
-				local neg, real_id = isneg(k)
-				local powerup = powerups[real_id]
-
-				dodeactivate_global(powerup, real_id, neg)
-				hook.Run("nzu_Powerups_PowerupEnded", real_id, neg)
-			end
-		end
-		for k,v in pairs(playeractives) do
-			for k2,v2 in pairs(v) do
-				if CT > v2 then
-					local neg, real_id = isneg(k2)
-					local powerup = powerups[real_id]
-
-					dodeactivate_personal(powerup, real_id, neg, k, powerup and powerup.PlayerBased and powerup.EndFunction and not globalactives[id])
-					networkupdate_deactivate(real_id, neg, k)
-					hook.Run("nzu_Powerups_PowerupEnded", real_id, neg, k)
-				end
-			end
-		end
-	end
-	hook.Add("Think", "nzu_Powerups_TimerControl", checkpowerups)
-
-	-- When a player drops in, apply all global powerups to him that are PlayerBased
-	hook.Add("nzu_PlayerInitialSpawned", "nzu_Powerups_ApplyGlobals", function(ply)
-		for k,v in pairs(globalactives) do
-			local neg, real_id = isneg(id)
-			local powerup = powerups[real_id]
-
-			if powerup and powerup.PlayerBased and powerup.Function then
-				powerup.Function(nil, ply, neg) -- No position for drop-ins
-			end
-		end
-	end)
-
-	-- Function for if a player drops out, is disconnects, or otherwise removed
-	-- Clean this player's table, along with running EndFunction for all powerups
-	-- that are PlayerBased and active on him
-	local function removeply(ply)
-		local removed = {}
-		if playeractives[ply] then
-			for k,v in pairs(playeractives[ply]) do
-				local neg, real_id = isneg(k)
-				local powerup = powerups[real_id]
-
-				if powerup and powerup.EndFunction then
-					powerup.EndFunction(true, ply, neg)
-				end
-
-				removed[k] = true
-			end
-			playeractives[ply] = nil
-		end
-		for k,v in pairs(globalactives) do
-			if not removed[k] then -- Not already deactivated for this player
-				local neg, real_id = isneg(id)
-				local powerup = powerups[real_id]
-
-				if powerup and powerup.PlayerBased and powerup.EndFunction then
-					powerup.EndFunction(true, ply, neg)
-				end
-			end
-		end
-	end
-	hook.Add("nzu_PlayerUnspawned", "nzu_Powerups_UnspawnPowerups", removeply) -- Unspawning = Removal of all active powerups
-	hook.Add("PlayerDisconnected", "nzu_Powerups_DisconnectPowerups", removeply) -- Disconnecting also cleans up that player
-
-	local function fullreset()
-		local playerbased = {}
-		for k,v in pairs(globalactives) do
-			local neg, real_id = isneg(id)
-			local powerup = powerups[real_id]
-
-			if powerup and powerup.EndFunction then
-				if powerup.PlayerBased then
-					playerbased[id] = {powerup, neg}
-				else
-					powerup.EndFunction(true, neg)
-				end
-			end
-		end
-		globalactives = {}
-
-		for k,v in pairs(getplayers()) do
-			for k2,v2 in pairs(playerbased) do
-				v2[1].EndFunction(true, v, v2[2])
-			end
-			if playeractives[v] then
-				for k2,v2 in pairs(playeractives[v]) do
-					if not playerbased[k2] then
-						local neg2, real_id2 = isneg(k2)
-						local powerup2 = powerups[real_id2]
-						if powerup2 and powerup2.EndFunction then
-							powerup2.EndFunction(true, v, neg2)
-						end
+			if IsValid(ply) then
+				if playeractives[ply][id] then
+					toterminate = ply
+				else return end
+			else
+				local toterminate = {}
+				for k,v in pairs(plys) do
+					if playeractives[v][id] then
+						table.insert(toterminate, v)
 					end
 				end
-				playeractives[v] = nil
+
+				if table.IsEmpty(toterminate) then return end
 			end
+
+			terminate_powerup(powerup, id, real_id, neg, toterminate)
+			network_terminate(real_id, neg, toterminate)
+		elseif globalactives[id] then
+			terminate_powerup(powerup, id, real_id, neg)
+			network_terminate(real_id, neg)
+		end
+	end
+else
+	local loopsounds = {}
+	local hiddentimedloopsounds = {}
+
+	local function checkloopsounds()
+		local ct = CurTime()
+		for k,v in pairs(hiddentimedloopsounds) do
+			if v.Time < ct then
+				if v.Sound then v.Sound:Stop() end
+
+				local neg, real_id = isneg(k)
+				local powerup = powerups[real_id]
+				if powerup and powerup.EndSound then
+					sound.Play(powerup.EndSound, LocalPlayer():GetPos(), 0, neg and 75 or 100, 1)
+				end
+				
+				hiddentimedloopsounds[k] = nil
+			end
+		end
+
+		if table.IsEmpty(hiddentimedloopsounds) then
+			hook.Remove("Think", "nzu_PowerupSoundTimer")
 		end
 	end
 
-	hook.Add("nzu_RoundStateChanged", "nzu_Powerups_FullReset", function(round, state)
-		if state == ROUND_WAITING then fullreset() end
-	end)
-else
-	--[[-------------------------------------------------------------------------
-	Client Powerups Activation & Networking (Locals - Usable functions down below!)
-	---------------------------------------------------------------------------]]
-	local activepowerups = {}
-
-	net.Receive("nzu_powerups_activation", function()
+	net.Receive("nzu_powerups", function()
 		local real_id = net.ReadString()
 		local neg = net.ReadBool()
-		local id = neg and "-"..real_id or real_id
 		local personal = net.ReadBool()
 
-		print("Reading:", real_id, neg, id, personal)
+		local powerup = powerups[real_id] or {}
+		local id = neg and "-"..real_id or real_id
 
 		if net.ReadBool() then
-			print("Activating!")
-			local powerup = powerups[real_id]
-			local time = powerup and powerup.Duration and net.ReadFloat()
-
-			-- SOUNDS :D
-			if powerup and powerup.Sound then
-				sound.Play(powerup.Sound, LocalPlayer():GetPos(), 0, neg and 50 or 100, 1)
+			local time = net.ReadBool() and net.ReadFloat()
+			if not powerup.Duration then
+				if powerup.Function then
+					powerup.Function(nil, neg, nil, personal and LocalPlayer())
+				end
+			else
+				activate_powerup(powerup, id, time, time and time - CurTime(), real_id, neg, nil, personal and LocalPlayer()) -- Pos is always nil on client (can network it if it is useful?)
 			end
-			local ann = nzu.GetAnnouncerSound("powerups/"..string.lower(id))
-			if ann then sound.Play(ann, LocalPlayer():GetPos(), 0, neg and 50 or 100, 1) end
 
-			-- Duration-based Activation (for HUD and tables)
+			-- If the powerup has a sound, play it :D
+			if powerup.Sound then
+				sound.Play(powerup.Sound, LocalPlayer():GetPos(), 0, neg and 75 or 100, 1)
+			end
+
+			-- If time is passed, we do loop sounds
 			if time then
-				local tbl
-				if personal then
-					tbl = playeractives[LocalPlayer()]
-					if not tbl then
-						tbl = {}
-						playeractives[LocalPlayer()] = tbl
-					end
-				else
-					tbl = globalactives
-				end
-				tbl[id] = time
-
-				local found = false
-				for k,v in pairs(activepowerups) do
-					if v.Key == id then
-						v.Time = math.max(v.Time, time)
-						found = true
-						break
-					end
-				end
-				if not found then
-					local t = {Time = time, ID = real_id, Negative = neg, Key = id, Powerup = powerup}
-					if powerup and powerup.LoopSound then
+				if powerup.Duration then
+					if not loopsounds[id] then
 						local s = CreateSound(LocalPlayer(), powerup.LoopSound)
 						s:PlayEx(0.5, neg and 50 or 100)
-						t.Sound = s
+						loopsounds[id] = s
 					end
-					table.insert(activepowerups, t)
-				end
-			end
-
-
-			hook.Run("nzu_Powerups_PowerupActivated", real_id, time and time - CurTime(), neg, nil, personal and LocalPlayer())
-		else
-			print("Deactivating!")
-			-- Deactivate powerup
-
-			local tbl = personal and playeractives[LocalPlayer()] or globalactives
-			local tbl2 = personal and globalactives or playeractives[LocalPlayer()]
-
-			tbl[id] = nil
-			for k,v in pairs(activepowerups) do
-				if v.Key == id then
-					if tbl2 and tbl2[id] then
-						v.Time = tbl2[id]
+				else
+					local looper = hiddentimedloopsounds[id]
+					if looper then
+						if looper.Time < time then looper.Time = time end
 					else
-						table.remove(activepowerups, k)
+						local s
+						if powerup.LoopSound then
+							s = CreateSound(LocalPlayer(), powerup.LoopSound)
+							s:PlayEx(0.5, neg and 50 or 100)
+						end
+
+						hiddentimedloopsounds[id] = {Sound = s, Time = time}
+						hook.Add("Think", "nzu_PowerupSoundTimer", checkloopsounds)
 					end
-					break
 				end
 			end
 
-			if personal and table.IsEmpty(tbl) then
-				playeractives[LocalPlayer()] = nil
-			end
-
-			hook.Run("nzu_Powerups_PowerupEnded", real_id, neg, personal and LocalPlayer())
+			-- 1 Second later, play the announcer voice line
+			timer.Simple(1, function()
+				local ann = nzu.GetAnnouncerSound("powerups/"..string.lower(real_id))
+				if ann then sound.Play(ann, LocalPlayer():GetPos(), 0, neg and 75 or 100, 1) end
+			end)
+		else
+			terminate_powerup(powerup, id, real_id, neg, personal and LocalPlayer())
+			endsounds(id, powerup)
 		end
 	end)
 
-	-- Internal hook: On the game going to the Waiting state, reset all awareness of powerups
-	local function fullreset()
-		activepowerups = {}
-		globalactives = {}
-		playeractives[LocalPlayer()] = nil
+	local function endloopsound(id, real_id, neg)
+		if loopsounds[id] then
+			loopsounds[id]:Stop()
+			loopsounds[id] = nil
+		end
+
+		local powerup = powerups[real_id]
+		if powerup and powerup.EndSound then
+			sound.Play(powerup.EndSound, LocalPlayer():GetPos(), 0, neg and 75 or 100, 1)
+		end
 	end
-	hook.Add("nzu_RoundStateChanged", "nzu_Powerups_FullReset", function(round, state)
-		if state == ROUND_WAITING then fullreset() end
+	hook.Add("nzu_PowerupEnded_Personal", "nzu_PowerupLoopSoundEnd",  function(real_id, neg, k)
+		local id = neg and "-"..real_id or real_id
+		if k == LocalPlayer() and not globalactives[id] then
+			endloopsound(id, real_id, neg)
+		end
 	end)
-	hook.Add("nzu_PlayerUnspawned", "nzu_Powerups_UnspawnPowerups", function(ply)
-		if ply == LocalPlayer() then fullreset() end
+	hook.Add("nzu_PowerupEnded", "nzu_PowerupLoopSoundEnd",  function(real_id, neg)
+		local id = neg and "-"..real_id or real_id
+		local plytbl = playeractives[LocalPlayer()]
+
+		if not plytbl or not plytbl[id] then
+			endloopsound(id, real_id, neg)
+		end
 	end)
 
-	--[[-------------------------------------------------------------------------
-	HUD Components + Fallback function
-	---------------------------------------------------------------------------]]
 	local font = "nzu_Font_Bloody_Large"
 	local col_pos = color_white
 	local col_neg = Color(255,150,150)
-	--[[nzu.HUDComponent("Powerups", function() return activepowerups end, function(hud, ups)
-		local w = ScrW()/2
-		for k,v in pairs(ups) do
-			draw.SimpleText(v.Name .. ": " .. math.ceil(v.Time - CurTime()), font, w, ScrH()*0.85 - k*50, v.Negative and col_neg or col_pos, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-		end
-		draw.SimpleText("Hello", font, w, ScrH()*0.85, col_pos, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-	end)]]
 	hook.Add("HUDPaint", "nzu_Powerups_DevHUD", function()
 		local w = ScrW()/2
-		for k,v in pairs(activepowerups) do
-			draw.SimpleText(v.Powerup.Name .. ": " .. math.ceil(v.Time - CurTime()), font, w, ScrH()*0.85 - k*50, v.Negative and col_neg or col_pos, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		local i = 1
+
+		for k,v in pairs(globalactives) do
+			local neg, real_id = isneg(k)
+			draw.SimpleText(k .. ": " .. math.ceil(v - CurTime()), font, w, ScrH()*0.85 - i*50, neg and col_neg or col_pos, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			i = i + 1
+		end
+		draw.SimpleText("Global Actives", font, w, ScrH()*0.85 - i*50, neg and col_neg or col_pos, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+
+		if playeractives[LocalPlayer()] then
+			i = i + 2
+			for k,v in pairs(playeractives[LocalPlayer()]) do
+				local neg, real_id = isneg(k)
+				draw.SimpleText(k .. ": " .. math.ceil(v - CurTime()), font, w, ScrH()*0.85 - i*50, neg and col_neg or col_pos, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				i = i + 1
+			end
+			draw.SimpleText("Player Actives", font, w, ScrH()*0.85 - i*50, neg and col_neg or col_pos, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
 	end)
 end
