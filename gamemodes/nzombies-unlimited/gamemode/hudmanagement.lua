@@ -262,13 +262,15 @@ function SETTINGS:OnHUDChanged(old, new)
 end
 
 hook.Add("nzu_PlayerInitialSpawned", "nzu_InitializeHUD", function(ply)
-	if ply == LocalPlayer() then
-		if not hud then
-			hud = loadhud(string.StripExtension(SETTINGS.HUD))
-			nzu.HUD = hud
+	timer.Simple(0, function()
+		if ply == LocalPlayer() then
+			if not hud then
+				hud = loadhud(string.StripExtension(SETTINGS.HUD))
+				nzu.HUD = hud
+			end
+			setuphud(hud)
 		end
-		setuphud(hud)
-	end
+	end)
 end)
 
 hook.Add("nzu_PlayerUnspawned", "nzu_DeactivateHUD", function(ply)

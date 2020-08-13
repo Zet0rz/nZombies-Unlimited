@@ -80,6 +80,14 @@ Here is a table of contents of what components this HUD is made up from:
 
 local HUD = {}
 
+-------------------------
+-- Localize
+local pairs = pairs
+local IsValid = IsValid
+local math = math
+local surface = surface
+local table = table
+-------------------------
 
 
 --[[-------------------------------------------------------------------------
@@ -981,7 +989,241 @@ end
 
 --[[-------------------------------------------------------------------------
 Powerups
+
+This demonstrates a method of capturing Powerup activations and keeping an order
+It hooks into powerup activation, both personal and global,
+and creates icons if there isn't one already, and adds it to an ordered table
+where it is trivial to paint them in that order
+
+Global and Personal powerups are tracked independently (but still retain order)
+They could potentially be merged, if you want in your own HUD
 ---------------------------------------------------------------------------]]
+local activepowerups
+--local numpowerups
+
+-- Initialize the tables; Add all active powerups to the Activepowerups table, and add their position as lookup in the order table
+function HUD:Initialize_Powerups()
+	activepowerups = {}
+	--numpowerups = 0
+
+	for k,v in pairs(nzu.GetGlobalActivePowerups()) do
+		local neg,id = nzu.IsNegativePowerup(k)
+		local powerup = nzu.GetPowerup(id)
+		table.insert(activepowerups, {ID = id, Negative = neg, EndTime = v, Icon = powerup and powerup.Icon})
+		--numpowerups = numpowerups + 1
+	end
+
+	-- We could use self.Player, but since powerups are only networked to their owner, we just use LocalPlayer() regardless of who we're spectating
+	for k,v in pairs(LocalPlayer():GetPersonalActivePowerups()) do
+		local neg,id = nzu.IsNegativePowerup(k)
+		local powerup = nzu.GetPowerup(id)
+		table.insert(activepowerups, {ID = id, Negative = neg, EndTime = v, Personal = true, Icon = powerup and powerup.Icon})
+		--numpowerups = numpowerups + 1
+	end
+end
+
+local iconsize = 80
+local bgsize = 100
+local icondist = 102
+local bg_green = Material("nzombies-unlimited/hud/powerups/background_unlimited-green.png", "unlitgeneric smooth")
+local bg_blue = Material("nzombies-unlimited/hud/powerups/background_unlimited-blue.png", "unlitgeneric smooth")
+local bg_red = Material("nzombies-unlimited/hud/powerups/background_unlimited-red.png", "unlitgeneric smooth")
+local bg_purple = Material("nzombies-unlimited/hud/powerups/background_unlimited-purple.png", "unlitgeneric smooth")
+
+-- This function basically steals the algorithm from draw.SimpleTextOutlined to draw an outlined textured rect
+-- It works by drawing the icon multiple times in every direction behind the main icon to give it an outline-like effect
+local function DrawTexturedRectOutline(x,y,w,h,width)
+	local steps = ( width * 2 ) / 3
+	if ( steps < 1 ) then steps = 1 end
+
+	for _x = -width, width, steps do
+		for _y = -width, width, steps do
+			surface.DrawTexturedRect(x + _x, y + _y, w,h)
+		end
+	end
+end
+
+--local activepowerups = {{Icon = Material("nzombies-unlimited/hud/powerups/deathmachine.png", "unlitgeneric smooth")}, {Icon = Material("nzombies-unlimited/hud/powerups/instakill.png", "unlitgeneric smooth")}, {Icon = Material("nzombies-unlimited/hud/powerups/doublepoints.png", "unlitgeneric smooth")}, {Icon = Material("nzombies-unlimited/hud/powerups/firesale.png", "unlitgeneric smooth")}, {Icon = Material("nzombies-unlimited/hud/powerups/bonfiresale.png", "unlitgeneric smooth")}}
+function HUD:Paint_Powerups()
+	local num = #activepowerups + 2
+	local icondiff = (bgsize - iconsize)/2
+
+	local ct = CurTime()
+	for k,v in pairs(activepowerups) do
+		local timeleft = v.EndTime and v.EndTime - ct
+
+		if not timeleft or timeleft > 10 or (timeleft > 3 and timeleft % 1 > 0.5) or (timeleft <= 3 and timeleft % 0.5 > 0.25) then
+			surface.SetMaterial(v.Negative and (v.Personal and bg_purple or bg_red) or (v.Personal and bg_blue or bg_green))
+			surface.SetDrawColor(255,255,255)
+
+			local xpos = (ScrW() - icondist*num)/2 + icondist*k
+			local ypos = ScrH() - 250
+			surface.DrawTexturedRect(xpos, ypos, bgsize, bgsize)
+
+			local xpos2 = xpos + icondiff
+			local ypos2 = ypos + icondiff - 5
+			surface.SetMaterial(v.Icon)
+			surface.SetDrawColor(0,0,0)
+			DrawTexturedRectOutline(xpos2, ypos2, iconsize, iconsize,4)
+			--surface.DrawTexturedRect(xpos2 + 5, ypos2 + 2, iconsize, iconsize,5)
+			surface.SetDrawColor(255,255,255)
+			surface.DrawTexturedRect(xpos2, ypos2, iconsize, iconsize,5)
+		end
+	end
+end
+
+-- Whenever a powerup is activated, loop through all icons and update the time of the one equivalent to this, if so
+-- If the loop is exited without finding this, add it as a new icon to the table
+function HUD:Hook_nzu_PowerupActivated(id, neg, dur, ply)
+	if not ply or ply == LocalPlayer() then
+		local powerup = nzu.GetPowerup(id)
+
+		if dur and (not powerup or powerup.Duration) then
+			local isply = ply and true or nil
+			for k,v in pairs(activepowerups) do
+				if v.ID == id and v.Negative == neg and v.Personal == isply then
+					local newtime = CurTime() + dur
+					if v.EndTime < newtime then v.EndTime = newtime end
+					return
+				end
+			end
+
+			table.insert(activepowerups, {ID = id, Negative = neg, EndTime = CurTime() + dur, Personal = ply and true or nil, Icon = powerup and powerup.Icon})
+			--numpowerups = numpowerups + 1
+		else
+			self:Alert(powerup and powerup.Name or id)
+		end
+	end
+end
+HUD.Hook_nzu_PowerupActivated_Personal = HUD.Hook_nzu_PowerupActivated -- This is the same function :D
+
+-- Loop through all icons and remove the one that is equivalent. This reorders all icons beneath it too.
+function HUD:Hook_nzu_PowerupEnded(id, neg, ply)
+	if not ply or ply == LocalPlayer() then
+		local isply = ply and true or nil
+		for k,v in pairs(activepowerups) do
+			if v.ID == id and v.Negative == neg and v.Personal == isply then
+				table.remove(activepowerups, k)
+				--numpowerups = numpowerups - 1
+				return
+			end
+		end
+	end
+end
+
+-- All these hooks are the same; regardless of how a powerup ends, we remove it
+HUD.Hook_nzu_PowerupEnded_Personal = HUD.Hook_nzu_PowerupEnded
+HUD.Hook_nzu_PowerupTerminated = HUD.Hook_nzu_PowerupEnded
+HUD.Hook_nzu_PowerupTerminated_Personal = HUD.Hook_nzu_PowerupEnded
+
+--[[-------------------------------------------------------------------------
+Alerts!
+We use these for powerups that don't have an activation time, but it can
+also be used by the gamemode to display any text (very rare circumstances)
+---------------------------------------------------------------------------]]
+-- Also coincidentally the same one used by powerup drop glows
+local circleglow = Material("nzombies-unlimited/particle/powerup_glow_09")
+-- Font = weaponfont_primary
+
+function HUD:Alert(text)
+	if self.Panels.Alert then
+		self.Panels.Alert:SetText(text)
+	else
+		local p = vgui.Create("Panel")
+		p:ParentToHUD()
+		p:SetSize(800, 300)
+		p.NextParticle = 0
+		p.Particles = {}
+
+		local nextparticleindex = 1
+		local maxparticles = 6
+		local particledur = 2
+
+		function p:Paint(w,h)
+			local w_h = w/2
+			local line_height = 50
+			local h_line = h - line_height
+			local glowwidth = 250
+
+			-- Rotating Glow Circle, starting with shadow
+			if self.NextParticle < CurTime() then
+				self.Particles[nextparticleindex] = {Rot = math.random(360), Time = CurTime() + particledur/2}
+				self.NextParticle = CurTime() + particledur/maxparticles
+				nextparticleindex = (nextparticleindex % maxparticles) + 1
+			end
+
+			local rot = 0
+			local size = h_line*2.5
+			local rot_h = h
+
+			surface.SetMaterial(circleglow)
+			for k,v in pairs(self.Particles) do
+				surface.SetDrawColor(255,255,255,255 - math.abs(v.Time - CurTime()) * 255)
+				surface.DrawTexturedRectRotated(w_h, rot_h, size, size, v.Rot)
+			end
+
+			--surface.SetMaterial(point_shadow)
+			--surface.DrawTexturedRectRotated(w_h, h_line - 10, 30, glowwidth, 90)
+			
+			--[[surface.SetDrawColor(0,0,0,255)
+			surface.SetMaterial(circleglow)
+			surface.DrawTexturedRectRotated(w_h, rot_h, size, size, rot)
+
+			-- Then the rotating glow
+			surface.SetDrawColor(255,255,255,255)
+			surface.DrawTexturedRectRotated(w_h, rot_h, size - 20, size - 20, rot)
+			-- Then the overlaid rotating shadow
+			surface.SetDrawColor(0,0,0,255)
+			surface.DrawTexturedRectRotated(w_h, rot_h, size - 40, size - 40, rot)]]
+
+			-- Central rectangle
+			surface.SetDrawColor(0,0,0,255)
+			surface.DrawRect(glowwidth, h_line, w - glowwidth*2, line_height)
+
+			-- Outer glow shadow
+			surface.SetMaterial(point_shadow)
+			surface.DrawTexturedRect(w - glowwidth, h_line, glowwidth, line_height)
+			surface.DrawTexturedRectUV(0, h_line, glowwidth, line_height, 1,0,0,1)
+
+			-- Outer glow color
+			surface.SetDrawColor(255,255,255,255)
+			surface.SetMaterial(point_glow)
+			surface.DrawTexturedRect(w - glowwidth, h_line, glowwidth, line_height)
+			surface.DrawTexturedRectUV(0, h_line, glowwidth, line_height, 1,0,0,1)
+
+			-- Outer glow shadow overlay
+			local glowwidth2 = 100
+			surface.SetDrawColor(0,0,0,255)
+			surface.SetMaterial(point_shadow)
+			surface.DrawTexturedRect(w - glowwidth, h_line, glowwidth - glowwidth2, line_height)
+			surface.DrawTexturedRectUV(glowwidth2, h_line, glowwidth - glowwidth2, line_height, 1,0,0,1)
+
+			draw.SimpleTextOutlined(self.Text, weaponfont_name, w_h, h_line + line_height/2, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, color_black)
+		end
+
+		function p:Think()
+			if self.RemoveTime and self.RemoveTime < CurTime() then
+				self:AlphaTo(0,2,0, function()
+					self:Remove()
+				end)
+				self.RemoveTime = nil
+			end
+		end
+
+		function p:SetText(t)
+			self.Text = t
+			self:SetAlpha(0)
+			self:AlphaTo(255, 0.25, 0)
+			self.RemoveTime = CurTime() + 5
+		end
+
+		p:SetPos((ScrW() - p:GetWide())/2, 50)
+		p:SetText(text)
+
+		return p
+	end
+end
+
 
 --[[-------------------------------------------------------------------------
 Game Over Panel

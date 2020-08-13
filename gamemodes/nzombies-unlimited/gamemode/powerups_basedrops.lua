@@ -184,6 +184,7 @@ nzu.RegisterPowerup("DoublePoints", {
 	LoopSound = Sound("nzu/powerups/doublepoints/loop.wav"),
 	EndSound = Sound("nzu/powerups/doublepoints/end.wav"),
 	-- We don't do a function. Instead we have the hook below.
+	Icon = Material("nzombies-unlimited/hud/powerups/doublepoints.png", "unlitgeneric smooth")
 })
 
 -- TODO: Add and remove this hook through Function and EndFunction to optimize?
@@ -202,6 +203,7 @@ nzu.RegisterPowerup("InstaKill", {
 	LoopSound = Sound("nzu/powerups/instakill/loop.wav"),
 	EndSound = Sound("nzu/powerups/instakill/end.wav"),
 	-- Same as double points
+	Icon = Material("nzombies-unlimited/hud/powerups/instakill.png", "unlitgeneric smooth")
 })
 
 hook.Add("EntityTakeDamage", "InstaKill", function(ent, dmg)
@@ -210,3 +212,30 @@ hook.Add("EntityTakeDamage", "InstaKill", function(ent, dmg)
 		dmg:SetDamage(ent:Health()) -- Instantly kill
 	end
 end)
+
+-- TODO: Make these
+nzu.RegisterPowerup("FireSale", {
+	Name = "Fire Sale",
+	Model = Model("models/nzu/powerups/firesale.mdl"),
+	Color = Color(255,255,100),
+	Duration = 30,
+	Global = true,
+	--Negative = true,
+	Icon = Material("nzombies-unlimited/hud/powerups/firesale.png", "unlitgeneric smooth"),
+	Function = SERVER and function()
+
+	end or nil,
+})
+
+nzu.RegisterPowerup("DeathMachine", {
+	Name = "Fire Sale",
+	Model = Model("models/nzu/powerups/deathmachine.mdl"),
+	Color = Color(255,255,100),
+	Duration = 30,
+	DefaultPersonal = true,
+	--Negative = true,
+	Icon = Material("nzombies-unlimited/hud/powerups/deathmachine.png", "unlitgeneric smooth"),
+	Function = SERVER and function()
+
+	end or nil,
+})

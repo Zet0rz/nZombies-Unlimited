@@ -27,6 +27,7 @@ local function isneg(id)
 	end
 	return false, id
 end
+nzu.IsNegativePowerup = isneg
 
 --[[-------------------------------------------------------------------------
 Adding and Getting Powerups, Utility
@@ -52,6 +53,20 @@ end
 SHARED FUNCTIONS
 Getters & Accessors
 ---------------------------------------------------------------------------]]
+function nzu.GetGlobalActivePowerups() return globalactives end
+function PLAYER:GetPersonalActivePowerups() return playeractives[self] end
+function PLAYER:GetActivePowerups()
+	local t = {}
+	for k,v in pairs(playeractives[self]) do
+		t[k] = v
+	end
+	for k,v in pairs(globalactives) do
+		if not t[k] or t[k] < v then t[k] = v end
+	end
+
+	return t
+end
+
 -- Get the end time of a globally active powerup
 function nzu.GetPowerupTime(id)
 	return globalactives[id]
@@ -167,7 +182,7 @@ local function activate_powerup(powerup, id, time, dur, real_id, neg, pos, plys)
 				if f then f(pos, neg, dur, plys) end
 
 			-- Else, if the player has it active but it ends in a shorter time, we update the time (and not run the function)
-			elseif playeractivse[plys][id] < time then
+			elseif playeractives[plys][id] < time then
 				playeractives[plys][id] = time
 			end
 
@@ -180,7 +195,7 @@ local function activate_powerup(powerup, id, time, dur, real_id, neg, pos, plys)
 				if not playeractives[v][id] then
 					playeractives[v][id] = time
 					if f then f(pos, neg, dur, v) end
-				elseif playeractivse[v][id] < time then
+				elseif playeractives[v][id] < time then
 					playeractives[v][id] = time
 				end
 				hook.Run("nzu_PowerupActivated_Personal", real_id, neg, dur, v)
@@ -504,12 +519,22 @@ if SERVER then
 		elseif powerup.Function then
 			if powerup.Global then
 				time = powerup.Function(pos, neg)
+				hook.Run("nzu_PowerupActivated", real_id, neg, time)
 			else
 				if IsValid(plys) then
 					time = powerup.Function(pos, neg, nil, plys)
+					hook.Run("nzu_PowerupActivated_Personal", real_id, neg, time, plys)
 				else
-					for k,v in pairs(plys or getplayers()) do
-						time = powerup.Function(pos, neg, nil, v)
+					if plys then
+						for k,v in pairs(plys) do
+							time = powerup.Function(pos, neg, nil, v)
+							hook.Run("nzu_PowerupActivated_Personal", real_id, neg, time, v)
+						end
+					else
+						for k,v in pairs(getplayers()) do
+							time = powerup.Function(pos, neg, nil, v)
+						end
+						hook.Run("nzu_PowerupActivated", real_id, neg, time)
 					end
 				end
 			end
@@ -585,8 +610,12 @@ else
 		if net.ReadBool() then
 			local time = net.ReadBool() and net.ReadFloat()
 			if not powerup.Duration then
-				if powerup.Function then
-					powerup.Function(nil, neg, nil, personal and LocalPlayer())
+				if personal then
+					if powerup.Function then powerup.Function(nil, neg, nil, LocalPlayer()) end
+					hook.Run("nzu_PowerupActivated_Personal", real_id, neg, time, LocalPlayer())
+				else
+					if powerup.Function then powerup.Function(nil, neg, nil) end
+					hook.Run("nzu_PowerupActivated", real_id, neg, time)
 				end
 			else
 				activate_powerup(powerup, id, time, time and time - CurTime(), real_id, neg, nil, personal and LocalPlayer()) -- Pos is always nil on client (can network it if it is useful?)
@@ -600,7 +629,7 @@ else
 			-- If time is passed, we do loop sounds
 			if time then
 				if powerup.Duration then
-					if not loopsounds[id] then
+					if not loopsounds[id] and powerup.LoopSound then
 						local s = CreateSound(LocalPlayer(), powerup.LoopSound)
 						s:PlayEx(0.5, neg and 50 or 100)
 						loopsounds[id] = s
@@ -656,31 +685,6 @@ else
 
 		if not plytbl or not plytbl[id] then
 			endloopsound(id, real_id, neg)
-		end
-	end)
-
-	local font = "nzu_Font_Bloody_Large"
-	local col_pos = color_white
-	local col_neg = Color(255,150,150)
-	hook.Add("HUDPaint", "nzu_Powerups_DevHUD", function()
-		local w = ScrW()/2
-		local i = 1
-
-		for k,v in pairs(globalactives) do
-			local neg, real_id = isneg(k)
-			draw.SimpleText(k .. ": " .. math.ceil(v - CurTime()), font, w, ScrH()*0.85 - i*50, neg and col_neg or col_pos, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-			i = i + 1
-		end
-		draw.SimpleText("Global Actives", font, w, ScrH()*0.85 - i*50, neg and col_neg or col_pos, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-
-		if playeractives[LocalPlayer()] then
-			i = i + 2
-			for k,v in pairs(playeractives[LocalPlayer()]) do
-				local neg, real_id = isneg(k)
-				draw.SimpleText(k .. ": " .. math.ceil(v - CurTime()), font, w, ScrH()*0.85 - i*50, neg and col_neg or col_pos, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-				i = i + 1
-			end
-			draw.SimpleText("Player Actives", font, w, ScrH()*0.85 - i*50, neg and col_neg or col_pos, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
 	end)
 end
