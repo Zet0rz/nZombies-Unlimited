@@ -66,6 +66,7 @@ if SERVER then
 	AccessorFunc(ENT, "m_iTimesUsed", "TimesUsed", FORCE_NUMBER)
 	AccessorFunc(ENT, "m_eUser", "CurrentUser")
 	AccessorFunc(ENT, "m_eSpawnpoint", "Spawnpoint")
+	AccessorFunc(ENT, "m_bIsTeddy", "IsTeddy", FORCE_BOOL)
 
 	function ENT:Use(activator)
 		if self:GetIsReady() and IsValid(activator) and activator:IsPlayer() then
@@ -288,13 +289,17 @@ if SERVER then
 
 	function ENT:Think()
 		if self.ReadyTime and self.ReadyTime < CurTime() then
-			self:SetIsReady(true)
 			self.ReadyTime = nil
-			if self.FirstReady then
-				self:CreateBeam()
-				self.FirstReady = nil
+			if self.nzu_RemoveOnClose then
+				self:Remove()
+			else
+				self:SetIsReady(true)
+				if self.FirstReady then
+					self:CreateBeam()
+					self.FirstReady = nil
 
-				self:OnAppeared()
+					self:OnAppeared()
+				end
 			end
 		end
 
@@ -318,6 +323,14 @@ if SERVER then
 		end
 	end
 
+	function ENT:RemoveOnClose()
+		if self:GetIsReady() then
+			self:Remove()
+		else
+			self.nzu_RemoveOnClose = true
+		end
+	end
+
 	function ENT:UpdateTransmitState() return TRANSMIT_ALWAYS end -- Always be valid on clients
 else
 	function ENT:Think()
@@ -335,7 +348,7 @@ else
 			end
 		end
 
-		self:NextThink(CurTime())
+		--self:NextThink(CurTime())
 		return true
 	end
 

@@ -71,6 +71,7 @@ function nzu.CreateMysteryBox(spawnpoint, ang)
 
 	local e = ents.Create("nzu_mysterybox")
 	e:Appear(point, ang) -- Pass ang if you want to spawn it on a position (which also then needs an angle)
+	return e
 end
 
 function nzu.GetAllMysteryBoxSpawnpoints()

@@ -132,7 +132,7 @@ nzu.RegisterPowerup("Nuke", {
 	Global = true,
 	Function = SERVER and function(pos)
 		local pos = pos or Vector()
-		local zombs = ents.FindByClass("nzu_zombie") -- TODO: Also account for other entities
+		local zombs = nzu.Round:GetZombies()
 		local max = 0
 		for k,v in pairs(zombs) do
 			local t = v:GetPos():Distance(pos)/2000
@@ -214,6 +214,7 @@ hook.Add("EntityTakeDamage", "InstaKill", function(ent, dmg)
 end)
 
 -- TODO: Make these
+local firesalemusic = Sound("nzu/powerups/firesale/loop.wav")
 nzu.RegisterPowerup("FireSale", {
 	Name = "Fire Sale",
 	Model = Model("models/nzu/powerups/firesale.mdl"),
@@ -223,19 +224,74 @@ nzu.RegisterPowerup("FireSale", {
 	--Negative = true,
 	Icon = Material("nzombies-unlimited/hud/powerups/firesale.png", "unlitgeneric smooth"),
 	Function = SERVER and function()
+		local shouldgiveteddy = function() return false end
 
+		for k,v in pairs(ents.FindByClass("nzu_mysterybox")) do
+			if IsValid(v.ReservedSpawnpoint) then
+				v:ReserveSpawnpoint(v:GetSpawnpoint()) -- By reserving the same spawnpoint, the box will move to the same location when it is moving
+			end
+			v:SetPrice(10)
+
+			v.FireSaleMusic = CreateSound(v, firesalemusic)
+			v.FireSaleMusic:Play()
+
+			v.old_teddy = v.ShouldGiveTeddy
+			v.ShouldGiveTeddy = shouldgiveteddy
+		end
+
+		for k,v in pairs(nzu.GetAllMysteryBoxSpawnpoints()) do
+			if not IsValid(v:GetMysteryBox()) then
+				local box = nzu.CreateMysteryBox(v)
+				box:SetPrice(10)
+				box.nzu_FireSale = true
+
+				box.FireSaleMusic = CreateSound(box, firesalemusic)
+				box.FireSaleMusic:Play()
+
+				box.old_teddy = box.ShouldGiveTeddy
+				box.ShouldGiveTeddy = shouldgiveteddy
+			end
+		end
+	end or nil,
+	EndFunction = SERVER and function()
+		for k,v in pairs(ents.FindByClass("nzu_mysterybox")) do
+			-- Stop the music
+			if v.FireSaleMusic then
+				v.FireSaleMusic:Stop()
+				v.FireSaleMusic = nil
+			end
+
+			if v.nzu_FireSale then
+				v:RemoveOnClose() -- If the box was created by fire sale, remove it when it is over
+			else
+				v:SetPrice(950) -- Otherwise just set the price
+
+				-- Restore the teddy roll chance function
+				if v.old_teddy then
+					v.ShouldGiveTeddy = v.old_teddy
+					v.old_teddy = nil
+				end
+			end
+		end
 	end or nil,
 })
 
 nzu.RegisterPowerup("DeathMachine", {
-	Name = "Fire Sale",
+	Name = "Death Machine",
 	Model = Model("models/nzu/powerups/deathmachine.mdl"),
 	Color = Color(255,255,100),
 	Duration = 30,
 	DefaultPersonal = true,
 	--Negative = true,
 	Icon = Material("nzombies-unlimited/hud/powerups/deathmachine.png", "unlitgeneric smooth"),
-	Function = SERVER and function()
-
+	Function = SERVER and function(pos, neg, dur, ply)
+		local wep = ply:GiveWeaponInSlot("nzu_deathmachine", "Powerup")
+		wep.nzu_Powerup = "DeathMachine"
+	end or nil,
+	EndFunction = SERVER and function(neg, ply)
+		local wep = ply:GetWeapon("nzu_deathmachine")
+		if IsValid(wep) then
+			wep:Remove()
+		end
 	end or nil,
 })

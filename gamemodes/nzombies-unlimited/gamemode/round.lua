@@ -46,9 +46,13 @@ if SERVER then
 		net.Send(ply)
 	end)
 
-	ROUND.Zombies = ROUND.Zombies or {} -- List
-	ROUND.NumberZombies = ROUND.NumberZombies or 0 -- Count
+	ROUND.Zombies = ROUND.Zombies or {} -- List of zombies that count for the round
+	ROUND.NumberZombies = ROUND.NumberZombies or 0 -- Number of zombies that count for the round currently alive
 	ROUND.ZombiesToSpawn = ROUND.ZombiesToSpawn or 0 -- Zombies still not spawned
+
+	-- Localize
+	local ZOMBIES = ROUND.Zombies
+
 	function ROUND:GetRemainingZombies() return self.NumberZombies + self.ZombiesToSpawn end
 
 	local weightedrandom = nzu.WeightedRandom
@@ -69,23 +73,31 @@ if SERVER then
 	end
 
 	local function dozombieadd(z)
+		ZOMBIES[z] = true -- Register as zombie
+
 		ROUND.NumberZombies = ROUND.NumberZombies + 1
 		ROUND.ZombiesToSpawn = ROUND.ZombiesToSpawn - 1
-		ROUND.Zombies[z] = true
+		z.nzu_RoundOwner = ROUND -- Set what round this zombie belongs to
 	end
 
 	local function dozombiedeath(z)
-		if ROUND.Zombies[z] then
-			if z.nzu_RefundOnDeath then
-				ROUND.ZombiesToSpawn = ROUND.ZombiesToSpawn + 1
+		if ZOMBIES[z] then
+			ZOMBIES[z] = nil
+
+			local round = z.nzu_RoundOwner
+			if round then
+				round.NumberZombies = round.NumberZombies - 1
+				if z.nzu_RefundOnDeath then
+					round.ZombiesToSpawn = round.ZombiesToSpawn + 1
+				end
 			end
-			ROUND.Zombies[z] = nil
-			ROUND.NumberZombies = ROUND.NumberZombies - 1
 
 			hook.Run("nzu_ZombieKilled", z)
 
-			if ROUND:GetRemainingZombies() <= 0 then
-				ROUND:Progress()
+			if round then
+				if round:GetRemainingZombies() <= 0 then
+					round:Progress()
+				end
 			end
 		end
 	end
@@ -93,24 +105,54 @@ if SERVER then
 	hook.Add("EntityRemoved", "nzu_Round_ZombieDeath", dozombiedeath)
 	--hook.Add("EntityRemoved", "nzu_Round_ZombieRemoved", dozombiedeath)
 
-	local ENTITY = FindMetaTable("Entity")
-	function ENTITY:Respawn() -- This respawns the specific zombie by simply restoring health and position
-		if ROUND.Zombies[self] then
-			ROUND:RefundZombie(self) -- ... eeeexcept it doesn't right now. TODO: How to make it just respawn? Spawners might be blocked
-			self:TakeDamage(self:Health(), self, self)
-		end
+	function ROUND:GetZombies()
+		return table.GetKeys(ZOMBIES)
 	end
-	
-	function ROUND:RefundZombie(z) -- "Refunds" a Zombie by making it not count and adding a new zombie to spawn in its place
-		if self.Zombies[z] then
-			ROUND.Zombies[z] = nil
-			self.ZombiesToSpawn = self.ZombiesToSpawn + 1
-			self.NumberZombies = self.NumberZombies - 1
+
+	-- Mark an enemy as a regular zombie. This is used in ROUND:GetZombies() (such as for nukes)
+	function ROUND:RegisterZombie(z)
+		ZOMBIES[z] = true
+	end
+
+	-- ADDS an entity as a zombie to the round. This both registers it AND makes it count for the round, adding +1 to the number of zombies to kill, and associating it with the round
+	function ROUND:AddZombie(z)
+		self:RegisterZombie(z)
+		if not z.nzu_RoundOwner then
+			z.nzu_RoundOwner = self
+			self.NumberZombies = self.NumberZombies + 1
 		end
 	end
 
-	function ROUND:GetZombies()
-		return table.GetKeys(self.Zombies)
+	--[[-------------------------------------------------------------------------
+	Entity utilities
+	---------------------------------------------------------------------------]]
+	local ENTITY = FindMetaTable("Entity")
+
+	-- This respawns the specific zombie by simply restoring health and position
+	function ENTITY:Respawn()
+		self:RefundZombie() -- ... eeeexcept it doesn't right now. TODO: How to make it just respawn? Spawners might be blocked
+		self:TakeDamage(self:Health(), self, self)
+	end
+
+	-- "Refunds" a Zombie by dissociating it with its round controller, and adding +1 to zombies for it to spawn again
+	-- This leaves the zombie still alive, but no longer counting for the round
+	function ENTITY:RefundZombie()
+		if self.nzu_RoundOwner then
+			local round = self.nzu_RoundOwner
+
+			round.ZombiesToSpawn = round.ZombiesToSpawn + 1
+			round.NumberZombies = round.NumberZombies - 1
+
+			self.nzu_RoundOwner = nil
+		end
+	end
+
+	function ENTITY:IsZombie()
+		return ZOMBIES[self]
+	end
+
+	function ENTITY:RegisterAsZombie()
+		ZOMBIES[self] = true
 	end
 
 

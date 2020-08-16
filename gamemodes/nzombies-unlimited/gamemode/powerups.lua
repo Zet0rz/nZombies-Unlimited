@@ -574,6 +574,14 @@ if SERVER then
 			network_terminate(real_id, neg)
 		end
 	end
+
+	function PLAYER:ActivatePowerup(id, dur)
+		nzu.ActivatePowerup(id, self:GetPos(), self, dur)
+	end
+
+	function PLAYER:TerminatePowerup(id)
+		nzu.TerminatePowerup(id, self)
+	end
 else
 	local loopsounds = {}
 	local hiddentimedloopsounds = {}
