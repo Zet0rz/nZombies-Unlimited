@@ -63,11 +63,11 @@ SWEP.nzu_PreventBox = true -- Do not put in the box by default
 	--self.Deploy = self.SpecialDeployKnife
 --end
 
--- This function is called instead of SWEP:Deploy() if the weapon is deployed through a Special Slot keybind
--- This function is NOT called instead of SWEP:Deploy() if the weapon is switched to in ANOTHER means than keybind, even if it is special slot
--- It works by temporarily replacing SWEP:Deploy() with a function that runs this function. This is restored upon switching to any other weapon
--- Access the old SWEP:Deploy() using 'self:nzu_NonSpecialDeploy()'
+-- This function is called instead of SWEP:Deploy() if the weapon is deployed through a Special Slot
+-- It works by replacing SWEP:Deploy() with this function when the weapon is equipped in a special slot. This is restored if the weapon should ever be removed from this slot (but remain equipped)
+-- Access the old SWEP:Deploy() using 'self:NormalDeploy()'
 function SWEP:SpecialDeploy()
+	self.IsQuickSwing = true
 	self:PrimaryAttack()
 end
 
@@ -165,10 +165,11 @@ end
 -- It is predicted and shared from the Think() above
 if NZU_NZOMBIES then
 	function SWEP:OnSwingFinished()
-		if self:IsSpecialDeployed() then
-			if self:SpecialKeyDown() then
-				self.nzu_IsSpecialDeployed = false -- Make it no longer special deployed
-			else
+		if self.IsQuickSwing then
+			self.IsQuickSwing = nil -- This only works on the first swing
+
+			-- If we aren't holding this weapon's special key down, then we go back to our previous weapon
+			if not self:SpecialKeyDown() then
 				self.Owner:SelectPreviousWeapon()
 			end
 		end

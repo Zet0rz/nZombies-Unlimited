@@ -218,9 +218,11 @@ local function activate_powerup(powerup, id, time, dur, real_id, neg, pos, plys)
 			-- Else, it is player-based. We must loop through all players and run it only on those that don't have it personally active
 			else
 				local f = powerup.Function
-				for k,v in pairs(getplayers()) do
-					if not playeractives[v][id] and f then
-						f(pos, neg, v)
+				if f then
+					for k,v in pairs(getplayers()) do
+						if not playeractives[v][id] then
+							f(pos, neg, dur, v)
+						end
 					end
 				end
 			end

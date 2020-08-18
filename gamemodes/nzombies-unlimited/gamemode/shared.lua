@@ -107,7 +107,7 @@ loadfile_s("nzombies-unlimited/core/rooms.lua") -- Only Server outside Sandbox
 --[[-------------------------------------------------------------------------
 Gamemode-specific files
 ---------------------------------------------------------------------------]]
-loadfile_c("hudmanagement.lua")
+loadfile("hudmanagement.lua")
 loadfile("player.lua")
 loadfile("playeruse.lua")
 

@@ -596,3 +596,24 @@ loaded_extensions.core = core
 
 include(extensionpath.."core/settings.lua")
 CompleteSettings(core)
+
+--[[-------------------------------------------------------------------------
+AddCSLuaFile'ing all extensions that could potentially be loaded
+Clients need these when they JOIN, or they won't be able to load them, even if they are dynamically loaded
+It sucks that you have to do this, but that's how it be sometimes
+
+Add all files in all valid extensions that do not start with "sv_"
+Exception is info.lua as this is only needed server side
+---------------------------------------------------------------------------]]
+if SERVER then
+	local _, dirs = file.Find(prefix..extensionpath.."*", searchpath)
+	for k,v in pairs(dirs) do
+		if IsValidExtension(v) then
+			for k2,v2 in pairs(file.Find(prefix..extensionpath..v.."/*.lua", searchpath)) do
+				if v2 ~= "info.lua" and string.sub(v2, 1, 3) ~= "sv_" then
+					AddCSLuaFile(extensionpath..v.."/"..v2)
+				end
+			end
+		end
+	end
+end

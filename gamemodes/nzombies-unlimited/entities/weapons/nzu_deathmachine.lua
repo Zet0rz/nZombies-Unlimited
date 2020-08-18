@@ -7,7 +7,8 @@ SWEP.HoldType = "shotgun"
 
 if SERVER then
 	SWEP.AutoSwitchTo = true
-	SWEP.AutoSwitchFrom = false
+	SWEP.AutoSwitchFrom = true
+	SWEP.Weight = 5
 
 	SWEP.nzu_PreventBox = true
 	SWEP.nzu_DefaultWeaponSlot = "Powerup"
@@ -53,14 +54,14 @@ function SWEP:PrimaryAttack()
 	bullet.TracerName = "AirboatGunHeavyTracer"
 	bullet.Src = shootpos
 	bullet.Dir = shootang + Vector(0,0,0)
-	bullet.Spread = Vector(0.02, 0.02, 0)
+	bullet.Spread = Vector(0.01, 0.01, 0)
 	if SERVER then bullet.Callback = calculatedamage end
 
 	self.Owner:MuzzleFlash()
 	self.Owner:FireBullets(bullet)
 	self:SendWeaponAnim(ACT_VM_PRIMARYATTACK)
 	self.Owner:SetAnimation(PLAYER_ATTACK1)
-	self.Owner:ViewPunch(Angle(math.Rand(-0.5,-0.3), math.Rand(-0.3,0.3), 0 ))
+	--self.Owner:ViewPunch(Angle(math.Rand(-0.5,-0.3), math.Rand(-0.3,0.3), 0 ))
 
 	self:SetNextPrimaryFire(CurTime() + 0.05)
 	self:EmitSound(shootsound)

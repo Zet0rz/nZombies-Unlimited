@@ -577,11 +577,49 @@ local weaponfont_name = "nzu_Font_Bloody_Medium"
 
 local equipmentfont = "nzu_Font_Bloody_Small"
 
--- This special table is the ordered set of all weapons the client is aware of
--- that are equipped in slots with associated keybinds. The results are in order of receival.
--- Each result is a table with two values: Weapon = the weapon, Bind = input.GetKeyName(keybind)
-local hudweapons = nzu.GetOrderedKeybindSlotWeapons()
+--[[-------------------------------------------------------------------------
+hudweapons table
 
+The functions structured in the following section keep track of all weapons the player
+is notified of receiving. Whenever a weapon's slot has a keybind to it, it will
+be added to the hudweapons table. This table then contains the ordered set
+of accessible weapons.
+
+You can copy/paste this if you want a dynamic drawing of keybinds independent of slots
+---------------------------------------------------------------------------]]
+local hudweapons
+
+function HUD:Initialize_KeybindSlots()
+	hudweapons = {}
+	for k,v in pairs(LocalPlayer():GetWeaponSlots()) do
+		if IsValid(v.Weapon) then
+			local keybind = nzu.GetKeybindForWeaponSlot(k)
+			if keybind then
+				table.insert(hudweapons, {Weapon = v.Weapon, Bind = input.GetKeyName(keybind)})
+			end
+		end
+	end
+end
+
+function HUD:Hook_nzu_WeaponEquippedInSlot(ply, wep, slot)
+	local keybind = nzu.GetKeybindForWeaponSlot(slot)
+	if keybind then
+		table.insert(hudweapons, {Weapon = wep, Bind = input.GetKeyName(keybind)})
+	end
+end
+
+function HUD:Hook_nzu_WeaponRemovedFromSlot(ply, wep, slot)
+	for k,v in pairs(hudweapons) do
+		if v.Weapon == wep then
+			table.remove(hudweapons, k)
+			return
+		end
+	end
+end
+
+--[[-------------------------------------------------------------------------
+Painting the HUD
+---------------------------------------------------------------------------]]
 function HUD:Paint_Weapons()
 	local ply = self.Player
 	local w,h = ScrW(),ScrH()

@@ -33,7 +33,7 @@ SWEP.Secondary.Ammo = "none"
 
 -- Grenade-specific values
 SWEP.DeployDelay = 0.2
-SWEP.HolsterDelay = 0.2
+SWEP.HolsterDelay = 0.3
 SWEP.ThrowForce = 1000
 
 SWEP.GrenadeCanCook = true
@@ -193,7 +193,7 @@ end
 -- Sandbox compatibility
 if NZU_NZOMBIES then
 	function SWEP:OnThrowFinished()
-		if self:IsSpecialDeployed() then self.Owner:SelectPreviousWeapon() end
+		self.Owner:SelectPreviousWeapon()
 	end
 	
 	function SWEP:Think()

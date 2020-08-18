@@ -32,6 +32,7 @@ Getters and Utility
 function PLAYER:GetWeaponSlot(slot)
 	return self.nzu_WeaponSlots[slot]
 end
+function PLAYER:GetWeaponSlots() return self.nzu_WeaponSlots end
 
 function PLAYER:GetWeaponInSlot(slot)
 	local slot = self:GetWeaponSlot(slot)
@@ -70,7 +71,9 @@ function WEAPON:GetWeaponSlot()
 	return self.nzu_WeaponSlot
 end
 
-
+function WEAPON:IsAutoWeaponSwitch()
+	return self.nzu_AutoWeaponSwitch
+end
 
 --[[-------------------------------------------------------------------------
 Ammo Supply & Calculations (Max Ammo functions)
@@ -252,7 +255,7 @@ Weapon slots adding, removing, and networking
 ---------------------------------------------------------------------------]]
 local specialslots = {} -- Used for Special Slots (later in this file)
 
-local function doweaponslot(ply, wep, slot)
+local function doweaponslot(ply, wep, slot, autoswitch)
 	local wslot = ply:GetWeaponSlot(slot)
 	if not wslot then
 		wslot = {ID = slot, Weapon = wep}
@@ -265,12 +268,18 @@ local function doweaponslot(ply, wep, slot)
 
 	local id = wslot.ID
 	if specialslots[id] then
+		if wep.SpecialDeploy then
+			wep.NormalDeploy = wep.Deploy
+			wep.Deploy = wep.SpecialDeploy
+		end
+
 		local func = wep["SpecialSlot" .. id] or wep["SpecialSlot"] or specialslots[id]
 		if func then func(wep, ply, id) end
 	end
 
 	-- If the slot can be numerically accessed, auto-switch to it
-	if wslot.Number and IsValid(wep) then
+	if autoswitch or wslot.Number then
+		wep.nzu_AutoWeaponSwitch = true
 		ply:SelectWeaponPredicted(wep)
 	end
 
@@ -283,6 +292,12 @@ local function doremoveweapon(ply, wep)
 		local wslot = ply.nzu_WeaponSlots[slot]
 		if wslot.Weapon == wep then
 			wslot.Weapon = nil
+
+			if specialslots[slot] and wep.NormalDeploy then
+				wep.Deploy = wep.NormalDeploy
+				wep.NormalDeploy = nil
+			end
+
 			hook.Run("nzu_WeaponRemovedFromSlot", ply, wep, slot)
 		end
 	end
@@ -337,23 +352,24 @@ if SERVER then
 		end
 	end
 
-	local function doweaponslotnetwork(ply, wep, slot)
-		wep.nzu_OldWeight = wep.Weight
-		wep.Weight = math.huge -- Ensure this weapon is always selected!
+	local function doweaponslotnetwork(ply, wep, slot, autoswitch)
+		--wep.nzu_OldWeight = wep.Weight
+		--wep.Weight = 999999 -- Ensure this weapon is always selected!
 		ply:StripWeaponSlot(slot)
-		doweaponslot(ply, wep, slot)
+		doweaponslot(ply, wep, slot, autoswitch)
 
 		net.Start("nzu_weaponslot")
 			net.WriteEntity(wep)
 			net.WriteString(slot)
+			net.WriteBool(autoswitch)
 		net.Send(ply)
 	end
-	hook.Add("PostPlayerSwitchWeapon", "nzu_Weapons_RestoreWeight", function(ply, old, new)
+	--[[hook.Add("PostPlayerSwitchWeapon", "nzu_Weapons_RestoreWeight", function(ply, old, new)
 		if new.nzu_OldWeight then
 			new.Weight = new.nzu_OldWeight
 			new.nzu_OldWeight = nil
 		end
-	end)
+	end)]]
 
 	function PLAYER:SetNumericalAccessToWeaponSlot(slot, b)
 		accessweaponslot(self, slot, b)
@@ -364,9 +380,9 @@ if SERVER then
 		net.Send(self)
 	end
 
-	function PLAYER:GiveWeaponInSlot(class, slot, noammo)
+	function PLAYER:GiveWeaponInSlot(class, slot, noammo, autoswitch)
 		local wep = self:Give(class, noammo)
-		if IsValid(wep) then doweaponslotnetwork(self, wep, slot) end
+		if IsValid(wep) then doweaponslotnetwork(self, wep, slot, autoswitch) end
 		return wep
 	end
 
@@ -384,13 +400,14 @@ else
 		local i = net.ReadUInt(16) -- Same as net.ReadEntity()
 		local wep = Entity(i)
 		local slot = net.ReadString()
+		local autoswitch = net.ReadBool()
 
 		if IsValid(wep) then
-			doweaponslot(LocalPlayer(), wep, slot)
+			doweaponslot(LocalPlayer(), wep, slot, autoswitch)
 		else -- If we get networking before the entity is valid, keep an eye out for when it should be ready
 			hook.Add("WeaponEquip", "nzu_WeaponSlot" .. slot, function(wep)
 				if wep:EntIndex() == i then
-					doweaponslot(LocalPlayer(), wep, slot)
+					doweaponslot(LocalPlayer(), wep, slot, autoswitch)
 					hook.Remove("WeaponEquip", "nzu_WeaponSlot" .. slot)
 				end
 			end)
@@ -414,33 +431,16 @@ function nzu.AddKeybindToWeaponSlot(slot, key)
 	keybinds[key] = slot
 end
 
-local maxswitchtime = 3
+function nzu.GetKeybindForWeaponSlot(slot) -- This is NOT efficient! Do not use this in a frequently running hook!
+	for k,v in pairs(keybinds) do
+		if v == slot then return k end
+	end
+end
+
+local maxswitchtime = 5
 function PLAYER:SelectWeaponPredicted(wep)
 	self.nzu_DoSelectWeapon = wep
 	self.nzu_DoSelectWeaponTime = CurTime() + maxswitchtime
-end
-
--- Select the weapon, but mark it as a Special deploy
-function PLAYER:SpecialSelectWeaponPredicted(wep)
-	local w = self.nzu_DoSelectWeaponSpecial
-	if IsValid(w) and w ~= wep then
-		if w.nzu_NonSpecialDeploy then
-			w.Deploy = w.nzu_NonSpecialDeploy
-			w.nzu_NonSpecialDeploy = nil
-		end
-		w.nzu_IsSpecialDeployed = nil
-	end
-
-	self:SelectWeaponPredicted(wep)
-	self.nzu_DoSelectWeaponSpecial = wep
-	wep.nzu_IsSpecialDeployed = true
-
-	if wep.SpecialDeploy then
-		wep.nzu_NonSpecialDeploy = wep.Deploy
-		function wep:Deploy()
-			self:SpecialDeploy()
-		end
-	end
 end
 
 hook.Add("PlayerButtonDown", "nzu_WeaponSwitching_Keybinds", function(ply, but)
@@ -449,13 +449,18 @@ hook.Add("PlayerButtonDown", "nzu_WeaponSwitching_Keybinds", function(ply, but)
 	if slot then
 		-- It is a keybind (special slot)
 		local wep = ply:GetWeaponInSlot(slot)
+		--print(ply.nzu_SpecialWeapon, ply.nzu_SpecialKeyDown, wep, wep.CanSpecialDeploy and wep:CanSpecialDeploy())
 		if IsValid(wep) and (not wep.CanSpecialDeploy or wep:CanSpecialDeploy()) then
-			wep.nzu_SpecialKeyDown = but
-			if IsValid(ply.nzu_SpecialWeapon) then ply.nzu_SpecialWeapon.nzu_SpecialKeyDown = nil end -- Can only use 1 at a time, to make things simple
-			ply.nzu_SpecialKeyDown = but
-			ply.nzu_SpecialWeapon = wep
+			--wep.nzu_SpecialKeyDown = but
+			--if IsValid(ply.nzu_SpecialWeapon) then ply.nzu_SpecialWeapon.nzu_SpecialKeyDown = nil end -- Can only use 1 at a time, to make things simple
+			--ply.nzu_SpecialKeyDown = but
+			--ply.nzu_SpecialWeapon = wep
 
-			ply:SpecialSelectWeaponPredicted(wep)
+			--wep.nzu_PlayerWeaponSwitch = true
+			--ply:SpecialSelectWeaponPredicted(wep)
+
+			wep.nzu_SpecialKeyDown = true
+			ply:SelectWeaponPredicted(wep)
 		end
 
 
@@ -491,24 +496,18 @@ hook.Add("PlayerButtonDown", "nzu_WeaponSwitching_Keybinds", function(ply, but)
 end)
 
 hook.Add("PlayerButtonUp", "nzu_WeaponSwitching_Keybinds", function(ply, but)
-	if ply.nzu_SpecialKeyDown == but then
-		local w = ply.nzu_SpecialWeapon
-		if IsValid(w) then
-			w.nzu_SpecialKeyDown = nil
-			if w.SpecialKeyReleased then w:SpecialKeyReleased() end
+	local slot = keybinds[but]
+	if slot then
+		local wep = ply:GetWeaponInSlot(slot)
+		if IsValid(wep) and wep.nzu_SpecialKeyDown then
+			wep.nzu_SpecialKeyDown = nil
+			if wep.SpecialKeyReleased then wep:SpecialKeyReleased() end
 		end
-
-		ply.nzu_SpecialKeyDown = nil
-		ply.nzu_SpecialWeapon = nil
 	end
 end)
 
 function WEAPON:SpecialKeyDown()
 	return self.nzu_SpecialKeyDown
-end
-
-function WEAPON:IsSpecialDeployed()
-	return self.nzu_IsSpecialDeployed
 end
 
 hook.Add("StartCommand", "nzu_WeaponSwitching", function(ply, cmd)
@@ -532,6 +531,7 @@ hook.Add("StartCommand", "nzu_WeaponSwitching", function(ply, cmd)
 			if wep == ply.nzu_DoSelectWeapon or CurTime() > ply.nzu_DoSelectWeaponTime then
 				ply.nzu_DoSelectWeapon = nil
 				ply.nzu_DoSelectWeaponTime = nil
+				wep.nzu_AutoWeaponSwitch = nil
 			else
 				cmd:SelectWeapon(ply.nzu_DoSelectWeapon)
 			end
@@ -553,6 +553,10 @@ hook.Add("StartCommand", "nzu_WeaponSwitching", function(ply, cmd)
 				w.nzu_IsSpecialDeployed = nil
 			end
 			ply.nzu_DoSelectWeaponSpecial = nil
+		end
+
+		if IsValid(w2) then
+			w2.nzu_AutoWeaponSwitch = nil
 		end
 
 		hook.Run("PostPlayerSwitchWeapon", ply, w2, wep)
@@ -693,7 +697,8 @@ local function defaultkeybindattack(self)
 end
 local function defaultmodify(wep)
 	if not wep.SpecialDeploy then
-		wep.SpecialDeploy = defaultkeybindattack
+		wep.NormalDeploy = wep.Deploy
+		wep.Deploy = defaultkeybindattack
 
 		local oldholster = wep.Holster
 		wep.Holster = function(self)
