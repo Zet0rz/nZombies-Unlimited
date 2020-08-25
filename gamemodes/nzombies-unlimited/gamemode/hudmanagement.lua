@@ -195,21 +195,23 @@ function GM:HUDDrawTargetID()
 		local ent = res.Entity
 		if not IsValid(ent) then return end
 
-		local str = ent:GetNW2String("nzu_TargetIDText") -- This takes priority over all others
+		local str = ent:GetNW2String("nzu_TargetIDText", false) -- This takes priority over all others
 		if str then
 			if str ~= "" then
 				hud:DrawTargetID(str, ent)
 			end
 		else
 			local typ, str, val = hook.Run("nzu_GetTargetIDText", ent)
-			local f = hud["DrawTargetID"..typ]
-			if f then
-				f(hud, str, ent, val)
-			else
-				-- The HUD can also implement this as a hook, but it's probably better to just implement all types you'd translate anyway
-				local str2 = hook.Run("nzu_TranslateTargetID", ent, typ, str, val)
-				if str2 then
-					hud:DrawTargetID(str2, typ, str, ent, val)
+			if typ then
+				local f = hud["DrawTargetID"..typ]
+				if f then
+					f(hud, str, ent, val)
+				else
+					-- The HUD can also implement this as a hook, but it's probably better to just implement all types you'd translate anyway
+					local str2 = hook.Run("nzu_TranslateTargetID", ent, typ, str, val)
+					if str2 then
+						hud:DrawTargetID(str2, typ, str, ent, val)
+					end
 				end
 			end
 		end
@@ -219,7 +221,9 @@ end
 -- Perform the code that will determine based on the entity given what type of Target ID we want to pass on to the HUD
 -- In base, it is given by the function of the entity
 function GM:nzu_GetTargetIDText(ent)
-	return ent.GetTargetIDText and ent:GetTargetIDText()
+	if ent.GetTargetIDText then
+		return ent:GetTargetIDText()
+	end
 end
 
 local generictypes = {

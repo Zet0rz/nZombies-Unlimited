@@ -148,8 +148,6 @@ if SERVER then
 				self.ReturnTime = CurTime() + self:GetReturnDelay()
 			end
 		end
-		
-		self.Finalized = true
 
 		if self.OnFinishedWindup then self:OnFinishedWindup() end -- Let's provide accessibility for other code to add callbacks :)
 	end
@@ -172,6 +170,7 @@ if SERVER then
 
 		if not self.Finalized then
 			self:FinishWindup()
+			self.Finalized = true
 		end
 
 		if self.ReturnTime and self.ReturnTime < CurTime() then

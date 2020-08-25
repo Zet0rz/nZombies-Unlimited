@@ -72,10 +72,19 @@ if SERVER then
 
 	------- Overridables -------
 
-	-- Lets you determine what class of model this zombie is, along with a default
-	-- if it cannot be chosen by the gamemode's Model Packs settings
+	-- Lets you set the model of the zombie. By default, this fetches ENT.Models and randomly picks an entry.
+	-- Later, "nzu_zombie" will get an override for this that fetches models from a Config Setting (Zombie Models setting)
 	function ENT:SelectModel()
-		return "ZombieModels", self.Models
+		local models = self.Models
+		local choice = models[math.random(#models)]
+
+		self:SetModel(choice.Model)
+		if choice.Skin then self:SetSkin(choice.Skin) end
+		if choice.Bodygroups then
+			for k,v in pairs(choice.Bodygroups) do
+				self:SetBodygroup(k,v)
+			end
+		end
 	end
 
 	-- Called after each event to determine its base movement animation
@@ -126,7 +135,7 @@ Targeting
 if SERVER then
 	------- Callables -------
 	function ENT:GetTarget() return self.Target end -- Get the current target
-	function ENT:SetTarget(t) if self:AcceptTarget(t) then self.Target = t return true else return false end end -- Sets the target for the next path update
+	function ENT:SetTarget(t) if t == nil or self:AcceptTarget(t) then self.Target = t return true else return false end end -- Sets the target for the next path update
 	AccessorFunc(ENT, "m_bTargetLocked", "TargetLocked", FORCE_BOOL) -- Stops the Zombie from retargetting and keeps this target while it is valid and targetable
 	function ENT:SetNextRetarget(time) self.NextRetarget = CurTime() + time end -- Sets the next time the Zombie will repath to its target
 	function ENT:Retarget() -- Causes a retarget
@@ -930,20 +939,7 @@ Below here is the base code that you shouldn't override
 function ENT:Initialize()
 	if SERVER then
 		self:SetLagCompensated(true)
-		
-		local m,fallback = self:SelectModel()
-
-		local models = m and nzu.GetResourceSet(m) or fallback
-		local choice = models[math.random(#models)]
-		if not choice then choice = fallback[math.random(#fallback)] end
-		self:SetModel(choice.Model)
-		if choice.Skin then self:SetSkin(choice.Skin) end
-		if choice.Bodygroups then
-			for k,v in pairs(choice.Bodygroups) do
-				self:SetBodygroup(k,v)
-			end
-		end
-
+		self:SelectModel()
 		self:SetCollisionBounds(self.CollisionMins, self.CollisionMaxs)
 
 		self:SetNextRepath(0)
@@ -1006,44 +1002,46 @@ if SERVER then
 			end
 
 			if not IsValid(self.Target) then
+				self.Path = nil
 				self:OnNoTarget()
-			end
+			else
+				local path = self.Path
+				if not path then
+					self:InitializePath()
+					path = self.Path
+				elseif not IsValid(path) then -- We reached the goal, or path terminated for another reason
+					self:OnPathEnd()
 
-			local path = self.Path
-			if not path then
-				self:InitializePath()
-				path = self.Path
-			elseif not IsValid(path) then -- We reached the goal, or path terminated for another reason
-				self:OnPathEnd()
+					if not IsValid(self.Target) or not self:AcceptTarget(self.Target) then
+						self:Retarget() -- Retarget on path end if the previous target is no longer valid
+						if not IsValid(self.Target) or not self:AcceptTarget(self.Target) then continue end
+					end
 
-				if not IsValid(self.Target) or not self:AcceptTarget(self.Target) then
-					self:Retarget() -- Retarget on path end if the previous target is no longer valid
-					if not IsValid(self.Target) or not self:AcceptTarget(self.Target) then continue end
+					-- Recompute the path
+					path:Compute(self, self:GetTargetPosition(), self.ComputePath)
+					self:SetNextRepath(self:CalculateNextRepath(path))
 				end
 
-				-- Recompute the path
-				path:Compute(self, self:GetTargetPosition(), self.ComputePath)
-				self:SetNextRepath(self:CalculateNextRepath(path))
-			end
-
-			if path:GetAge() >= self.NextRepath then
-				if not IsValid(self.Target) then
-					self:SetNextRetarget(0) -- Retarget next cycle
-					coroutine.yield()
-					continue
+				if path:GetAge() >= self.NextRepath then
+					if not IsValid(self.Target) then
+						self:SetNextRetarget(0) -- Retarget next cycle
+						coroutine.yield()
+						continue
+					end
+					path:Compute(self, self:GetTargetPosition(), self.ComputePath)
+					self:SetNextRepath(self:CalculateNextRepath(path))
 				end
-				path:Compute(self, self:GetTargetPosition(), self.ComputePath)
-				self:SetNextRepath(self:CalculateNextRepath(path))
-			end
-			-- DEBUG
-			--path:Draw()
-			path:Update(self)
-			if self:IsStuck() then self:HandleStuck() end
+				-- DEBUG
+				--path:Draw()
+				path:Update(self)
+				if self:IsStuck() then self:HandleStuck() end
 
-			if not self.NextSound or self.NextSound < CurTime() then
-				self:Sound()
+				if not self.NextSound or self.NextSound < CurTime() then
+					self:Sound()
+				end
+
+				self:AI()
 			end
-			self:AI()
 
 			coroutine.yield()
 		end

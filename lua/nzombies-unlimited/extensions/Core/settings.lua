@@ -61,9 +61,6 @@ EXT.Settings = {
 	-- Mystery Box settings
 	["MysteryBoxWeapons"] = {
 		Type = "WeightedWeaponList",
-		Notify = function(val, key, ext)
-			--if NZU_NZOMBIES then timer.Simple(0.1, function() ext.ReloadModelsList() end) end
-		end,
 		Label = "Mystery Box Weapons",
 		Order = 100,
 	},

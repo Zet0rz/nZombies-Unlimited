@@ -3,8 +3,8 @@ game.AddParticles("particles/mysterybox.pcf")
 PrecacheParticleSystem("mysterybox_beam")
 PrecacheParticleSystem("mysterybox_roll")
 
-local SETTINGS = nzu.GetExtension("core").Settings
-local baseweapons -- built-in weapons if reloaded
+local SETTINGS = nzu.GetExtension("core")
+local weaponpool -- The table of weapons. This will be the settings if it is non-empty, otherwise it will be a base generated list from installed weapons
 local weaponmodels -- Cache of the list of world models for each weapon
 
 local function reloadweaponmodels(weps)
@@ -23,10 +23,10 @@ local function reloadweaponmodels(weps)
 	nzu.NetworkPrecacheWeaponModels(weps)
 end
 
-local function reloadbaseweapons()
-	baseweapons = {}
+local function getbaseweapons()
+	local baseweapons = {}
 	for k,v in pairs(weapons.GetList()) do
-		local wep = weapons.GetStored(v.ClassName)
+		local wep = weapons.Get(v.ClassName)
 		if wep and wep.Spawnable and not wep.nzu_PreventBox and not wep.NZPreventBox then
 			local model = wep.WM or wep.WorldModel
 			if model and model ~= "" then
@@ -38,7 +38,7 @@ local function reloadbaseweapons()
 end
 
 function nzu.GetMysteryBoxWeaponPool()
-	return SETTINGS.MysteryBoxWeapons or baseweapons or reloadbaseweapons()
+	return weaponpool
 end
 
 function nzu.GetMysteryBoxModelPool()
@@ -46,9 +46,11 @@ function nzu.GetMysteryBoxModelPool()
 end
 
 function nzu.ReloadMysteryBoxWeaponPool()
-	baseweapons = nil -- Reset base weapons. This will cause a reload if SETTINGS was empty.
-	reloadweaponmodels(nzu.GetMysteryBoxWeaponPool()) -- Reload model list to the weapon pool
+	weaponpool = table.IsEmpty(SETTINGS.MysteryBoxWeapons) and getbaseweapons() or SETTINGS.MysteryBoxWeapons
+	reloadweaponmodels(weaponpool) -- Reload model list to the weapon pool
 end
+SETTINGS.OnMysteryBoxWeaponsChanged = nzu.ReloadMysteryBoxWeaponPool -- Reload the weapons whenever the setting is changed
+nzu.ReloadMysteryBoxWeaponPool() -- Also reload to begin with
 
 -- Get the mystery box pool for a specific player. This runs a hook to allow manipulation
 function nzu.GetMysteryBoxWeaponPoolFor(ply)
@@ -70,6 +72,7 @@ function nzu.CreateMysteryBox(spawnpoint, ang)
 	if IsValid(point) and IsValid(point:GetMysteryBox()) then return end
 
 	local e = ents.Create("nzu_mysterybox")
+	--e:Spawn()
 	e:Appear(point, ang) -- Pass ang if you want to spawn it on a position (which also then needs an angle)
 	return e
 end

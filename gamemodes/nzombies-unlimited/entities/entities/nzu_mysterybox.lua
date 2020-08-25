@@ -8,10 +8,16 @@ ENT.Author = "Zet0r"
 ENT.AutomaticFrameAdvance = true
 ENT.RenderGroup = RENDERGROUP_OPAQUE
 
+game.AddParticles("particles/nzombies-unlimited/mysterybox.pcf")
+PrecacheParticleSystem("mysterybox_beam")
+PrecacheParticleSystem("mysterybox_roll")
+
 -- You can override these in a subclass entity (with a different model for example)
 ENT.BeamColor = Color(150, 200, 255)
 
 if SERVER then
+	AddCSLuaFile()
+
 	-- Only server needs to know sequences, models and sounds
 	ENT.Model = Model("models/nzu/mysterybox/nzu_mystery_box.mdl")
 	ENT.OpenAnimation = "box_open"
@@ -19,7 +25,7 @@ if SERVER then
 	ENT.DisappearAnimation = "box_leave"
 	ENT.AppearAnimation = "box_arrive"
 
-	ENT.TeddyModel = Model("models/weapons/w_rif_m4a1.mdl")
+	ENT.TeddyModel = Model("models/nzu/mysterybox/teddybear.mdl")
 	ENT.TeddySound = Sound("nzu/mysterybox/child.wav")
 
 	ENT.OpenSound = Sound("nzu/mysterybox/open.wav")
@@ -49,18 +55,50 @@ function ENT:Initialize()
 		self:SetTimesUsed(0)
 	end
 
-	if not self:GetIsReady() then
+	--[[if not self:GetIsReady() then
 		self.FirstReady = true
 	else
 		self:CreateBeam()
-	end
+	end]]
 end
 
 function ENT:SetupDataTables()
 	self:NetworkVar("Bool", 0, "IsReady")
 	self:NetworkVar("Int", 0, "Price")
 	self:NetworkVar("Bool", 1, "IsOpen")
+
+	self:NetworkVarNotify("IsReady", self.OnReadyChanged)
+	self:NetworkVarNotify("IsOpen", self.OnOpenChanged)
 end
+
+function ENT:OnReadyChanged(_, old, new)
+	if new then
+		self:CreateBeam()
+		--self:OnReady()
+	else
+		self:RemoveBeam()
+		--self:OnUnready()
+	end
+end
+
+function ENT:OnOpenChanged(_, old, new)
+	if new then
+		self:CreateOpenEffect()
+		--self:OnOpen()
+	else
+		self:RemoveOpenEffect()
+		if self.DoRemoveOnClose then
+			self:Remove()
+		end
+		--self:OnClosed()
+	end
+end
+
+-- Overridable. These are shared, however arguments (such as who opened it) do not exist for these callbacks
+--function ENT:OnReady() end
+--function ENT:OnUnready() end
+--function ENT:OnOpen() end
+--function ENT:OnClosed() end
 
 if SERVER then
 	AccessorFunc(ENT, "m_iTimesUsed", "TimesUsed", FORCE_NUMBER)
@@ -69,7 +107,7 @@ if SERVER then
 	AccessorFunc(ENT, "m_bIsTeddy", "IsTeddy", FORCE_BOOL)
 
 	function ENT:Use(activator)
-		if self:GetIsReady() and IsValid(activator) and activator:IsPlayer() then
+		if self:GetIsReady() and not self:GetIsOpen() and IsValid(activator) and activator:IsPlayer() then
 			activator:Buy(self:GetPrice(), function(ply, box)
 				box:Open(ply)
 			end, self)
@@ -80,7 +118,7 @@ if SERVER then
 		local b = hook.Run("nzu_MysteryBox_OverrideTeddy", self, ply)
 		if b == nil then
 			local r = math.random()
-			local t = box:GetTimesUsed()
+			local t = self:GetTimesUsed()
 			local ch = t > 12 and 0.5 or t > 8 and 0.3 or 0.15 -- 50% over 12 uses, 30% 8-12 uses, 15% under 8 uses
 
 			b = r < ch
@@ -113,8 +151,8 @@ if SERVER then
 	end
 
 	function ENT:Open(ply)
-		if not self:GetIsReady() then return end
-		self:SetIsReady(false) -- Cannot be used!
+		if not self:GetIsReady() or self:GetIsOpen() then return end
+		--self:SetIsReady(false) -- Cannot be used!
 		self:SetCurrentUser(ply)
 		self:SetTimesUsed(self:GetTimesUsed() + 1)
 
@@ -122,7 +160,7 @@ if SERVER then
 		self:ResetSequence(seq)
 		self:EmitSound(self.OpenSound)
 
-		local wep = ents.Create("nzu_mysterybox_weapon")
+		local wep = ents.Create("nzu_weaponwindup")
 		wep:SetParent(self)
 		wep:SetLocalPos(Vector(0,0,0))
 		wep:SetLocalAngles(Angle(0,0,0))
@@ -132,6 +170,11 @@ if SERVER then
 		wep:SetModelPool(nzu.GetMysteryBoxModelPool())
 		wep:SetPlayer(ply)
 		wep.MysteryBox = self
+
+		-- The weapon's windup data
+		wep:SetWindupVelocity(Vector(0,0,8))
+		wep:SetReturnDelay(5)
+		wep:SetWindupTime(4)
 
 		if self:ShouldGiveTeddy(ply) and self:ReserveSpawnpoint() then
 			wep:SetChosenWeapon("") -- Nothing, we do our own overrides here
@@ -154,9 +197,7 @@ if SERVER then
 		wep:EmitSound(self.JingleSound)
 
 		self.Weapon = wep
-
 		self:SetIsOpen(true) -- This also triggers CreateOpenEffects on clients
-		self:CreateOpenEffect()
 	end
 
 	function ENT:Close()
@@ -166,10 +207,13 @@ if SERVER then
 		local seq,dur = self:LookupSequence(self.CloseAnimation)
 		self:ResetSequence(seq)
 		self:EmitSound(self.CloseSound)
-		self.ReadyTime = CurTime() + dur
+		--self.ReadyTime = CurTime() + dur
 
-		self:SetIsOpen(false)
-		self:RemoveOpenEffect()
+		timer.Simple(dur, function()
+			if IsValid(self) then
+				self:SetIsOpen(false)
+			end
+		end)
 	end
 
 	-- This function's a bit funny. It is actually never called on the box. Instead, it is given to the Windup entity
@@ -179,30 +223,39 @@ if SERVER then
 			self:GetPlayer():GivePoints(self.nzu_RefundCost, "MysteryBoxRefund")
 		end
 
+		self:SetLocalVelocity(Vector(0,0,0))
 		self:EmitSound(self.MysteryBox.TeddySound)
 		self:SetModel(self.MysteryBox.TeddyModel)
+		self:RotateToModel()
 
 		self.ReturnTime = CurTime() + 2
 		self.RemoveTime = CurTime() + 5
 		self:SetWindupVelocity(Vector(0,0,-35)) -- This makes it so that it thinks "returning" means flying up by this distance
 
 		self.OnRemove = function(s)
-			self.MysteryBox:Disappear() -- Instead of close, and whether or not it is open
 			self.MysteryBox.Weapon = nil
+			self.MysteryBox:Disappear() -- Instead of close, and whether or not it is open
+			timer.Simple(2, function() nzu.Announcer("mysterybox/leave") end)
 		end
 	end
 
 	-- Back to the box being self
 	function ENT:Disappear()
+		if IsValid(self.Weapon) then self.Weapon:Remove() end
 		self:SetIsOpen(false)
+		self:SetIsReady(false)
+
 		local seq,dur = self:LookupSequence(self.DisappearAnimation)
 		self:ResetSequence(seq)
+
 		self:EmitSound(self.DisappearSound)
+		timer.Simple(dur - 2.5, function()
+			if IsValid(self) then self:EmitSound(self.WhooshSound) end
+		end)
 
 		self.MoveTime = CurTime() + dur
 		self.Weapon = nil -- So it doesn't close us on its own removal
 
-		timer.Simple(3, function() nzu.Announcer("mysterybox/leave") end)
 		self:OnDisappear(dur)
 	end
 
@@ -225,24 +278,28 @@ if SERVER then
 		local seq,dur = self:LookupSequence(self.AppearAnimation)
 		self:ResetSequence(seq)
 		self:EmitSound(self.AppearSound)
-		self.ReadyTime = CurTime() + dur
+		--self.ReadyTime = CurTime() + dur
 
-		self:OnAppeared(dur)
-	end
-
-	-- When it first appears. Dur is the duration of the appear animation
-	function ENT:OnAppear(dur)
+		self:OnAppear(dur)
 		timer.Simple(dur - 0.2, function()
 			if IsValid(self) then self:EmitSound(self.LandSound) end
 		end)
+
+		timer.Simple(dur, function()
+			if IsValid(self) then
+				self:SetIsReady(true)
+				self:OnAppeared()
+			end
+		end)
 	end
+
+	-- When it first appears. Dur is the duration of the appear animation
+	function ENT:OnAppear(dur) end
 	function ENT:OnAppeared() end -- When it has fully appeared
 
 	-- When it first disappears. Dur is the duration of the disappear animation
 	function ENT:OnDisappear(dur) end
-	function ENT:OnDisappeared() -- When it has fully disappeared
-		sound.Play(self.WhooshSound, self:GetPos(), 100, 100, 1)
-	end
+	function ENT:OnDisappeared() end -- When it has fully disappeared
 
 	function ENT:Move(newpoint)
 		local target = newpoint
@@ -290,21 +347,13 @@ if SERVER then
 	function ENT:Think()
 		if self.ReadyTime and self.ReadyTime < CurTime() then
 			self.ReadyTime = nil
-			if self.nzu_RemoveOnClose then
-				self:Remove()
-			else
-				self:SetIsReady(true)
-				if self.FirstReady then
-					self:CreateBeam()
-					self.FirstReady = nil
-
-					self:OnAppeared()
-				end
-			end
+			self:SetIsReady(true)
+			self:OnAppeared()
 		end
 
 		if self.MoveTime and self.MoveTime < CurTime() then
 			self:Move()
+			self.MoveTime = nil
 		end
 
 		self:NextThink(CurTime())
@@ -324,34 +373,15 @@ if SERVER then
 	end
 
 	function ENT:RemoveOnClose()
-		if self:GetIsReady() then
-			self:Remove()
+		if self:GetIsOpen() then
+			self.DoRemoveOnClose = true
 		else
-			self.nzu_RemoveOnClose = true
+			self:Remove()
 		end
 	end
 
 	function ENT:UpdateTransmitState() return TRANSMIT_ALWAYS end -- Always be valid on clients
-else
-	function ENT:Think()
-		if self.FirstReady and self:GetIsReady() then
-			self:CreateBeam()
-			self.FirstReady = nil
-		end
-
-		if self:GetIsOpen() ~= self.IsOpen then
-			self.IsOpen = self:GetIsOpen()
-			if self.IsOpen then
-				self:CreateOpenEffect()
-			else
-				self:RemoveOpenEffect()
-			end
-		end
-
-		--self:NextThink(CurTime())
-		return true
-	end
-
+else -- CLIENT
 	function ENT:Draw()
 		self:DrawModel()
 
@@ -359,10 +389,10 @@ else
 			self:DrawBoxOpenFill() -- You can override the effect here
 		end
 	end
-	function ENT:DrawTranslucent() end
+	ENT.DrawTranslucent = ENT.Draw
 	
 	function ENT:GetTargetIDText()
-		if self:GetIsReady() then
+		if self:GetIsReady() and not self:GetIsOpen() then
 			return "Buy", "Random Weapon",  self:GetPrice()
 		end
 	end
