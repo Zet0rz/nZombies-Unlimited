@@ -58,23 +58,23 @@ if CLIENT then
 end
 
 if SERVER then
-	-- TODO: Change the structure of this so that a subclass implementation doesn't inheret this table too
-	ENT.Models = {
+	
+	-- This is an example of how the Models table is defined (A Model, an optional Skin, and an optional set of Bodygroups)
+	--[[ENT.Models = {
 		{Model = "models/nzu/nzombie_honorguard.mdl", Skin = 0, Bodygroups = {0,0}},
 		{Model = "models/nzu/nzombie_honorguard.mdl", Skin = 0, Bodygroups = {0,1}},
-	}
+	}]]
 
 	-- This should be the same as the model bounds to prevent the player from getting stuck in the zombie moving into us
 	ENT.CollisionMins = Vector(-13,-13,0)
 	ENT.CollisionMaxs = Vector(13,13,72)
 
-
-
 	------- Overridables -------
 
 	-- Lets you set the model of the zombie. By default, this fetches ENT.Models and randomly picks an entry.
 	-- Later, "nzu_zombie" will get an override for this that fetches models from a Config Setting (Zombie Models setting)
-	function ENT:SelectModel()
+	-- Extend this base if you want a generic solid Zombie NPC base, extend "nzu_zombie" if you want a normal zombie-like entity (like the skeletons in Der Eisendrache)
+	function ENT:UpdateModel()
 		local models = self.Models
 		local choice = models[math.random(#models)]
 
@@ -87,11 +87,26 @@ if SERVER then
 		end
 	end
 
-	-- Called after each event to determine its base movement animation
-	-- This could be dependant on the zombie's movement speed
-	-- It is called whenever an event is done and the zombie returns to normal movement
-	function ENT:SelectMovementSequence()
-		return self.MovementSequence
+	-- 
+	function ENT:UpdateMovementSequences()
+		if self.SequenceTables then
+			local t
+			if self.SpeedBasedSequences then
+				for k,v in pairs(self.SequenceTables) do
+					if v.Threshold and v.Threshold > self.DesiredSpeed then break end
+					t = v
+				end
+			else
+				t = self.SequenceTables[math.random(#self.SequenceTables)]
+			end
+
+			if t then
+				local seqs = t.Sequences[1] and t.Sequences[math.random(#t.Sequences)] or t.Sequences -- If Sequences is a numerical table, pick a random one (supports random selection)
+				for k,v in pairs(seqs) do
+					self[k] = v[math.random(#v)] -- Pick a random entry
+				end
+			end
+		end
 	end
 
 	-- Called by the round when the Zombie spawns
@@ -105,7 +120,11 @@ if SERVER then
 	-- You can use this to modify the zombie's behavior based on its speed
 	-- Note: This isn't it's actual speed, but rather its desired speed
 	-- In any normal circumstance, this is only called on spawn (but any ENT:SetDesiredSpeed call will ping this too)
-	function ENT:SpeedChanged(speed) end
+	function ENT:SpeedChanged(speed)
+		if self.SpeedBasedSequences then
+			self:UpdateMovementSequences()
+		end
+	end
 
 	-- Called by the round when the Zombie should have its health set
 	-- It is given the curve-based health from Round as an argument
@@ -210,8 +229,7 @@ if SERVER then
 
 	-- Returns to normal movement sequence. Call this in events where you want to MoveToPos after an animation
 	function ENT:ResetMovementSequence()
-		local seq = self:SelectMovementSequence()
-		self:ResetSequence(seq)
+		self:ResetSequence(self.MovementSequence)
 	end
 
 	-- Simple, get the current goal position of the path, including tolerance
@@ -271,17 +289,17 @@ if SERVER then
 	-- Setting to 0 will make the Zombie unable to move while attacking (only attack on full Path end)
 	ENT.MovementAttackRange = 0.5
 
-	-- List of different attack sequences, and the cycle at which they impact
+	-- List of different attack sequences, and the cycle at which they impact (Example table)
 	-- Impacts are in cycle (0-1), the percentage through the sequence
 	-- It may contain multiple entries, at which point the Zombie will hit multiple times
 	-- They must be sequential.
 	-- These are also used for ENT:DoAttackFunction(), only first if 'multihit' is not true
-	ENT.AttackSequences = {
+	--[[ENT.AttackSequences = {
 		{Sequence = "swing", Impacts = {0.5}}
-	}
+	}]]
 
-	-- List of attack sounds
-	ENT.AttackSounds = {
+	-- List of attack sounds (Example table)
+	--[[ENT.AttackSounds = {
 		Sound("nzu/zombie/attack/attack_00.wav"),
 		Sound("nzu/zombie/attack/attack_01.wav"),
 		Sound("nzu/zombie/attack/attack_02.wav"),
@@ -298,7 +316,7 @@ if SERVER then
 		Sound("nzu/zombie/attack/attack_13.wav"),
 		Sound("nzu/zombie/attack/attack_14.wav"),
 		Sound("nzu/zombie/attack/attack_15.wav"),
-	}
+	}]]
 
 	------- Callables -------
 
@@ -312,27 +330,19 @@ if SERVER then
 	-- Perform an attack
 	-- It selects an attack animation and plays it, dealing damage during its moments of impact
 	-- A damage info can be passed, otherwise a default is created
-	function ENT:AttackTarget(target, dmg, move)
+	function ENT:AttackTarget(target, move)
 		if not self:GetBlockAttack() and IsValid(target) then
-		
-			local tbl = {}
-			if not dmg then
-				tbl.Damage = self.AttackDamage
-				tbl.Type = DMG_SLASH
-			else
-				tbl.Damage = dmg:GetDamage()
-				tbl.Type = dmg:GetDamageType()
-				tbl.Force = dmg:GetDamageForce()
-			end
 
 			-- Perform the attack with the function of hurting the target!
 			if move then
 				self:DoMovingAttackFunction(target, function(self, target)
 					if self:GetRangeTo(target) <= self.AttackRange then
 						local dmg = DamageInfo()
-						dmg:SetDamage(tbl.Damage)
-						dmg:SetDamageType(tbl.Type)
-						if tbl.Force then dmg:SetDamageForce(tbl.Force) end
+						dmg:SetDamage(self.AttackDamage)
+						dmg:SetDamageType(DMG_SLASH)
+						local dir = (target:GetPos() - self:GetPos())
+						dmg:SetDamageForce(dir:GetNormalized() * 10)
+						dmg:SetDamagePosition(target:GetPos())
 						dmg:SetAttacker(self)
 						dmg:SetInflictor(self)
 						
@@ -343,9 +353,11 @@ if SERVER then
 				self:DoAttackFunction(target, function(self, target)
 					if self:GetRangeTo(target) <= self.AttackRange then
 						local dmg = DamageInfo()
-						dmg:SetDamage(tbl.Damage)
-						dmg:SetDamageType(tbl.Type)
-						if tbl.Force then dmg:SetDamageForce(tbl.Force) end
+						dmg:SetDamage(self.AttackDamage)
+						dmg:SetDamageType(DMG_SLASH)
+						local dir = (target:GetPos() - self:GetPos())
+						dmg:SetDamageForce(dir:GetNormalized() * 10)
+						dmg:SetDamagePosition(target:GetPos())
 						dmg:SetAttacker(self)
 						dmg:SetInflictor(self)
 						
@@ -370,7 +382,7 @@ if SERVER then
 		self:SetPlaybackRate(speed)
 
 		-- Play the attack sound (which also stops further calls to ENT:Sound() until it is done + delay)
-		self:PlaySound(self.AttackSounds[math.random(#self.AttackSounds)])
+		if self.AttackSounds then self:PlaySound(self.AttackSounds[math.random(#self.AttackSounds)]) end
 
 		if multihit then
 			-- Support using multiple hit times
@@ -406,7 +418,7 @@ if SERVER then
 		self:SetPlaybackRate(speed)
 
 		-- Play the attack sound (which also stops further calls to ENT:Sound() until it is done + delay)
-		self:PlaySound(self.AttackSounds[math.random(#self.AttackSounds)])
+		if self.AttackSounds then self:PlaySound(self.AttackSounds[math.random(#self.AttackSounds)]) end
 
 		local options = options or {}
 		local compute = self.ComputePath
@@ -484,7 +496,7 @@ if SERVER then
 	------- Fields -------
 
 	-- A list of sounds to play on death
-	ENT.DeathSounds = {
+	--[[ENT.DeathSounds = {
 		Sound("nzu/zombie/death/death_00.wav"),
 		Sound("nzu/zombie/death/death_01.wav"),
 		Sound("nzu/zombie/death/death_02.wav"),
@@ -496,7 +508,7 @@ if SERVER then
 		Sound("nzu/zombie/death/death_08.wav"),
 		Sound("nzu/zombie/death/death_09.wav"),
 		Sound("nzu/zombie/death/death_10.wav"),
-	}
+	}]]
 	
 	-- The amount of force to skip the death animation and do a ragdoll instead
 	-- Set to 0 to always ragdoll, -1 to never
@@ -504,7 +516,7 @@ if SERVER then
 	
 	-- A table of death animations. Will play if the force of the damage is below ENT.DeathRagdollForce
 	-- Default: nil (since the base always ragdolls)
-	ENT.DeathAnimations = nil
+	--ENT.DeathAnimations = nil
 
 	------- Callables -------
 
@@ -540,10 +552,11 @@ if SERVER then
 
 	-- Select a spawn sequence and sound to play. This is called after everything is initialized
 	-- so it can be made dependant on certain properties defined on spawning
+	-- If ENT.SpawnSequence is a table, we pick a random one
 	function ENT:SelectSpawnSequence()
 		local s
 		if self.SpawnSounds then s = self.SpawnSounds[math.random(#self.SpawnSounds)] end
-		return self.SpawnSequence, s
+		return type(self.SpawnSequence) == "table" and self.SpawnSequence[math.random(#self.SpawnSequence)] or self.SpawnSequence, s
 	end
 
 	-- Perform the actual spawn. This can be overwritten if you want to do something COMPLETELY
@@ -563,14 +576,13 @@ Similar to attacks, these are just fields along with a SelectVault function
 ---------------------------------------------------------------------------]]
 if SERVER then
 	------- Fields -------
-	ENT.VaultSequence = "nz_barricade_walk_1" -- What animation to vault with
-	ENT.VaultSpeed = 30 -- How fast the zombie moves over the vault
+	--ENT.VaultSequence = {Sequence = "nz_barricade_walk_1", Speed = 30} -- What animation to vault with
 
 	------- Overridables -------
-
 	-- Select a vault sequence based on the target location
 	function ENT:SelectVaultSequence(pos)
-		return self.VaultSequence, self.VaultSpeed
+		local seq = self.VaultSequence[1] and self.VaultSequence[math.random(#self.VaultSequence)] or self.VaultSequence
+		return seq.Sequence, seq.Speed
 	end
 end
 
@@ -593,7 +605,7 @@ if SERVER then
 		if mask then
 			self:SetSolidMask(mask)
 			self.EventMask = true
-			else
+		else
 			self:SetSolidMask(MASK_NPCSOLID)
 			self.EventMask = nil
 		end
@@ -614,7 +626,7 @@ if SERVER then
 	-- We do a moving attack if the target is a player
 	function ENT:Event_Attack(target)
 		local t = target or self.Target
-		self:AttackTarget(t, nil, t:IsPlayer())
+		self:AttackTarget(t, t:IsPlayer())
 	end
 
 	-- Perform a basic vault to a target position
@@ -876,18 +888,19 @@ you need to play those yourself in your functions (see Attack section for exampl
 ---------------------------------------------------------------------------]]
 if SERVER then
 	------- Fields -------
-	ENT.SoundDelayMin = 1
-	ENT.SoundDelayMax = 3
+	ENT.SoundDelayMin = 2
+	ENT.SoundDelayMax = 4
+	ENT.BehindSoundDistance = 0 -- The distance to a target where we will play "behind sounds" instead (0 = disable). This requires ENT.BehindSounds to be set
 
-	-- Sounds that play through the AI
-	ENT.PassiveSounds = {
+	-- Sounds that play through the AI (Example commented out table)
+	--[[ENT.PassiveSounds = {
 		Sound("nzu/zombie/amb/amb_00.wav"),
 		Sound("nzu/zombie/amb/amb_01.wav"),
 		Sound("nzu/zombie/amb/amb_02.wav"),
 		Sound("nzu/zombie/amb/amb_03.wav"),
 		Sound("nzu/zombie/amb/amb_04.wav"),
 		Sound("nzu/zombie/amb/amb_05.wav"),
-	}
+	}]]
 
 	------- Callables -------
 
@@ -906,11 +919,24 @@ if SERVER then
 
 	------- Overridables -------
 
-	-- Perform sound play logic. If you want to play sounds based on other logic (such as distance or target)
-	-- you'll overwrite this function. This is called repeatedly once the delay of a PlaySound is over
-	-- Default: Play a random sound from the PassiveSounds table
+	-- Perform sound play logic. This is called repeatedly once the delay of a PlaySound is over
+	-- If BehindSoundDistance is set to an above-0 value, when the zombie is within this range to its target and that target is a player
+	-- then it will instead play a sound from ENT.BehindSounds, at a louder level
+	-- Otherwise it will play one from PassiveSounds if that exists
+
 	function ENT:Sound()
-		self:PlaySound(self.PassiveSounds[math.random(#self.PassiveSounds)])
+		if self.BehindSoundDistance > 0 -- We have enabled behind sounds
+			and IsValid(self.Target)
+			and self.Target:IsPlayer() -- We have a target and it's a player within distance
+			and self:GetRangeTo(self.Target) <= self.BehindSoundDistance
+			and (self.Target:GetPos() - self:GetPos()):GetNormalized():Dot(self.Target:GetAimVector()) >= 0 then -- If the direction towards the player is same 180 degree as the player's aim (away from the zombie)
+				self:PlaySound(self.BehindSounds[math.random(#self.BehindSounds)], SNDLVL_140) -- Play the behind sound, and a bit louder!
+		elseif self.PassiveSounds then
+			self:PlaySound(self.PassiveSounds[math.random(#self.PassiveSounds)])
+		else
+			-- We still delay by max sound delay even if there was no sound to play
+			self.NextSound = CurTime() + self.SoundDelayMax
+		end
 	end
 end
 
@@ -939,7 +965,7 @@ Below here is the base code that you shouldn't override
 function ENT:Initialize()
 	if SERVER then
 		self:SetLagCompensated(true)
-		self:SelectModel()
+		self:UpdateModel()
 		self:SetCollisionBounds(self.CollisionMins, self.CollisionMaxs)
 
 		self:SetNextRepath(0)
@@ -951,6 +977,7 @@ function ENT:Initialize()
 		self.loco:SetMaxYawRate(self.MaxYawRate)
 		self.loco:SetStepHeight(self.StepHeight)
 
+		if not self.SpeedBasedSequences then self:UpdateMovementSequences() end -- If SpeedBasedSequences WAS true, it would do this in SpeedChanged (unless overwritten)
 		self:SetAlive(true)
 	end
 

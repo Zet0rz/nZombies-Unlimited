@@ -16,6 +16,12 @@ This is also the spawnable entity of the main Zombie type
 ---------------------------------------------------------------------------]]
 if CLIENT then return end -- Client doesn't really need anything beyond the basics
 
+-- Models this zombie can use. Later, this will instead fetch from Config Settings (when Zombie Models is introduced)
+ENT.Models = {
+	{Model = "models/nzu/nzombie_honorguard.mdl", Skin = 0, Bodygroups = {0,0}},
+	{Model = "models/nzu/nzombie_honorguard.mdl", Skin = 0, Bodygroups = {0,1}},
+}
+
 ENT.DeathRagdollForce = 1000
 ENT.DeathAnimations = {
 	"nz_death_1",
@@ -99,13 +105,12 @@ local runsounds = {
 	Sound("nzu/zombie/sprint/sprint_08.wav"),
 }
 
-ENT.MaxSpeed = 600
-ENT.AnimTables = {
-	-- 1: Arms Down
-	[1] = {
-		-- Slowest speed, arms down (ad)
-		{Threshold = 0,
-			SpawnSequence = spawnslow,
+ENT.MaxSpeed = 300
+ENT.SpeedBasedSequences = true
+ENT.SequenceTables = {
+	{Threshold = 0, Sequences = {
+		{
+			SpawnSequence = {spawnslow},
 			MovementSequence = {
 				"nz_walk_ad1",
 				"nz_walk_ad2",
@@ -122,78 +127,12 @@ ENT.AnimTables = {
 				"nz_walk_ad24",
 				"nz_walk_ad25",
 			},
-			AttackSequences = attack_walk_ad,
-			VaultSequence = vault_walk,
-			PassiveSounds = walksounds,
+			AttackSequences = {attack_walk_ad},
+			VaultSequence = {vault_walk},
+			PassiveSounds = {walksounds},
 		},
-
-		-- Slower running, arms down (ad)
-		{Threshold = 100,
-			SpawnSequence = spawnslow,
-			MovementSequence = {
-				"nz_run_ad7",
-				"nz_run_ad8",
-				"nz_run_ad11",
-				"nz_run_ad20",
-				"nz_run_ad21",
-				"nz_run_ad24",
-			},
-			AttackSequences = attack_walk_ad,
-			VaultSequence = vault_walk,
-			PassiveSounds = walksounds,
-		},
-
-		-- Faster running, arms down (ad)
-		{Threshold = 160,
-			SpawnSequence = spawnslow,
-			MovementSequence = {
-				"nz_run_ad1",
-				"nz_run_ad2",
-				"nz_run_ad4",
-				"nz_run_ad12",
-				"nz_run_ad14",
-				"nz_run_ad23",
-			},
-			AttackSequences = attack_run_ad,
-			VaultSequence = vault_run,
-			PassiveSounds = runsounds,
-		},
-
-		-- Sprinting, arms down (ad)
-		{Threshold = 200,
-			SpawnSequence = spawnfast,
-			MovementSequence = {
-				"nz_sprint_ad1",
-				"nz_sprint_ad2",
-				"nz_sprint_ad5",
-				"nz_sprint_ad21",
-				"nz_sprint_ad22",
-				"nz_sprint_ad23",
-				"nz_sprint_ad24",
-			},
-			AttackSequences = attack_run_ad,
-			VaultSequence = vault_sprint,
-			PassiveSounds = runsounds,
-		},
-
-		-- Super Sprint, arms down (ad)
-		{Threshold = 250,
-			SpawnSequence = spawnfast,
-			MovementSequence = {
-				"nz_supersprint_ad1",
-				"nz_supersprint_ad2"
-			},
-			AttackSequences = attack_run_ad,
-			VaultSequence = vault_sprint,
-			PassiveSounds = runsounds,
-		},
-	},
-
-	-- 2: Arms Up
-	[2] = {
-		-- Also slowest speed, arms up (au)
-		{Threshold = 0,
-			SpawnSequence = spawnslow,
+		{
+			SpawnSequence = {spawnslow},
 			MovementSequence = {
 				"nz_walk_au1",
 				"nz_walk_au2",
@@ -212,14 +151,28 @@ ENT.AnimTables = {
 				"nz_walk_au21",
 				"nz_walk_au23",
 			},
-			AttackSequences = attack_walk_au,
-			VaultSequence = vault_walk,
-			PassiveSounds = walksounds,
+			AttackSequences = {attack_walk_au},
+			VaultSequence = {vault_walk},
+			PassiveSounds = {walksounds},
+		}
+	}},
+	{Threshold = 80, Sequences = {
+		{
+			SpawnSequence = {spawnslow},
+			MovementSequence = {
+				"nz_run_ad7",
+				"nz_run_ad8",
+				"nz_run_ad11",
+				"nz_run_ad20",
+				"nz_run_ad21",
+				"nz_run_ad24",
+			},
+			AttackSequences = {attack_walk_ad},
+			VaultSequence = {vault_walk},
+			PassiveSounds = {walksounds},
 		},
-
-		-- Slower running, arms up (au)
-		{Threshold = 100,
-			SpawnSequence = spawnfast,
+		{
+			SpawnSequence = {spawnfast},
 			MovementSequence = {
 				"nz_run_au4",
 				"nz_run_au5",
@@ -228,14 +181,28 @@ ENT.AnimTables = {
 				"nz_run_au23",
 				"nz_run_au24",
 			},
-			AttackSequences = attack_walk_au,
-			VaultSequence = vault_walk,
-			PassiveSounds = walksounds,
+			AttackSequences = {attack_walk_au},
+			VaultSequence = {vault_walk},
+			PassiveSounds = {walksounds},
+		}
+	}},
+	{Threshold = 150, Sequences = {
+		{
+			SpawnSequence = {spawnslow},
+			MovementSequence = {
+				"nz_run_ad1",
+				"nz_run_ad2",
+				"nz_run_ad4",
+				"nz_run_ad12",
+				"nz_run_ad14",
+				"nz_run_ad23",
+			},
+			AttackSequences = {attack_run_ad},
+			VaultSequence = {vault_run},
+			PassiveSounds = {runsounds},
 		},
-
-		-- Faster running, arms up (au)
-		{Threshold = 160,
-			SpawnSequence = spawnfast,
+		{
+			SpawnSequence = {spawnfast},
 			MovementSequence = {
 				"nz_run_au1",
 				"nz_run_au2",
@@ -244,13 +211,28 @@ ENT.AnimTables = {
 				"nz_run_au13", -- This one too
 				"nz_run_au21",
 			},
-			AttackSequences = attack_run_au,
-			VaultSequence = vault_run,
-			PassiveSounds = runsounds,
+			AttackSequences = {attack_run_au},
+			VaultSequence = {vault_run},
+			PassiveSounds = {runsounds},
+		}
+	}},
+	{Threshold = 200, Sequences = {
+		{
+			SpawnSequence = {spawnfast},
+			MovementSequence = {
+				"nz_sprint_ad1",
+				"nz_sprint_ad2",
+				"nz_sprint_ad5",
+				"nz_sprint_ad21",
+				"nz_sprint_ad22",
+				"nz_sprint_ad23",
+				"nz_sprint_ad24",
+			},
+			AttackSequences = {attack_run_ad},
+			VaultSequence = {vault_sprint},
+			PassiveSounds = {runsounds},
 		},
-
-		-- Sprinting, arms up (au)
-		{Threshold = 200,
+		{
 			SpawnSequence = spawnfast,
 			MovementSequence = {
 				"nz_sprint_au1",
@@ -260,74 +242,40 @@ ENT.AnimTables = {
 				"nz_sprint_au22",
 				"nz_sprint_au25",
 			},
-			AttackSequences = attack_run_au,
-			VaultSequence = vault_sprint,
-			PassiveSounds = runsounds,
+			AttackSequences = {attack_run_au},
+			VaultSequence = {vault_sprint},
+			PassiveSounds = {runsounds},
+		}
+	}},
+	{Threshold = 250, Sequences = {
+		{
+			SpawnSequence = spawnfast,
+			MovementSequence = {
+				"nz_supersprint_ad1",
+				"nz_supersprint_ad2"
+			},
+			AttackSequences = {attack_run_ad},
+			VaultSequence = {vault_sprint},
+			PassiveSounds = {runsounds},
 		},
-
-		-- Super Sprint, arms up (au)
-		{Threshold = 250,
+		{
 			SpawnSequence = spawnfast,
 			MovementSequence = {
 				"nz_supersprint_au1",
 				"nz_supersprint_au2"
 			},
-			AttackSequences = attack_run_au,
-			VaultSequence = vault_sprint,
-			PassiveSounds = runsounds,
-		},
-	}
+			AttackSequences = {attack_run_au},
+			VaultSequence = {vault_sprint},
+			PassiveSounds = {runsounds},
+		}
+	}}
 }
-
--- Pick a random subtable of AnimTables to poll
--- Poll all of them until we find one that we cross the threshold for
--- Apply all fields of that onto ourselves
-function ENT:SpeedChanged(speed)
-	local tbl = self.AnimTables[2]--math.random(#self.AnimTables)]
-
-	local n = #tbl
-	local t
-	for i = 1,n do
-		if tbl[i].Threshold > speed then
-			break
-		else
-			t = tbl[i]
-		end
-	end
-
-	-- Movement sequence we pick a single random of! This makes the zombie always use the same one for its lifespan (until speed change)
-	if t.MovementSequence then
-		self.MovementSequence = t.MovementSequence[math.random(#t.MovementSequence)]
-		self:ResetMovementSequence()
-	end
-
-	-- Apply all the remaining data from the AnimTable directly
-	for k,v in pairs(t) do
-		if k ~= "MovementSequence" then self[k] = v end
-	end
-end
-
--- Now we have data applied to our Zombie. We still need to modify the parts that don't use tables to that they can
-
--- Vault: Select from table
-function ENT:SelectVaultSequence(pos)
-	local seq = self.VaultSequence[math.random(#self.VaultSequence)]
-	return seq.Sequence, seq.Speed
-end
-
--- Spawn: Select from table
-function ENT:SelectSpawnSequence()
-	local s
-	if self.SpawnSounds then s = self.SpawnSounds[math.random(#self.SpawnSounds)] end
-	return self.SpawnSequence[math.random(#self.SpawnSequence)], s
-end
-
 
 --[[-------------------------------------------------------------------------
 Sounds
 We an additional sound type: When we're behind a player, we play a different sound
 ---------------------------------------------------------------------------]]
-ENT.BehindSoundDistance = 200 -- Set to 0 to disable
+ENT.BehindSoundDistance = 200 -- When the zombie is within 200 units of a player, play these sounds instead
 ENT.BehindSounds = {
 	Sound("nzu/zombie/behind/behind_00.wav"),
 	Sound("nzu/zombie/behind/behind_01.wav"),
@@ -335,17 +283,39 @@ ENT.BehindSounds = {
 	Sound("nzu/zombie/behind/behind_03.wav"),
 	Sound("nzu/zombie/behind/behind_04.wav"),
 }
-function ENT:Sound()
-	if self.BehindSoundDistance > 0 -- We have enabled behind sounds
-		and IsValid(self.Target)
-		and self.Target:IsPlayer() -- We have a target and it's a player within distance
-		and self:GetRangeTo(self.Target) <= self.BehindSoundDistance
-		and (self.Target:GetPos() - self:GetPos()):GetNormalized():Dot(self.Target:GetAimVector()) >= 0 then -- If the direction towards the player is same 180 degree as the player's aim (away from the zombie)
-			self:PlaySound(self.BehindSounds[math.random(#self.BehindSounds)], SNDLVL_140) -- Play the behind sound, and a bit louder!
-	else
-		self:PlaySound(self.PassiveSounds[math.random(#self.PassiveSounds)])
-	end
-end
+
+ENT.AttackSounds = {
+	Sound("nzu/zombie/attack/attack_00.wav"),
+	Sound("nzu/zombie/attack/attack_01.wav"),
+	Sound("nzu/zombie/attack/attack_02.wav"),
+	Sound("nzu/zombie/attack/attack_03.wav"),
+	Sound("nzu/zombie/attack/attack_04.wav"),
+	Sound("nzu/zombie/attack/attack_05.wav"),
+	Sound("nzu/zombie/attack/attack_06.wav"),
+	Sound("nzu/zombie/attack/attack_07.wav"),
+	Sound("nzu/zombie/attack/attack_08.wav"),
+	Sound("nzu/zombie/attack/attack_09.wav"),
+	Sound("nzu/zombie/attack/attack_10.wav"),
+	Sound("nzu/zombie/attack/attack_11.wav"),
+	Sound("nzu/zombie/attack/attack_12.wav"),
+	Sound("nzu/zombie/attack/attack_13.wav"),
+	Sound("nzu/zombie/attack/attack_14.wav"),
+	Sound("nzu/zombie/attack/attack_15.wav"),
+}
+
+ENT.DeathSounds = {
+	Sound("nzu/zombie/death/death_00.wav"),
+	Sound("nzu/zombie/death/death_01.wav"),
+	Sound("nzu/zombie/death/death_02.wav"),
+	Sound("nzu/zombie/death/death_03.wav"),
+	Sound("nzu/zombie/death/death_04.wav"),
+	Sound("nzu/zombie/death/death_05.wav"),
+	Sound("nzu/zombie/death/death_06.wav"),
+	Sound("nzu/zombie/death/death_07.wav"),
+	Sound("nzu/zombie/death/death_08.wav"),
+	Sound("nzu/zombie/death/death_09.wav"),
+	Sound("nzu/zombie/death/death_10.wav"),
+}
 
 --[[-------------------------------------------------------------------------
 Custom barricade tear animations
