@@ -173,7 +173,7 @@ nzu.AddSaveExtension("Spawnpoints", {
 		nzu.Spawns = {}
 		nzu.OpenSpawns = {}
 		spawnpoints = nzu.Spawns
-		openspawns = nzu.Spawns
+		openspawns = nzu.OpenSpawns
 
 		for k,v in pairs(tbl) do
 			if not spawnpoints[v.Type] then spawnpoints[v.Type] = {} end
@@ -193,12 +193,8 @@ nzu.AddSaveExtension("Spawnpoints", {
 
 -- This is a cheeky way of enabling Entity-based Room system on non-entities (but it works fine, since they just need to be indexable - aka tables)
 -- To make the hack work, we just have to ensure it doesn't error due to a lack of functions
-function SPAWNER:AddRoom(v)
-	ENTITY.AddRoom(self, v)
-end
-function SPAWNER:SetRooms(tbl)
-	ENTITY.SetRooms(self, tbl)
-end
+SPAWNER.AddRoom = ENTITY.AddRoom
+SPAWNER.SetRooms = ENTITY.SetRooms
 
 -- Now we just add our opening function
 function SPAWNER:OnRoomOpened(flag)

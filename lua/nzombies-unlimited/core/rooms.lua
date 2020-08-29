@@ -8,6 +8,8 @@ if SERVER then
 	function ENTITY:AddRoom(flag)
 		if not rooms[flag] then rooms[flag] = {} end
 		rooms[flag][self] = true
+
+		if not self.nzu_Rooms then self.nzu_Rooms = {} end
 		self.nzu_Rooms[flag] = true
 	end
 
@@ -19,6 +21,7 @@ if SERVER then
 			end
 		end
 		self.nzu_Rooms[flag] = nil
+		if table.IsEmpty(self.nzu_Rooms) then self.nzu_Rooms = nil end
 	end
 
 	function ENTITY:SetRooms(flags)

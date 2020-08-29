@@ -104,8 +104,6 @@ local function loadconfig(config)
 	local str = file.Read(config.Path.."/settings.txt", "GAME") or file.Read(config.Path.."/settings.lua", "GAME")
 	if str then
 		local tbl = util.JSONToTable(str)
-		local toload = {}
-		local core = {}
 		if tbl then
 			for k,v in pairs(tbl) do
 				-- Load extensions with specified settings (rather than defaults)

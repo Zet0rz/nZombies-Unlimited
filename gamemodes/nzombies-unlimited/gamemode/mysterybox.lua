@@ -50,7 +50,7 @@ function nzu.ReloadMysteryBoxWeaponPool()
 	reloadweaponmodels(weaponpool) -- Reload model list to the weapon pool
 end
 SETTINGS.OnMysteryBoxWeaponsChanged = nzu.ReloadMysteryBoxWeaponPool -- Reload the weapons whenever the setting is changed
-nzu.ReloadMysteryBoxWeaponPool() -- Also reload to begin with
+--nzu.ReloadMysteryBoxWeaponPool() -- Also reload to begin with
 
 -- Get the mystery box pool for a specific player. This runs a hook to allow manipulation
 function nzu.GetMysteryBoxWeaponPoolFor(ply)

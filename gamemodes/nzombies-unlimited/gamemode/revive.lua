@@ -101,7 +101,7 @@ if CLIENT then
 			ply.nzu_DownedTime = net.ReadFloat()
 			ply.nzu_BleedoutTime = net.ReadFloat()
 
-			hook.Run(already and "nzu_PlayerBleedoutChanged" or "nzu_PlayerDowned", self)
+			hook.Run(already and "nzu_PlayerBleedoutChanged" or "nzu_PlayerDowned", ply)
 		else
 			ply.nzu_DownedTime = nil
 			ply.nzu_BleedoutTime = nil

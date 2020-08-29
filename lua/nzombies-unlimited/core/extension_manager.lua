@@ -174,10 +174,10 @@ if SERVER then
 		if t then
 			local old = self[key]
 
-			if t and t.Parse then val = t:Parse(val) end
+			if t.Parse then val = t:Parse(val) end
 			self[key] = val
 
-			if t and t.Notify then t:Notify(self, key, old, val) end -- Mimics NetworkVarNotify signature
+			if t.Notify then t:Notify(self, key, old, val) end -- Mimics NetworkVarNotify signature
 			local f = self["On"..key.."Changed"]
 			if f then f(self, old, val) end
 
@@ -247,8 +247,8 @@ if SERVER then
 		local setts = {}
 		local any = false
 		for k,v in pairs(tbl) do
-			local t, val = dochangesetting(self, key, val)
-			if t then
+			local t, val = dochangesetting(self, k, v)
+			if t and (NZU_SANDBOX or t.Client) then
 				setts[k] = t[k]
 				any = true
 			end
@@ -256,7 +256,7 @@ if SERVER then
 		
 		if any then
 			net.Start("nzu_extension_load") -- This "tricks" clients into loading a table of settings into their extension by the ID
-				networkextension(ext, setts) -- it's the same logic that is used when an extension is first loaded, with its initial settings from the config
+				networkextension(self, setts) -- it's the same logic that is used when an extension is first loaded, with its initial settings from the config
 			net.Broadcast()
 		end
 	end

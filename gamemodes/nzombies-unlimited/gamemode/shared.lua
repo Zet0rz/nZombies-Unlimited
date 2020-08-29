@@ -150,6 +150,7 @@ loadfile("nzombies-unlimited/core/entities_tools/barricades.lua")
 loadfile("nzombies-unlimited/core/entities_tools/wallbuys.lua")
 loadfile("nzombies-unlimited/core/entities_tools/invisiblewalls.lua")
 loadfile("nzombies-unlimited/core/entities_tools/naveditor.lua")
+loadfile("nzombies-unlimited/core/entities_tools/nav_outofbounds.lua")
 
 --[[-------------------------------------------------------------------------
 Misc GM hooks
