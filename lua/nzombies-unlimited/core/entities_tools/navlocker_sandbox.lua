@@ -39,6 +39,10 @@ if SERVER then
 			PrintMessage(HUD_PRINTTALK, "Nav Locks cleared by "..ply:Nick())
 		--end
 	end)
+
+	function nzu.GetNavLocks()
+		return navdoors, navblocks
+	end
 end
 
 --[[-------------------------------------------------------------------------

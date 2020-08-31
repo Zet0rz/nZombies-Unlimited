@@ -69,7 +69,7 @@ loadfile("entities_tools/invisiblewalls.lua")
 loadfile("entities_tools/naveditor.lua")
 
 loadfile("entities_tools/nav_outofbounds.lua")
---loadfile("entities_tools/nav_rooms.lua")
+loadfile("entities_tools/nav_rooms.lua")
 
 --loadfile("entities_tools/thumbnail_camera.lua")
 
